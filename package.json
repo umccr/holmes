@@ -1,0 +1,20 @@
+{
+  "name": "holmes",
+  "version": "0.1.0",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "cdk": "cdk"
+  },
+  "devDependencies": {
+    "@types/node": "14.18.12",
+    "aws-cdk": "2.12.0",
+    "ts-node": "^10.5.0",
+    "typescript": "^4.5.5"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "2.12.0",
+    "constructs": "^10.0.63",
+    "source-map-support": "^0.5.21"
+  }
+}
