@@ -2,7 +2,9 @@ import {GetSecretValueCommand, SecretsManagerClient} from "@aws-sdk/client-secre
 import {env as envDict} from "process";
 import axios from "axios";
 
+// module level cache of ICA JWT
 let icaJwt: string | null = null;
+
 const secretsClient = new SecretsManagerClient({});
 
 export async function getIcaJwt(): Promise<string> {
@@ -12,6 +14,8 @@ export async function getIcaJwt(): Promise<string> {
 
         if (!jwtSecretArn)
             throw new Error('To use GDS links the lambdas must have an environment variable SECRET_ARN set to a secret holding an ICA JWT');
+
+        console.log("First use of GDS link so will fetch ICA JWT secret");
 
         const jwtResponse = await secretsClient.send(new GetSecretValueCommand({
             SecretId:  jwtSecretArn
@@ -40,13 +44,21 @@ export async function getGdsFileAsPresigned(volume: string, path: string): Promi
         }
     );
 
+    // TODO: some error checking here on responses (investigate error codes from GDS)
+
     if (preSignedResponse.data.itemCount != 1) {
+        // in the unusual case this happens we mind as well log the entire response
+        console.log(preSignedResponse.data);
         throw new Error(`Could not find file gds://${volume}/${path} in GDS using the given ICA JWT permissions`);
     }
 
-    console.log(preSignedResponse.data);
+    const res = preSignedResponse?.data?.items[0]?.presignedUrl;
 
-    // TODO: some error checking here on responses (investigate error codes from GDS)
+    if (!res) {
+        // in the unusual case this happens we mind as well log the entire response
+        console.log(preSignedResponse.data);
+        throw new Error(`Could not construct pre-signed S3 URL for gds://${volume}/${path}`);
+    }
 
-    return preSignedResponse.data.items[0].presignedUrl;
+    return res;
 }

@@ -16,7 +16,7 @@ const chunk = (arr: any[], size: number) =>
 export const lambdaHandler = async (ev: EventInput, context: any) => {
   // do a (portal) search for all the files in the GDS that are somalier files
   const d = await axios
-    .get(`${ev.portalUrl}/gds?rowsPerPage=1000&search=.bam`, {
+    .get(`${ev.portalUrl}/gds?rowsPerPage=1000&search=.somalier$`, {
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${ev.portalBearer}`,
