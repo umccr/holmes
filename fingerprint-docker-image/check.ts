@@ -12,6 +12,7 @@ import {
   SecretsManagerClient,
 } from "@aws-sdk/client-secrets-manager";
 import axios from "axios";
+import {getGdsFileAsPresigned, getIcaJwt} from "./gds";
 
 // get this functionality as promise compatible funcs
 const exec = promisify(execCallback);
@@ -31,7 +32,6 @@ type EventInput = {
   fingerprints: string[];
 };
 
-let icaJwt: string|null = null;
 
 const streamToBuffer = (stream: any): Promise<Buffer> =>
   new Promise((resolve, reject) => {
@@ -42,7 +42,6 @@ const streamToBuffer = (stream: any): Promise<Buffer> =>
   });
 
 const s3Client = new S3Client({});
-const secretsClient = new SecretsManagerClient({});
 
 /**
  * Fetches a fingerprint (somalier) object from an object store and saves it to local
@@ -71,27 +70,11 @@ const getFingerprintObject = async (url: URL, count: number) => {
     fileBuffer = await streamToBuffer(data.Body);
   } else if (url.protocol === "gds:") {
 
-    // on first use of a GDS link we need to get an ICA API JWT from secrets manager
-    if (icaJwt == null) {
-      const command = new GetSecretValueCommand({
-        SecretId: envdict["SECRET_ARN"],
-      });
-      const jwtResponse = await secretsClient.send(command);
-      icaJwt = jwtResponse.SecretString;
-    }
+    console.log(`Trying GDS download for ${url.hostname} ${url.pathname}`);
 
-    console.log(`Trying GDS download for ${url.hostname} ${url.pathname} where JWT start is ${icaJwt?.substr(0, 16)})}..`);
+    const presignedUrl = await getGdsFileAsPresigned(url.hostname, url.pathname);
 
-    const preSignedResponse = await axios.get(
-      `https://aps2.platform.illumina.com/v1/files?include=PresignedUrl&volume.name=${url.hostname}&path=${url.pathname}`,
-      {
-        headers: {
-          Authorization: `Bearer ${icaJwt}`,
-        },
-      }
-    );
-
-    const fileResponse = await axios.get(preSignedResponse.data.items[0].presignedUrl, {
+    const fileResponse = await axios.get(presignedUrl, {
       responseType: "arraybuffer",
     });
 

@@ -18,13 +18,20 @@ FROM public.ecr.aws/lambda/nodejs:14
 
 COPY --from=somalier-builder /usr/bin/somalier ./
 
+COPY sites.hg38.vcf.gz ./
+
 COPY package*.json ./
 RUN npm install
 
-COPY check.ts ./
+# esbuild is lightning quick so it doesn't really matter that we do a full rebuild of
+# these all every time any one of them changes
+COPY check.ts gather.ts ./
 RUN npx esbuild check.ts --bundle --outfile=check.cjs --platform=node --target=node14
-
-COPY gather.ts ./
 RUN npx esbuild gather.ts --bundle --outfile=gather.cjs --platform=node --target=node14
 
-CMD [ "" ]
+# Disabled - this was just a proof of concept - but is not feasible in the 15 mins lambda limit
+# COPY extract.ts ./
+# RUN npx esbuild extract.ts --bundle --outfile=extract.cjs --platform=node --target=node14
+
+# the CMD must be set as part of the lambda definition or docker invoke.. we have no default
+CMD [ "fail" ]

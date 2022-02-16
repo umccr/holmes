@@ -6,6 +6,7 @@ import { lambdaHandler } from "../gather";
         portalBearer: process.env.PORTAL_TOKEN || "goingtofail",
         portalUrl: "https://api.data.dev.umccr.org",
         index: "gds://development/analysis_data/SBJ00910/wgs_alignment_qc/202201212c374ca2/L2100746__1_dragen_somalier/MDX210176.somalier",
+        relatednessThreshold: 0.5,
         chunkSize: 5
     },
     {}

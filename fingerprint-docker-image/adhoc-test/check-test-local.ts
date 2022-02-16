@@ -6,6 +6,7 @@ import { lambdaHandler } from "../check";
   const r = await lambdaHandler(
     {
       index: "s3://umccr-10g-data-dev/HG00096/HG00096.somalier",
+      relatednessThreshold: 0.5,
       fingerprints: [
         "s3://umccr-10g-data-dev/HG00097/HG00097.somalier",
         "s3://umccr-10g-data-dev/HG00099/HG00099.somalier",
