@@ -71,7 +71,7 @@ export class HolmesPipelineStack extends Stack {
         region: "ap-southeast-2",
       },
       namespaceName: "umccr",
-      namespaceId: "",
+      namespaceId: "ns-z7kktgazzvwokcvz",
       icaSecretNamePartial: "IcaSecretsPortal",
     });
 
@@ -83,9 +83,9 @@ export class HolmesPipelineStack extends Stack {
           },
           commands: [
             "echo $STEPS_ARN",
-//            "cd test/onto-cli",
-//            "npm ci",
-//            `npm run test -- "$FHIR_BASE_URL"`,
+            //            "cd test/onto-cli",
+            //            "npm ci",
+            //            `npm run test -- "$FHIR_BASE_URL"`,
           ],
         }),
       ],
