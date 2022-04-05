@@ -48,6 +48,9 @@ export class HolmesApplicationStack extends Stack {
   ) {
     super(scope, id, props);
 
+    this.templateOptions.description =
+      "Holmes is a service for querying the somalier files in GDS/S3 looking for matching genomic data compared to an index file";
+
     // we need access to a ICA JWT in order to be able to download from GDS
     const icaSecret = Secret.fromSecretNameV2(
       this,
@@ -138,8 +141,7 @@ export class HolmesApplicationStack extends Stack {
     });
 
     /* I don't understand CloudMap - there seems no way for me to import in a namespace that
-        already exists.. other than providing *all* the details.. and a blank arn?? */
-    // this seems to actually work though
+        already exists... other than providing *all* the details... and a blank arn?? */
     const namespace = HttpNamespace.fromHttpNamespaceAttributes(
       this,
       "Namespace",
