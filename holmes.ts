@@ -1,22 +1,20 @@
-#!/usr/bin/env node
-import 'source-map-support/register';
-import * as cdk from 'aws-cdk-lib';
-import { HolmesStack } from './holmes-stack';
+import "source-map-support/register";
+import * as cdk from "aws-cdk-lib";
+import { HolmesPipelineStack } from "./holmes-pipeline-stack";
+import {TAG_STACK_VALUE} from "./holmes-settings";
+
+const AWS_BUILD_ACCOUNT = "383856791668";
+const AWS_BUILD_REGION = "ap-southeast-2";
 
 const app = new cdk.App();
 
-new HolmesStack(app, 'HolmesStack', {
-  /* If you don't specify 'env', this stack will be environment-agnostic.
-   * Account/Region-dependent features and context lookups will not work,
-   * but a single synthesized template can be deployed anywhere. */
-
-  /* Uncomment the next line to specialize this stack for the AWS Account
-   * and Region that are implied by the current CLI configuration. */
-  env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: process.env.CDK_DEFAULT_REGION },
-
-  /* Uncomment the next line if you know exactly what Account and Region you
-   * want to deploy the stack to. */
-  // env: { account: '123456789012', region: 'us-east-1' },
-
-  /* For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html */
+new HolmesPipelineStack(app, "HolmesPipelineStack", {
+  // the pipeline can only be deployed to 'build' and this should only happen once
+  env: {
+    account: AWS_BUILD_ACCOUNT,
+    region: AWS_BUILD_REGION,
+  },
+  tags: {
+    Stack: TAG_STACK_VALUE,
+  },
 });

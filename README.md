@@ -35,6 +35,9 @@ The lambdas are distributed concurrently using Steps Map - which means that no
 one lambda is required to spend too much time downloading files, nor can the files
 overflow its /tmp directory.
 
+THe lambda *could* be taught to source somalier files from any
+source - currently supported are S3 and GDS.
+
 ## Step
 
 The step function can be executed with the equivalent of

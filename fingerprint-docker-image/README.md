@@ -24,3 +24,12 @@ IT IS STILL NOT IDENTICAL TO THE REAL LAMBDA ENVIRONMENT THOUGH - as it does not
 disk size or disk r/w limits like a real lambda does. This testing does require the environment have AWS_SECRET_X etc variables
 set up for a user in UMCCR dev account.
 
+
+## Extract Testing (disabled)
+
+For local testing/building of the extract function (disabled due to not working
+in lambda time frames) you need to make a `sites.vcf.gz` file in the
+Docker folder (see somalier website for this file).
+
+In a real deployed version of the application this file is
+fetched from the master location as part of the CodeBuild process.

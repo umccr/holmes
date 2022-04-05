@@ -19,7 +19,7 @@ const execFile = promisify(execFileCallback);
 // HAPPEN IF YOU ARE LETTING PEOPLE INVOKE THIS AND LETTING THEM SET THE ENV VARIABLES
 const somalierBinary = envDict["SOMALIER"] || "/var/task/somalier";
 const somalierWork = envDict["SOMALIERTMP"] || "/tmp";
-const somalierSites = envDict["SOMALIERSITES"] || "/var/task/sites.hg38.vcf.gz";
+const somalierSites = envDict["SOMALIERSITES"] || "/var/task/sites.vcf.gz";
 const somalierFasta =
   envDict["SOMALIERFASTA"] || "/var/task/Homo_sapiens_assembly38.fasta";
 

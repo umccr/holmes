@@ -18,8 +18,6 @@ FROM public.ecr.aws/lambda/nodejs:14
 
 COPY --from=somalier-builder /usr/bin/somalier ./
 
-COPY sites.hg38.vcf.gz ./
-
 COPY package*.json ./
 RUN npm install
 
@@ -30,6 +28,10 @@ RUN npx esbuild check.ts --bundle --outfile=check.cjs --platform=node --target=n
 RUN npx esbuild gather.ts --bundle --outfile=gather.cjs --platform=node --target=node14
 
 # Disabled - this was just a proof of concept - but is not feasible in the 15 mins lambda limit
+# inside the docker build we expect this to have a generic name - but this is likely to have been sourced
+# from something like sites.hg38.rna.vcf.gz as part of the CI build
+# for local build/test just put any suitable file from brentp/somalier release
+# COPY sites.vcf.gz ./
 # COPY extract.ts ./
 # RUN npx esbuild extract.ts --bundle --outfile=extract.cjs --platform=node --target=node14
 
