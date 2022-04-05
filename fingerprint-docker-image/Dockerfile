@@ -1,4 +1,4 @@
-FROM brentp/musl-hts-nim:v0.3.4 as somalier-builder
+FROM brentp/musl-hts-nim:v0.3.17 as somalier-builder
 
 # Use the standard somalier docker build (keep checking this is kept up to date with the master on github)
 # to build a static binary that executes in lambdas
@@ -23,7 +23,7 @@ RUN npm install
 
 # esbuild is lightning quick so it doesn't really matter that we do a full rebuild of
 # these all every time any one of them changes
-COPY check.ts gather.ts ./
+COPY *.ts ./
 RUN npx esbuild check.ts --bundle --outfile=check.cjs --platform=node --target=node14
 RUN npx esbuild gather.ts --bundle --outfile=gather.cjs --platform=node --target=node14
 
