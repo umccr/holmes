@@ -1,8 +1,18 @@
 import { pipelines, Stack, StackProps } from "aws-cdk-lib";
 import { Construct } from "constructs";
-import { HolmesApplicationStage } from "./holmes-application-stack";
 import { StringParameter } from "aws-cdk-lib/aws-ssm";
 import { PolicyStatement } from "aws-cdk-lib/aws-iam";
+import { STACK_DESCRIPTION } from "./holmes-settings";
+import {
+  AWS_DEV_ACCOUNT,
+  AWS_DEV_REGION,
+  AWS_PROD_ACCOUNT,
+  AWS_PROD_REGION,
+  NAMESPACE_DEV_ID,
+  NAMESPACE_NAME,
+  NAMESPACE_PROD_ID,
+} from "./umccr-constants";
+import { HolmesBuildStage } from "./holmes-build-stage";
 
 /**
  * Stack to hold the self mutating pipeline, and all the relevant settings for deployments
@@ -10,6 +20,8 @@ import { PolicyStatement } from "aws-cdk-lib/aws-iam";
 export class HolmesPipelineStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
+
+    this.templateOptions.description = STACK_DESCRIPTION;
 
     // these are *build* parameters that we either want to re-use across lots of stacks, or are
     // 'sensitive' enough we don't want them checked into Git - but not sensitive enough to record as a Secret
@@ -32,11 +44,7 @@ export class HolmesPipelineStack extends Stack {
         }),
         env: {},
         commands: [
-          // need to think how to get pre-commit to run in CI given .git is not present
-          // "pip install pre-commit",
-          // "git init . && pre-commit run --all-files",
           "npm ci",
-          // "aws s3 cp s3://umccr-refdata-prod/somalier/sites.hg38.rna.vcf.gz fingerprint-docker-image/",
           // our cdk is configured to use ts-node - so we don't need any build step - just synth
           "npx cdk synth",
         ],
@@ -55,34 +63,35 @@ export class HolmesPipelineStack extends Stack {
       crossAccountKeys: true,
     });
 
-    const devStage = new HolmesApplicationStage(this, "Dev", {
+    const devStage = new HolmesBuildStage(this, "Dev", {
       env: {
-        account: "843407916570",
-        region: "ap-southeast-2",
+        account: AWS_DEV_ACCOUNT,
+        region: AWS_DEV_REGION,
       },
-      namespaceName: "umccr",
-      namespaceId: "ns-mjt63c4ppdrly4jd",
-      icaSecretNamePartial: "IcaSecretsPortal",
+      namespaceName: NAMESPACE_NAME,
+      namespaceId: NAMESPACE_DEV_ID,
+      icaSecretNamePartial: "IcaSecretsPortal", // pragma: allowlist secret
     });
 
-    const prodStage = new HolmesApplicationStage(this, "Prod", {
+    const prodStage = new HolmesBuildStage(this, "Prod", {
       env: {
-        account: "472057503814",
-        region: "ap-southeast-2",
+        account: AWS_PROD_ACCOUNT,
+        region: AWS_PROD_REGION,
       },
-      namespaceName: "umccr",
-      namespaceId: "ns-z7kktgazzvwokcvz",
-      icaSecretNamePartial: "IcaSecretsPortal",
+      namespaceName: NAMESPACE_NAME,
+      namespaceId: NAMESPACE_PROD_ID,
+      icaSecretNamePartial: "IcaSecretsPortal", // pragma: allowlist secret
     });
 
     pipeline.addStage(devStage, {
       post: [
         new pipelines.ShellStep("Validate Endpoint", {
           envFromCfnOutputs: {
-            STEPS_ARN: devStage.stepsArnOutput,
+            CHECK_STEPS_ARN: devStage.checkStepsArnOutput,
+            EXTRACT_STEPS_ARN: devStage.extractStepsArnOutput,
           },
           commands: [
-            "echo $STEPS_ARN",
+            "echo $CHECK_STEPS_ARN",
             //            "cd test/onto-cli",
             //            "npm ci",
             //            `npm run test -- "$FHIR_BASE_URL"`,

@@ -1,18 +1,18 @@
 import { promisify } from "util";
 import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import {createReadStream, createWriteStream } from "fs";
+import { createReadStream, createWriteStream } from "fs";
 import { unlink, readdir, readFile } from "fs/promises";
 import { chdir, env as envdict } from "process";
 import { exec as execCallback } from "child_process";
 import { pipeline as pipelineCallback, Readable } from "stream";
-import {parse} from "csv-parse";
+import { parse } from "csv-parse";
 import { URL } from "url";
 import {
   GetSecretValueCommand,
   SecretsManagerClient,
 } from "@aws-sdk/client-secrets-manager";
 import axios from "axios";
-import {getGdsFileAsPresigned, getIcaJwt} from "./gds";
+import { getGdsFileAsPresigned, getIcaJwt } from "./gds";
 
 // get this functionality as promise compatible funcs
 const exec = promisify(execCallback);
@@ -31,7 +31,6 @@ type EventInput = {
 
   fingerprints: string[];
 };
-
 
 const streamToBuffer = (stream: any): Promise<Buffer> =>
   new Promise((resolve, reject) => {
@@ -69,29 +68,36 @@ const getFingerprintObject = async (url: URL, count: number) => {
 
     fileBuffer = await streamToBuffer(data.Body);
   } else if (url.protocol === "gds:") {
-
     console.log(`Trying GDS download for ${url.hostname} ${url.pathname}`);
 
-    const presignedUrl = await getGdsFileAsPresigned(url.hostname, url.pathname);
+    const presignedUrl = await getGdsFileAsPresigned(
+      url.hostname,
+      url.pathname
+    );
 
     const fileResponse = await axios.get(presignedUrl, {
       responseType: "arraybuffer",
     });
 
     fileBuffer = Buffer.from(fileResponse.data);
-
   } else {
     throw new Error(`Unknown file download technique for ${url}`);
   }
 
   // check the file version matches what we expect
   const ver = fileBuffer.readInt8(0);
-  if (ver !== 2) throw new Error("The fingerprint check lambda can only work with Somalier V2 fingerprint files");
+  if (ver !== 2)
+    throw new Error(
+      "The fingerprint check lambda can only work with Somalier V2 fingerprint files"
+    );
 
   // find out how much sample id space we have for our replacement sample ids
   const sampleIdLength = fileBuffer.readInt8(1);
 
-  if (sampleIdLength < 2) throw new Error("Due to the way we replace sample ids in Somalier we require all sample ids to be at least 2 characters for fingerprinting");
+  if (sampleIdLength < 2)
+    throw new Error(
+      "Due to the way we replace sample ids in Somalier we require all sample ids to be at least 2 characters for fingerprinting"
+    );
 
   const newSampleId = count.toString().padStart(sampleIdLength, "0");
   fileBuffer.fill(newSampleId, 2, 2 + sampleIdLength);
@@ -125,25 +131,29 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
   }
 
   // do a somalier relate run on everything we have downloaded
-  const { stdout, stderr } = await exec(
-    `${somalierBinary} relate *.somalier`
-  );
+  const { stdout, stderr } = await exec(`${somalierBinary} relate *.somalier`);
 
-  if(stdout) {
-    stdout.split('\n').forEach((l) => console.log(`stdout ${l}`));
+  if (stdout) {
+    stdout.split("\n").forEach((l) => console.log(`stdout ${l}`));
   }
-  if(stderr) {
-    stderr.split('\n').forEach((l) => console.log(`stderr ${l}`));
+  if (stderr) {
+    stderr.split("\n").forEach((l) => console.log(`stderr ${l}`));
   }
 
   const samples = await readFile("somalier.samples.tsv");
   const pairs = await readFile("somalier.pairs.tsv");
 
   if (samples) {
-    samples.toString().split('\n').forEach((l) => console.log(`samples ${l}`));
+    samples
+      .toString()
+      .split("\n")
+      .forEach((l) => console.log(`samples ${l}`));
   }
   if (pairs) {
-    pairs.toString().split('\n').forEach((l) => console.log(`pairs ${l}`));
+    pairs
+      .toString()
+      .split("\n")
+      .forEach((l) => console.log(`pairs ${l}`));
   }
 
   const processFile = async () => {
@@ -156,17 +166,16 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
 
     for await (const record of parser) {
       if (record[0] === indexSampleId || record[1] === indexSampleId) {
-
         // the pairs are not necessarily always with our index case on the left (i.e. A)
         // so we will need to normalise the results
         if (record[1] === indexSampleId) {
           console.log(`Did A/B swap for sample ${indexSampleId}`);
           // swap sample id
-          [record[0] , record[1] ] = [record[1], record[0]];
+          [record[0], record[1]] = [record[1], record[0]];
           // hets a<->b
-          [record[6] , record[7] ] = [record[7], record[6]];
+          [record[6], record[7]] = [record[7], record[6]];
           // hom_alts a<->b
-          [record[10] ,record[11] ] = [record[11], record[10]];
+          [record[10], record[11]] = [record[11], record[10]];
         }
 
         // this score is not directional so does not need to be swapped as A<->B swap
@@ -183,16 +192,16 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
             hom_concordance: parseFloat(record[5]),
             hets_a: parseInt(record[6]),
             hets_b: parseInt(record[7]),
-            hets_ab:parseInt(record[8]),
-            shared_hets:parseInt(record[9]),
+            hets_ab: parseInt(record[8]),
+            shared_hets: parseInt(record[9]),
             hom_alts_a: parseInt(record[10]),
             hom_alts_b: parseInt(record[11]),
-            shared_hom_alts:parseInt(record[12]),
-            n:parseInt(record[13]),
+            shared_hom_alts: parseInt(record[12]),
+            n: parseInt(record[13]),
             // confirm these are not directional too
-            x_ibs0:parseInt(record[14]),
+            x_ibs0: parseInt(record[14]),
             x_ibs2: parseInt(record[15]),
-          }
+          };
 
           matches.push(result);
         }
@@ -203,9 +212,9 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
 
   const matches = await processFile();
 
-  const allTmpFiles = await readdir(".", { withFileTypes: true});
+  const allTmpFiles = await readdir(".", { withFileTypes: true });
 
-  let regex = /[.]somalier$/
+  let regex = /[.]somalier$/;
   allTmpFiles.forEach((d) => {
     if (regex.test(d.name)) {
       console.log(`Removing ${d.name} from working directory`);

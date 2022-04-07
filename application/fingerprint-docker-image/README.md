@@ -15,7 +15,6 @@ is executing the Typescript lambda code directly as if it is not in a lambda at 
 as a Nodejs app). This testing does require the environment have AWS_SECRET_X etc variables
 set up for a user in UMCCR dev account.
 
-
 ## Local Docker
 
 The `docker-test` folder has some scripts for doing local testing but in an environment
@@ -23,7 +22,6 @@ that _simulates_ AWS lambdas. This is good for testing packaging, lambda path is
 IT IS STILL NOT IDENTICAL TO THE REAL LAMBDA ENVIRONMENT THOUGH - as it does not enforce
 disk size or disk r/w limits like a real lambda does. This testing does require the environment have AWS_SECRET_X etc variables
 set up for a user in UMCCR dev account.
-
 
 ## Extract Testing (disabled)
 

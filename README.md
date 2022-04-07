@@ -35,7 +35,7 @@ The lambdas are distributed concurrently using Steps Map - which means that no
 one lambda is required to spend too much time downloading files, nor can the files
 overflow its /tmp directory.
 
-THe lambda *could* be taught to source somalier files from any
+THe lambda _could_ be taught to source somalier files from any
 source - currently supported are S3 and GDS.
 
 ## Step
@@ -46,7 +46,7 @@ The step function can be executed with the equivalent of
 aws stepfunctions start-execution \
  --state-machine-arn arn:aws:states:ap-southeast-2:843407916570:stateMachine:StateMachine2E01A3A5-mOp8QLUdyXFQ \
  --cli-input-yaml file://adhoc-test-invoke-input.yaml
- ```
+```
 
 where the test input is
 
@@ -68,8 +68,22 @@ The step function constructed is registered into the `umccr` namespace.
 
 ## Useful commands
 
- * `cdk deploy`      deploy this stack to your default AWS account/region
- * `cdk diff`        compare deployed stack with current state
- * `cdk synth`       emits the synthesized CloudFormation template
+- `cdk deploy` deploy this stack to your default AWS account/region
+- `cdk diff` compare deployed stack with current state
+- `cdk synth` emits the synthesized CloudFormation template
 
 See `fingerprint-docker-image` for dev/test scripts.
+
+```
+{
+  "fasta": "s3://umccr-refdata-prod/genomes/hg38/hg38.fa",
+  "sites": "s3://umccr-refdata-prod/somalier/sites.hg38.rna.vcf.gz",
+  "fileGroups": [
+    [
+      "gds://production/analysis_data/SBJ00005/wgs_alignment_qc/20211201bd0ac3a3/L2101368__4_dragen/PTC_Tsqn211109.bam",
+      "b",
+      "c"
+    ]
+  ]
+}
+```
