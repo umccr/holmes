@@ -9,7 +9,9 @@ export const TAG_STACK_VALUE = "Holmes";
 export const STACK_DESCRIPTION =
   "Holmes is a service for querying the somalier files in GDS/S3 looking for matching genomic data compared to an index file";
 
-export interface HolmesSettings {
+export type HolmesSettings = HolmesStackSettings & HolmesReferenceDataSettings;
+
+export interface HolmesStackSettings {
   /**
    * The CloudMap namespace to register the Steps function into
    */
@@ -25,4 +27,30 @@ export interface HolmesSettings {
    * ICA secret name
    */
   readonly icaSecretNamePartial: string;
+
+  /**
+   * Fingerprint bucket name of the bucket we will create in this stack
+   * (must NOT exist)
+   */
+  readonly fingerprintBucketNameToCreate: string;
+}
+
+export interface HolmesReferenceDataSettings {
+  /**
+   * Reference FASTA bucket name
+   */
+  readonly referenceFastaBucketName: string;
+  /**
+   * Reference FASTA key
+   */
+  readonly referenceFastaBucketKey: string;
+
+  /**
+   * Sites VCF bucket name
+   */
+  readonly sitesBucketName: string;
+  /**
+   * Sites VCF key
+   */
+  readonly sitesBucketKey: string;
 }

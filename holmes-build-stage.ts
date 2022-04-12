@@ -20,6 +20,7 @@ export class HolmesBuildStage extends Stage {
 
     Tags.of(stack).add("Stack", TAG_STACK_VALUE);
 
+    this.checkStepsArnOutput = stack.checkStepsArnOutput;
     this.extractStepsArnOutput = stack.extractStepsArnOutput;
   }
 }

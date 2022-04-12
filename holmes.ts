@@ -7,6 +7,10 @@ import {
   AWS_BUILD_REGION,
   AWS_DEV_ACCOUNT,
   AWS_DEV_REGION,
+  FASTA_BUCKET,
+  FASTA_KEY,
+  SITES_BUCKET,
+  SITES_KEY,
 } from "./umccr-constants";
 import { HolmesApplicationStack } from "./application/holmes-application-stack";
 
@@ -41,4 +45,9 @@ new HolmesApplicationStack(app, "HolmesSandboxStack", {
     account: AWS_DEV_ACCOUNT,
     region: AWS_DEV_REGION,
   },
+  fingerprintBucketNameToCreate: "sandbox-fingerprint-please-remove",
+  referenceFastaBucketName: FASTA_BUCKET,
+  referenceFastaBucketKey: FASTA_KEY,
+  sitesBucketName: SITES_BUCKET,
+  sitesBucketKey: SITES_KEY,
 });

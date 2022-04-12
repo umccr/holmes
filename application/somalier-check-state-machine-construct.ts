@@ -32,22 +32,29 @@ import {
 import { ISecret, Secret } from "aws-cdk-lib/aws-secretsmanager";
 import { HttpNamespace, Service } from "aws-cdk-lib/aws-servicediscovery";
 import {
+  HolmesReferenceDataSettings,
   HolmesSettings,
   STACK_DESCRIPTION,
   TAG_STACK_VALUE,
 } from "../holmes-settings";
 import { SomalierExtractStateMachineConstruct } from "./somalier-extract-state-machine-construct";
+import { IBucket } from "aws-cdk-lib/aws-s3";
 
 type Props = {
   dockerImageAsset: DockerImageAsset;
   icaSecret: ISecret;
+  fingerprintBucket: IBucket;
 };
 
 export class SomalierCheckStateMachineConstruct extends Construct {
   private readonly lambdaRole: IRole;
   private readonly stateMachine: StateMachine;
 
-  constructor(scope: Construct, id: string, props: Props) {
+  constructor(
+    scope: Construct,
+    id: string,
+    props: Props & HolmesReferenceDataSettings
+  ) {
     super(scope, id);
 
     // create a single role that is used by all our step functions (could tighten this if needed)
@@ -66,32 +73,68 @@ export class SomalierCheckStateMachineConstruct extends Construct {
       );
     });
 
+    const lambdaEnv = {
+      SECRET_ARN: props.icaSecret.secretArn,
+      FINGERPRINT_BUCKET_NAME: props.fingerprintBucket.bucketName,
+      FASTA_BUCKET_NAME: props.referenceFastaBucketName,
+      FASTA_BUCKET_KEY: props.referenceFastaBucketKey,
+      SITES_BUCKET_NAME: props.sitesBucketName,
+      SITES_BUCKET_KEY: props.sitesBucketKey,
+    };
+
     // The gather function is used to collate the full list of fingerprints in the system - we could extend
     // it to use a db or look at S3 etc. This is also performs the chunking for the Map stage
     // NOTE: the 'cmd' is how we differ from the other Funcs
-    const gatherFunc = new DockerImageFunction(
+    const checkStartFunc = new DockerImageFunction(
       this,
-      "FingerprintGatherFunction",
+      "FingerprintCheckStartFunction",
       {
         memorySize: 2048,
         timeout: Duration.seconds(180),
         role: this.lambdaRole,
         code: DockerImageCode.fromEcr(props.dockerImageAsset.repository, {
           tag: props.dockerImageAsset.assetHash,
-          cmd: ["gather.lambdaHandler"],
+          cmd: ["check-start.lambdaHandler"],
         }),
+        environment: lambdaEnv,
       }
     );
-    const gatherInvoke = new LambdaInvoke(this, "FingerprintGatherTask", {
-      lambdaFunction: gatherFunc,
+    const checkStartInvoke = new LambdaInvoke(
+      this,
+      "FingerprintCheckStartTask",
+      {
+        lambdaFunction: checkStartFunc,
+        outputPath: "$.Payload",
+      }
+    );
+
+    // The gather function is used to collate the full list of fingerprints in the system - we could extend
+    // it to use a db or look at S3 etc. This is also performs the chunking for the Map stage
+    // NOTE: the 'cmd' is how we differ from the other Funcs
+    const checkEndFunc = new DockerImageFunction(
+      this,
+      "FingerprintCheckEndFunction",
+      {
+        memorySize: 2048,
+        timeout: Duration.seconds(180),
+        role: this.lambdaRole,
+        code: DockerImageCode.fromEcr(props.dockerImageAsset.repository, {
+          tag: props.dockerImageAsset.assetHash,
+          cmd: ["check-end.lambdaHandler"],
+        }),
+        environment: lambdaEnv,
+      }
+    );
+    const checkEndInvoke = new LambdaInvoke(this, "FingerprintCheckEndTask", {
+      lambdaFunction: checkEndFunc,
       outputPath: "$.Payload",
     });
 
     // the output of this func is
     /*
-       { index: FROM INPUT STEP,
+       { index: FROM INPUT STEP AS FINGERPRINT KEY,
          relatednessThreshold: FROM INPUT STEP,
-         fingerprintTasks: [ [ "gds://vol/file1", "gds://vol/file2" ], [ "gds://vol/file3", "gds://vol/file4" ] ]
+         fingerprintTasks: [ [ "gds://vol/file1" AS FINGERPRINT KEY, "gds://vol/file2" AS FINGERPRINT KEY ], [ "gds://vol/file3", "gds://vol/file4" ] ]
        }
      */
 
@@ -108,9 +151,7 @@ export class SomalierCheckStateMachineConstruct extends Construct {
           tag: props.dockerImageAsset.assetHash,
           cmd: ["check.lambdaHandler"],
         }),
-        environment: {
-          SECRET_ARN: props.icaSecret.secretArn,
-        },
+        environment: lambdaEnv,
       }
     );
     const checkInvoke = new LambdaInvoke(this, "FingerprintCheckTask", {
@@ -121,16 +162,22 @@ export class SomalierCheckStateMachineConstruct extends Construct {
     // The Map invoke step is the parallel invocation according to the dynamic array input
     const mapInvoke = new Map(this, "FingerprintMapTask", {
       inputPath: "$",
-      itemsPath: "$.fingerprintTasks",
+      itemsPath: "$.fingerprintKeys",
       parameters: {
         "index.$": "$.index",
+        "sitesChecksum.$": "$.sitesChecksum",
         "relatednessThreshold.$": "$.relatednessThreshold",
         "fingerprints.$": "$$.Map.Item.Value",
       },
+      // https://blog.revolve.team/2022/01/20/step-functions-array-flattening/
+      resultSelector: {
+        "flatten.$": "$[*][*]",
+      },
+      outputPath: "$.flatten",
     }).iterator(checkInvoke);
 
     this.stateMachine = new StateMachine(this, "StateMachine", {
-      definition: gatherInvoke
+      definition: checkStartInvoke
         .next(mapInvoke)
         .next(new Succeed(this, "Collate")),
     });

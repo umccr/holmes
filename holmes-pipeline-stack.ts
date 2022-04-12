@@ -8,9 +8,13 @@ import {
   AWS_DEV_REGION,
   AWS_PROD_ACCOUNT,
   AWS_PROD_REGION,
+  FASTA_BUCKET,
+  FASTA_KEY,
   NAMESPACE_DEV_ID,
   NAMESPACE_NAME,
   NAMESPACE_PROD_ID,
+  SITES_BUCKET,
+  SITES_KEY,
 } from "./umccr-constants";
 import { HolmesBuildStage } from "./holmes-build-stage";
 
@@ -71,6 +75,11 @@ export class HolmesPipelineStack extends Stack {
       namespaceName: NAMESPACE_NAME,
       namespaceId: NAMESPACE_DEV_ID,
       icaSecretNamePartial: "IcaSecretsPortal", // pragma: allowlist secret
+      fingerprintBucketNameToCreate: "umccr-fingerprint-dev",
+      referenceFastaBucketName: FASTA_BUCKET,
+      referenceFastaBucketKey: FASTA_KEY,
+      sitesBucketName: SITES_BUCKET,
+      sitesBucketKey: SITES_KEY,
     });
 
     const prodStage = new HolmesBuildStage(this, "Prod", {
@@ -81,6 +90,11 @@ export class HolmesPipelineStack extends Stack {
       namespaceName: NAMESPACE_NAME,
       namespaceId: NAMESPACE_PROD_ID,
       icaSecretNamePartial: "IcaSecretsPortal", // pragma: allowlist secret
+      fingerprintBucketNameToCreate: "umccr-fingerprint-prod",
+      referenceFastaBucketName: FASTA_BUCKET,
+      referenceFastaBucketKey: FASTA_KEY,
+      sitesBucketName: SITES_BUCKET,
+      sitesBucketKey: SITES_KEY,
     });
 
     pipeline.addStage(devStage, {

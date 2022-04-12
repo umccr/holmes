@@ -18,44 +18,23 @@ FROM --platform=linux/amd64 public.ecr.aws/lambda/nodejs:14 AS lambda
 
 COPY --from=somalier-builder /usr/bin/somalier ./
 
+# the somalier build environment bakes this path into its libcurl - so symlink to our real certs
+RUN ln -s /etc/ssl/certs/ca-bundle.crt /etc/ssl/certs/ca-certificates.crt
+
 COPY package*.json ./
 RUN npm install
 
 # esbuild is lightning quick so it doesn't really matter that we do a full rebuild of
 # these all every time any one of them changes
 COPY *.ts ./
-RUN npx esbuild check.ts --bundle --outfile=check.cjs --platform=node --target=node14
-RUN npx esbuild gather.ts --bundle --outfile=gather.cjs --platform=node --target=node14
-RUN npx esbuild extract.ts --bundle --outfile=extract.cjs --platform=node --target=node14
 
-# Disabled - this was just a proof of concept - but is not feasible in the 15 mins lambda limit
-# inside the docker build we expect this to have a generic name - but this is likely to have been sourced
-# from something like sites.hg38.rna.vcf.gz as part of the CI build
-# for local build/test just put any suitable file from brentp/somalier release
-# COPY sites.vcf.gz ./
-# COPY extract.ts ./
+RUN npx esbuild lambda-entry-check.ts --bundle --outfile=check.cjs --platform=node --target=node14
+RUN npx esbuild lambda-entry-check-start.ts --bundle --outfile=check-start.cjs --platform=node --target=node14
+RUN npx esbuild lambda-entry-check-end.ts --bundle --outfile=check-end.cjs --platform=node --target=node14
+
+RUN npx esbuild lambda-entry-difference.ts --bundle --outfile=difference.cjs --platform=node --target=node14
+
+RUN npx esbuild fargate-entry-extract.ts --bundle --outfile=extract.cjs --platform=node --target=node14
 
 # the CMD must be set as part of the lambda definition or docker invoke.. we have no default
 CMD [ "fail" ]
-
-#FROM public.ecr.aws/lambda/nodejs:14 AS fargate
-
-#COPY --from=somalier-builder /usr/bin/somalier ./
-
-#COPY package*.json ./
-#RUN npm install
-
-# esbuild is lightning quick so it doesn't really matter that we do a full rebuild of
-# these all every time any one of them changes
-#COPY *.ts ./
-
-#RUN npx esbuild extract.ts --bundle --outfile=extract.cjs --platform=node --target=node14
-
-# Disabled - this was just a proof of concept - but is not feasible in the 15 mins lambda limit
-# inside the docker build we expect this to have a generic name - but this is likely to have been sourced
-# from something like sites.hg38.rna.vcf.gz as part of the CI build
-# for local build/test just put any suitable file from brentp/somalier release
-#COPY sites.vcf.gz ./
-#COPY reference.fasta ./
-
-#ENTRYPOINT [ "/bin/node" ]

@@ -1,5 +1,5 @@
 import * as path from "path";
-import { CfnOutput, Stack, StackProps } from "aws-cdk-lib";
+import { CfnOutput, RemovalPolicy, Stack, StackProps } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import { DockerImageAsset } from "aws-cdk-lib/aws-ecr-assets";
 import { Secret } from "aws-cdk-lib/aws-secretsmanager";
@@ -7,6 +7,13 @@ import { HttpNamespace, Service } from "aws-cdk-lib/aws-servicediscovery";
 import { HolmesSettings, STACK_DESCRIPTION } from "../holmes-settings";
 import { SomalierExtractStateMachineConstruct } from "./somalier-extract-state-machine-construct";
 import { SomalierCheckStateMachineConstruct } from "./somalier-check-state-machine-construct";
+import { Bucket } from "aws-cdk-lib/aws-s3";
+import {
+  AttributeType,
+  BillingMode,
+  ProjectionType,
+  Table,
+} from "aws-cdk-lib/aws-dynamodb";
 
 export class HolmesApplicationStack extends Stack {
   // the output Steps functions we create (are also registered into CloudMap)
@@ -22,6 +29,12 @@ export class HolmesApplicationStack extends Stack {
     super(scope, id, props);
 
     this.templateOptions.description = STACK_DESCRIPTION;
+
+    const fingerprintBucket = new Bucket(this, "FingerprintBucket", {
+      bucketName: props.fingerprintBucketNameToCreate,
+      autoDeleteObjects: true,
+      removalPolicy: RemovalPolicy.DESTROY,
+    });
 
     // we need access to a ICA JWT in order to be able to download from GDS
     const icaSecret = Secret.fromSecretNameV2(
@@ -39,6 +52,8 @@ export class HolmesApplicationStack extends Stack {
       {
         dockerImageAsset: asset,
         icaSecret: icaSecret,
+        fingerprintBucket: fingerprintBucket,
+        ...props,
       }
     );
 
@@ -48,11 +63,16 @@ export class HolmesApplicationStack extends Stack {
       {
         dockerImageAsset: asset,
         icaSecret: icaSecret,
+        fingerprintBucket: fingerprintBucket,
+        ...props,
       }
     );
 
     icaSecret.grantRead(checkStateMachine.taskRole);
     icaSecret.grantRead(extractStateMachine.taskRole);
+
+    fingerprintBucket.grantRead(checkStateMachine.taskRole);
+    fingerprintBucket.grantReadWrite(extractStateMachine.taskRole);
 
     /* I don't understand CloudMap - there seems no way for me to import in a namespace that
         already exists... other than providing *all* the details... and a blank arn?? */

@@ -1,44 +1,33 @@
 import { promisify } from "util";
 import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { createReadStream, createWriteStream } from "fs";
-import { unlink, readdir, readFile } from "fs/promises";
-import { chdir, env as envdict } from "process";
+import { readdir, readFile, unlink } from "fs/promises";
+import { chdir } from "process";
 import { exec as execCallback } from "child_process";
 import { pipeline as pipelineCallback, Readable } from "stream";
 import { parse } from "csv-parse";
 import { URL } from "url";
-import {
-  GetSecretValueCommand,
-  SecretsManagerClient,
-} from "@aws-sdk/client-secrets-manager";
-import axios from "axios";
-import { getGdsFileAsPresigned, getIcaJwt } from "./gds";
+import { streamToBuffer } from "./misc";
+import { fingerprintBucketName, somalierBinary, somalierWork } from "./env";
+import { keyToUrl, urlToKey } from "./aws";
 
 // get this functionality as promise compatible funcs
 const exec = promisify(execCallback);
 const pipeline = promisify(pipelineCallback);
 
-// by default we obviously want this setup to work correctly in a lambda
-// HOWEVER, it is useful to be able to override these on an execution basis for local testing etc
-// THIS IS STRICTLY FOR USE IN DEV SETUPS - THESE PATHS ARE NOT CHECKED OR WHITELISTED - BAD THINGS CAN
-// HAPPEN IF YOU ARE LETTING PEOPLE INVOKE THIS AND LETTING THEM SET THE ENV VARIABLES
-const somalierBinary = envdict["SOMALIER"] || "/var/task/somalier";
-const somalierWork = envdict["SOMALIERTMP"] || "/tmp";
-
 type EventInput = {
+  // the URL of a BAM we are checking against all others
   index: string;
+
+  // the sites file checksum we are using for all our comparisons
+  sitesChecksum: string;
+
+  // the relatedness threshold to report against
   relatednessThreshold: number;
 
+  // a set of fingerprint keys which we will check the index against
   fingerprints: string[];
 };
-
-const streamToBuffer = (stream: any): Promise<Buffer> =>
-  new Promise((resolve, reject) => {
-    const chunks: any[] = [];
-    stream.on("data", (chunk: any) => chunks.push(chunk));
-    stream.on("error", reject);
-    stream.on("end", () => resolve(Buffer.concat(chunks)));
-  });
 
 const s3Client = new S3Client({});
 
@@ -47,42 +36,24 @@ const s3Client = new S3Client({});
  * working directory. Along the way fixes the file so its somalier id is the left padded
  * 'count' (up to the previous sample id size).
  *
- * @param url the URL of the fingerprint (.somalier) file (GDS or S3)
+ * @param fingerprintKey the key in our fingerprint of our fingerprint file to load
  * @param count the count used to generate a new id
+ * @return the sample id we generated matching the count
  */
-const getFingerprintObject = async (url: URL, count: number) => {
+async function getFingerprintObject(
+  fingerprintKey: string,
+  count: number
+): Promise<string> {
   let fileBuffer: Buffer | null = null;
 
-  if (url.protocol === "s3:") {
-    let p = url.pathname;
-    if (p.startsWith("/")) p = p.substr(1);
+  const data = await s3Client.send(
+    new GetObjectCommand({
+      Bucket: fingerprintBucketName,
+      Key: fingerprintKey,
+    })
+  );
 
-    console.log(`Trying S3 download for ${url.hostname} ${p}`);
-
-    const data = await s3Client.send(
-      new GetObjectCommand({
-        Bucket: url.hostname,
-        Key: p,
-      })
-    );
-
-    fileBuffer = await streamToBuffer(data.Body);
-  } else if (url.protocol === "gds:") {
-    console.log(`Trying GDS download for ${url.hostname} ${url.pathname}`);
-
-    const presignedUrl = await getGdsFileAsPresigned(
-      url.hostname,
-      url.pathname
-    );
-
-    const fileResponse = await axios.get(presignedUrl, {
-      responseType: "arraybuffer",
-    });
-
-    fileBuffer = Buffer.from(fileResponse.data);
-  } else {
-    throw new Error(`Unknown file download technique for ${url}`);
-  }
+  fileBuffer = await streamToBuffer(data.Body);
 
   // check the file version matches what we expect
   const ver = fileBuffer.readInt8(0);
@@ -110,23 +81,44 @@ const getFingerprintObject = async (url: URL, count: number) => {
 
   // let the caller know what sample id we ended up generating for later matching
   return newSampleId;
-};
+}
 
+/**
+ * A lambda which does the main work of comparing fingerprint files
+ * using the somalier command line tool.
+ *
+ * It is passed an index fingerprint file and compares it to a small subset of
+ * other fingerprint files (all in a fingerprint bucket in S3).
+ *
+ * There are file naming conventions on the fingerprint files which allow us
+ * to work out what source BAMs created them - though we do not deal with
+ * any of that logic here.
+ *
+ * The underlying assumption is that all fingerprint files exactly match
+ * on corresponding sites.yaml file that was used to create them - but again
+ * that logic is not dealt with here.
+ *
+ * @param ev
+ * @param context
+ */
 export const lambdaHandler = async (ev: EventInput, context: any) => {
   // only small areas of the lambda runtime are read/write so we need to make sure we are in a writeable working dir
   chdir(somalierWork);
 
+  const indexAsKey = urlToKey(ev.sitesChecksum, new URL(ev.index));
+
   // sample 0 is always going to be our index case
-  const indexSampleId = await getFingerprintObject(new URL(ev.index), 0);
+  // (and unlike the fingerprints it comes in as a URL BAM file location)
+  const indexSampleId = await getFingerprintObject(indexAsKey, 0);
 
   let count = 1;
 
   const results: any = {};
 
   // download and 'fix' the sample ids for all the other fingerprint files we have been passed
-  for (const url of ev.fingerprints) {
-    const newSampleId = await getFingerprintObject(new URL(url), count);
-    results[newSampleId] = url;
+  for (const fingerprintKey of ev.fingerprints) {
+    const newSampleId = await getFingerprintObject(fingerprintKey, count);
+    results[newSampleId] = fingerprintKey;
     count++;
   }
 
@@ -184,7 +176,7 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
 
         if (relatedness >= ev.relatednessThreshold) {
           const result: any = {
-            file: results[record[1]],
+            file: keyToUrl(ev.sitesChecksum, results[record[1]]),
             relatedness: relatedness,
             // TODO: confirm these are not directional scores
             ibs0: parseInt(record[3]),

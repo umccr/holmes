@@ -11,3 +11,8 @@ export const NAMESPACE_NAME = "umccr";
 
 export const NAMESPACE_DEV_ID = "ns-mjt63c4ppdrly4jd";
 export const NAMESPACE_PROD_ID = "ns-z7kktgazzvwokcvz";
+
+export const FASTA_BUCKET = "umccr-refdata-prod";
+export const FASTA_KEY = "genomes/hg38/hg38.fa";
+export const SITES_BUCKET = "umccr-refdata-prod";
+export const SITES_KEY = "somalier/sites.hg38.rna.vcf.gz";
