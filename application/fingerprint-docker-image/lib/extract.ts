@@ -70,16 +70,33 @@ async function fingerprint(file: string, sitesChecksum: string) {
   const execFilePromise = promisify(execFile);
 
   // do a somalier extract to generate the fingerprint
-  const { stdout, stderr } = await execFilePromise(somalierBinary, [
-    "extract",
-    indexString,
-    "-s",
-    somalierSites,
-    "-f",
-    somalierFasta,
-    "-d",
-    randomString,
-  ]);
+  // TODO: send failure events to event bridge?
+  try {
+    const { stdout, stderr } = await execFilePromise(
+      somalierBinary,
+      [
+        "extract",
+        indexString,
+        "-s",
+        somalierSites,
+        "-f",
+        somalierFasta,
+        "-d",
+        randomString,
+      ],
+      { maxBuffer: 1024 * 1024 * 64 }
+    );
+
+    if (stdout) {
+      stdout.split("\n").forEach((l) => console.log(`stdout ${l}`));
+    }
+    if (stderr) {
+      stderr.split("\n").forEach((l) => console.log(`stderr ${l}`));
+    }
+  } catch (e) {
+    console.log(e);
+    return;
+  }
 
   const producedFileList = await readdir(randomString);
 
@@ -96,13 +113,6 @@ async function fingerprint(file: string, sitesChecksum: string) {
   // cleanup the directory - we have 10Gb of docker storage to play with but best to at least try to
   // remove what we don't need
   await rm(randomString, { recursive: true, force: true });
-
-  if (stdout) {
-    stdout.split("\n").forEach((l) => console.log(`stdout ${l}`));
-  }
-  if (stderr) {
-    stderr.split("\n").forEach((l) => console.log(`stderr ${l}`));
-  }
 
   // our *last* step is to upload to S3 - if anything above fails we don't want
   // any trace of this fingerprint in the 'done' fingerprints bucket
