@@ -1,35 +1,28 @@
-import axios from "axios";
-import {
-  _Object,
-  ListObjectsV2Command,
-  ListObjectsV2Output,
-  S3Client,
-} from "@aws-sdk/client-s3";
-import {
-  keyToUrl,
-  s3Download,
-  s3ListAllFingerprintFiles,
-  urlToKey,
-} from "./aws";
-import { GdsFile, gdsFileSearchInVolume } from "./illumina-icav1";
-import { chunk } from "./misc";
+import { _Object } from "@aws-sdk/client-s3";
+import { keyToUrl, s3Download, s3ListAllFingerprintFiles } from "./lib/aws";
+import { GdsFile, gdsFileSearchInVolume } from "./lib/illumina-icav1";
+import { chunk } from "./lib/misc";
 import {
   fingerprintBucketName,
+  safeGetSources,
   somalierSites,
   somalierSitesBucketKey,
   somalierSitesBucketName,
-} from "./env";
+} from "./lib/env";
 
 type EventInput = {
-  gdsVolumes: string[];
-  gdsFileWildcard: string;
-  chunkSize: number;
-
+  // the size we want to chunk the output URLs into (defaults to 5)
+  devChunkSize?: number;
+  // a limit to the number of files we want to discover before exiting for dev/test scenarios
   devMaxGdsFiles?: number;
 };
 
 /**
- * A lambda function that scans
+ * A lambda function that scans GDS roots and collects all the files matching
+ * a file pattern (*.bam). We then cross check those files against our known
+ * fingerprints to sort into which files need fingerprinting - and which already
+ * have fingerprints.
+ *
  * @param ev
  * @param context
  */
@@ -61,23 +54,42 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
 
   // make a dictionary of all the gds files and their GDS entries keyed by GDS url
   const gdsEntries: { [index: string]: GdsFile } = {};
+  let foundCount = 0;
 
-  for (const vol of ev.gdsVolumes || []) {
-    let found = 0;
-    for await (const gds of gdsFileSearchInVolume(
-      vol,
-      "",
-      ev.gdsFileWildcard
-    )) {
-      gdsEntries[`gds://${gds.volumeName}${gds.path}`] = gds;
+  const sources = safeGetSources();
 
-      found++;
+  for (const root of sources) {
+    const rootUrl = new URL(root);
 
-      if (found % 50 == 0) console.log(`Currently discovered ${found} BAMs`);
+    if (rootUrl.protocol === "gds:") {
+      // the path prefix will have /* attached as part of the search so we ensure that if already
+      // present in the URL path we remove it
+      let rootPathPrefix = rootUrl.pathname;
 
-      // for debug/dev purposes it is useful to be able to limit the scope of the
-      // (long) recursive GDS search
-      if (ev.devMaxGdsFiles) if (found > ev.devMaxGdsFiles) break;
+      if (rootPathPrefix.endsWith("/*"))
+        rootPathPrefix = rootPathPrefix.slice(0, -2);
+      else if (rootPathPrefix.endsWith("/"))
+        rootPathPrefix = rootPathPrefix.slice(0, -1);
+
+      for await (const foundGdsFile of gdsFileSearchInVolume(
+        rootUrl.hostname,
+        rootPathPrefix,
+        "*.bam"
+      )) {
+        gdsEntries[`gds://${foundGdsFile.volumeName}${foundGdsFile.path}`] =
+          foundGdsFile;
+
+        foundCount++;
+
+        if (foundCount % 50 == 0)
+          console.log(`Currently discovered ${foundCount} BAMs`);
+
+        // for debug/dev purposes it is useful to be able to limit the scope of the
+        // (long) recursive GDS search
+        if (ev.devMaxGdsFiles) if (foundCount > ev.devMaxGdsFiles) break;
+      }
+    } else {
+      throw new Error(`Unknown protocol for root entry ${root}`);
     }
   }
 
@@ -100,11 +112,8 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
   return {
     needsFingerprinting: chunk(
       Array.from(needsFingerprintingSet.values()),
-      ev.chunkSize
+      ev.devChunkSize || 5
     ),
-    hasFingerprinting: chunk(
-      Array.from(hasFingerprintingSet.values()),
-      ev.chunkSize
-    ),
+    hasFingerprinting: Array.from(hasFingerprintingSet.values()),
   };
 };

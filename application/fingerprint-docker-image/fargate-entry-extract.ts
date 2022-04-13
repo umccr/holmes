@@ -1,5 +1,5 @@
 import { argv } from "process";
-import { extract } from "./extract";
+import { extract } from "./lib/extract";
 
 (async () => {
   try {

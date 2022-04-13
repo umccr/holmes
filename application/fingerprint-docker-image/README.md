@@ -1,19 +1,39 @@
-# Fingerprint Lambda Docker image
+# Fingerprint Lambda/Fargate Docker image
 
-The Docker image making up our fingerprint lambda.
+The Docker image making up our fingerprint tasks.
 
-We define multiple lambda entry points here - allowing this single asset to be used
-for different deployed lambdas (changing only the CMD in the CDK definition).
-Mainly due to there being so much commonality between the various
-lambdas (generally they use the same packages, possibly the same shared code). We could
-totally split them into separate Docker assets if need be though.
+We define multiple entry points here - allowing this single asset to be used
+for different deployed lambdas and fargate tasks
+(changing only the CMD in the CDK definition).
+
+This is mainly due to there being so much commonality between the various
+lambdas (generally they use the same Somalier binary, the same packages,
+the same shared library code).
+
+We could split them into separate Docker assets if need be though.
 
 ## Local
 
-The `adhoc-test` folder has some scripts for doing purely local testing - that
-is executing the Typescript lambda code directly as if it is not in a lambda at all (just
-as a Nodejs app). This testing does require the environment have AWS_SECRET_X etc variables
+The `local-test.sh` script are direct local test cases that can be executed
+on the Typescript code directly as Nodejs apps.
+This testing does require the environment have AWS_SECRET_X etc variables
 set up for a user in UMCCR dev account.
+
+```shell
+./test-local.sh extract
+```
+
+```shell
+./test-local.sh check
+```
+
+```shell
+./test-local.sh check-start
+```
+
+```shell
+./test-local.sh difference
+```
 
 ## Local Docker
 

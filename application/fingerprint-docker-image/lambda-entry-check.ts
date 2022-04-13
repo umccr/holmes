@@ -7,9 +7,9 @@ import { exec as execCallback } from "child_process";
 import { pipeline as pipelineCallback, Readable } from "stream";
 import { parse } from "csv-parse";
 import { URL } from "url";
-import { streamToBuffer } from "./misc";
-import { fingerprintBucketName, somalierBinary, somalierWork } from "./env";
-import { keyToUrl, urlToKey } from "./aws";
+import { streamToBuffer } from "./lib/misc";
+import { fingerprintBucketName, somalierBinary, somalierWork } from "./lib/env";
+import { keyToUrl, urlToKey } from "./lib/aws";
 
 // get this functionality as promise compatible funcs
 const exec = promisify(execCallback);

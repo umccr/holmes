@@ -33,6 +33,11 @@ export interface HolmesStackSettings {
    * (must NOT exist)
    */
   readonly fingerprintBucketNameToCreate: string;
+
+  /**
+   * BAM sources (url of folders)
+   */
+  readonly bamSources: string[];
 }
 
 export interface HolmesReferenceDataSettings {

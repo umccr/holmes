@@ -45,10 +45,17 @@ async function fingerprint(file: string, sitesChecksum: string) {
       url.hostname,
       url.pathname
     );
-    const presignedUrlBai = await getGdsFileAsPresigned(
-      url.hostname,
-      url.pathname + ".bai"
-    );
+
+    // we have some BAM files we will find with no index.. these we can ignore.. TEMP FIX
+    let presignedUrlBai;
+    try {
+      presignedUrlBai = await getGdsFileAsPresigned(
+        url.hostname,
+        url.pathname + ".bai"
+      );
+    } catch (e) {
+      return;
+    }
 
     // this is the undocumented mechanism of nim-htslib to have a path that also specifies the actual index file
     indexString = `${presignedUrl}##idx##${presignedUrlBai}`;

@@ -24,6 +24,17 @@ export const somalierFastaBucketKey = envDict["FASTA_BUCKET_KEY"];
 
 export const fingerprintBucketName = envDict["FINGERPRINT_BUCKET_NAME"];
 
+export function safeGetSources(): string[] {
+  const sources = envDict["SOURCES"];
+
+  if (!sources)
+    throw new Error(
+      "Source for the difference step must be defined as part of the stack"
+    );
+
+  return sources.split(" ");
+}
+
 export async function safeGetFingerprintSites(): Promise<[string, string]> {
   console.log("Settings are:");
   console.log(`Fingerprint bucket name = ${fingerprintBucketName}`);

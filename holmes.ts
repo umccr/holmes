@@ -46,6 +46,7 @@ new HolmesApplicationStack(app, "HolmesSandboxStack", {
     region: AWS_DEV_REGION,
   },
   fingerprintBucketNameToCreate: "sandbox-fingerprint-please-remove",
+  bamSources: ["gds://development/analysis_data"],
   referenceFastaBucketName: FASTA_BUCKET,
   referenceFastaBucketKey: FASTA_KEY,
   sitesBucketName: SITES_BUCKET,

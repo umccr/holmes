@@ -12,10 +12,15 @@ import { promisify } from "util";
 import { pipeline as pipelineCallback } from "stream";
 import { URL } from "url";
 
-const pipeline = promisify(pipelineCallback);
-
 const s3Client = new S3Client({});
 
+/**
+ * Converts a fingerprint bucket key into the URL that that fingerprint
+ * came from.
+ *
+ * @param sitesChecksum
+ * @param key
+ */
 export function keyToUrl(sitesChecksum: string, key: string): URL {
   // the key is in the format <sitesChecksum>/<hexencodedurl>
   if (!key.startsWith(sitesChecksum + "/")) {
@@ -30,6 +35,13 @@ export function keyToUrl(sitesChecksum: string, key: string): URL {
   return new URL(buf.toString("utf8"));
 }
 
+/**
+ * Turns a URL (of a BAM) into the key that its fingerprint would have
+ * in the fingerprint bucket.
+ *
+ * @param sitesChecksum
+ * @param url
+ */
 export function urlToKey(sitesChecksum: string, url: URL) {
   const buf = Buffer.from(url.toString(), "ascii");
 
@@ -70,7 +82,12 @@ export async function s3Download(
     const command = new GetObjectCommand(bucketParams);
     const response = await s3Client.send(command);
 
-    await pipeline(response.Body, createWriteStream(output));
+    const pipeline = promisify(pipelineCallback);
+
+    await pipeline(
+      response.Body as NodeJS.ReadableStream,
+      createWriteStream(output)
+    );
   }
 
   if (doChecksum) {

@@ -1,40 +1,16 @@
 import { Construct } from "constructs";
-import { DockerImageAsset } from "aws-cdk-lib/aws-ecr-assets";
-import {
-  IntegrationPattern,
-  JsonPath,
-  Map,
-  StateMachine,
-  Succeed,
-} from "aws-cdk-lib/aws-stepfunctions";
-import {
-  EcsFargateLaunchTarget,
-  EcsRunTask,
-} from "aws-cdk-lib/aws-stepfunctions-tasks";
-import {
-  Cluster,
-  Compatibility,
-  ContainerImage,
-  CpuArchitecture,
-  FargatePlatformVersion,
-  ICluster,
-  LogDriver,
-  TaskDefinition,
-} from "aws-cdk-lib/aws-ecs";
-import { Vpc } from "aws-cdk-lib/aws-ec2";
-import { IRole, ManagedPolicy } from "aws-cdk-lib/aws-iam";
-import { RetentionDays } from "aws-cdk-lib/aws-logs";
-import { ISecret } from "aws-cdk-lib/aws-secretsmanager";
-import { Bucket, IBucket } from "aws-cdk-lib/aws-s3";
-import { HolmesReferenceDataSettings } from "../holmes-settings";
+import { StateMachine, Succeed } from "aws-cdk-lib/aws-stepfunctions";
+import { TaskDefinition } from "aws-cdk-lib/aws-ecs";
+import { IRole } from "aws-cdk-lib/aws-iam";
 import {
   SomalierBaseStateMachineConstruct,
   SomalierBaseStateMachineProps,
 } from "./somalier-base-state-machine-construct";
 
-export class SomalierExtractStateMachineConstruct extends SomalierBaseStateMachineConstruct {
-  readonly stateMachine: StateMachine;
-  readonly taskDefinition: TaskDefinition;
+export class SomalierDifferenceThenExtractStateMachineConstruct extends SomalierBaseStateMachineConstruct {
+  private readonly lambdaRole: IRole;
+  private readonly stateMachine: StateMachine;
+  private readonly taskDefinition: TaskDefinition;
 
   constructor(
     scope: Construct,
@@ -50,6 +26,17 @@ export class SomalierExtractStateMachineConstruct extends SomalierBaseStateMachi
 
     this.taskDefinition = taskDefinition;
 
+    this.lambdaRole = this.createLambdaRole();
+
+    // The check-start function is used to divide up the work and work out the correct sites file to use
+    const differenceStep = this.createLambdaStep(
+      "Difference",
+      "difference.lambdaHandler",
+      "$.Payload",
+      this.lambdaRole,
+      props
+    );
+
     const extractMapStep = this.createExtractMapStep(
       props.fargateCluster,
       taskDefinition,
@@ -58,7 +45,9 @@ export class SomalierExtractStateMachineConstruct extends SomalierBaseStateMachi
     );
 
     this.stateMachine = new StateMachine(this, "StateMachine", {
-      definition: extractMapStep.next(new Succeed(this, "SucceedStep")),
+      definition: differenceStep
+        .next(extractMapStep)
+        .next(new Succeed(this, "Succeed")),
     });
   }
 
@@ -72,5 +61,9 @@ export class SomalierExtractStateMachineConstruct extends SomalierBaseStateMachi
    */
   public get taskRole(): IRole {
     return this.taskDefinition.taskRole;
+  }
+
+  public get lambdaTaskRole(): IRole {
+    return this.lambdaRole;
   }
 }

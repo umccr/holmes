@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# this can be checked into github - despite detect-secrets thinking in might be a password
+# these can safely be checked into github - despite detect-secrets thinking it might be a password
 SECRETARN="arn:aws:secretsmanager:ap-southeast-2:843407916570:secret:IcaSecretsPortal"  # pragma: allowlist secret
 BN="sandbox-fingerprint-please-remove" # pragma: allowlist secret
 

@@ -233,8 +233,6 @@ export async function* gdsFileSearchInVolume(
     // yield up the collated results from this page
     for (const fb of gdsFoundMatches) yield fb;
 
-    console.log(pageToken);
-
     // onto the next page if possible
   } while (pageToken);
 }

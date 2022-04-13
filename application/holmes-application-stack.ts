@@ -5,21 +5,21 @@ import { DockerImageAsset } from "aws-cdk-lib/aws-ecr-assets";
 import { Secret } from "aws-cdk-lib/aws-secretsmanager";
 import { HttpNamespace, Service } from "aws-cdk-lib/aws-servicediscovery";
 import { HolmesSettings, STACK_DESCRIPTION } from "../holmes-settings";
-import { SomalierExtractStateMachineConstruct } from "./somalier-extract-state-machine-construct";
 import { SomalierCheckStateMachineConstruct } from "./somalier-check-state-machine-construct";
-import { Bucket } from "aws-cdk-lib/aws-s3";
-import {
-  AttributeType,
-  BillingMode,
-  ProjectionType,
-  Table,
-} from "aws-cdk-lib/aws-dynamodb";
+import { Bucket, ObjectOwnership } from "aws-cdk-lib/aws-s3";
+import { Vpc } from "aws-cdk-lib/aws-ec2";
+import { Cluster } from "aws-cdk-lib/aws-ecs";
+import { SomalierExtractStateMachineConstruct } from "./somalier-extract-state-machine-construct";
+import { SomalierDifferenceThenExtractStateMachineConstruct } from "./somalier-difference-then-extract-state-machine-construct";
+import { SomalierDifferenceStateMachineConstruct } from "./somalier-difference-state-machine-construct";
 
 export class HolmesApplicationStack extends Stack {
   // the output Steps functions we create (are also registered into CloudMap)
   // we output this here so it can be used in the codepipeline build for testing
   public readonly checkStepsArnOutput: CfnOutput;
   public readonly extractStepsArnOutput: CfnOutput;
+  public readonly differenceStepsArnOutput: CfnOutput;
+  public readonly differenceThenExtractStepsArnOutput: CfnOutput;
 
   constructor(
     scope: Construct,
@@ -32,9 +32,18 @@ export class HolmesApplicationStack extends Stack {
 
     const fingerprintBucket = new Bucket(this, "FingerprintBucket", {
       bucketName: props.fingerprintBucketNameToCreate,
+      objectOwnership: ObjectOwnership.BUCKET_OWNER_ENFORCED,
       autoDeleteObjects: true,
       removalPolicy: RemovalPolicy.DESTROY,
     });
+
+    // we sometimes need to execute tasks in a VPC context
+    const vpc = Vpc.fromLookup(this, "MainVpc", {
+      vpcName: "main-vpc",
+    });
+
+    // a fargate cluster we use for non-lambda Tasks
+    const cluster = new Cluster(this, "FargateCluster", { vpc });
 
     // we need access to a ICA JWT in order to be able to download from GDS
     const icaSecret = Secret.fromSecretNameV2(
@@ -53,6 +62,7 @@ export class HolmesApplicationStack extends Stack {
         dockerImageAsset: asset,
         icaSecret: icaSecret,
         fingerprintBucket: fingerprintBucket,
+        fargateCluster: cluster,
         ...props,
       }
     );
@@ -64,15 +74,51 @@ export class HolmesApplicationStack extends Stack {
         dockerImageAsset: asset,
         icaSecret: icaSecret,
         fingerprintBucket: fingerprintBucket,
+        fargateCluster: cluster,
         ...props,
       }
     );
 
+    const differenceStateMachine = new SomalierDifferenceStateMachineConstruct(
+      this,
+      "SomalierDifference",
+      {
+        dockerImageAsset: asset,
+        icaSecret: icaSecret,
+        fingerprintBucket: fingerprintBucket,
+        fargateCluster: cluster,
+        ...props,
+      }
+    );
+
+    const differenceThenExtractStateMachine =
+      new SomalierDifferenceThenExtractStateMachineConstruct(
+        this,
+        "SomalierDifferenceThenExtract",
+        {
+          dockerImageAsset: asset,
+          icaSecret: icaSecret,
+          fingerprintBucket: fingerprintBucket,
+          fargateCluster: cluster,
+          ...props,
+        }
+      );
+
     icaSecret.grantRead(checkStateMachine.taskRole);
     icaSecret.grantRead(extractStateMachine.taskRole);
+    icaSecret.grantRead(differenceStateMachine.taskRole);
+    icaSecret.grantRead(differenceThenExtractStateMachine.taskRole);
+    icaSecret.grantRead(differenceThenExtractStateMachine.lambdaTaskRole);
 
     fingerprintBucket.grantRead(checkStateMachine.taskRole);
+    fingerprintBucket.grantRead(differenceStateMachine.taskRole);
     fingerprintBucket.grantReadWrite(extractStateMachine.taskRole);
+    fingerprintBucket.grantReadWrite(
+      differenceThenExtractStateMachine.taskRole
+    );
+    fingerprintBucket.grantReadWrite(
+      differenceThenExtractStateMachine.lambdaTaskRole
+    );
 
     /* I don't understand CloudMap - there seems no way for me to import in a namespace that
         already exists... other than providing *all* the details... and a blank arn?? */
@@ -89,14 +135,16 @@ export class HolmesApplicationStack extends Stack {
     const service = new Service(this, "Service", {
       namespace: namespace,
       name: "fingerprint",
-      description:
-        "Service for rapidly identifying existing BAM files with similar content",
+      description: STACK_DESCRIPTION,
     });
 
     service.registerNonIpInstance("NonIp", {
       customAttributes: {
         checkStepsArn: checkStateMachine.stepsArn,
         extractStepsArn: extractStateMachine.stepsArn,
+        differenceStepsArn: differenceStateMachine.stepsArn,
+        differenceThenExtractStepsArn:
+          differenceThenExtractStateMachine.stepsArn,
       },
     });
 
@@ -107,6 +155,18 @@ export class HolmesApplicationStack extends Stack {
     this.extractStepsArnOutput = new CfnOutput(this, "ExtractStepsArn", {
       value: extractStateMachine.stepsArn,
     });
+
+    this.differenceStepsArnOutput = new CfnOutput(this, "DifferenceStepsArn", {
+      value: differenceStateMachine.stepsArn,
+    });
+
+    this.differenceThenExtractStepsArnOutput = new CfnOutput(
+      this,
+      "DifferenceThenExtractStepsArn",
+      {
+        value: differenceThenExtractStateMachine.stepsArn,
+      }
+    );
   }
 
   /**

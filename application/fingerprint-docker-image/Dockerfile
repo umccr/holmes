@@ -27,10 +27,10 @@ RUN npm install
 # esbuild is lightning quick so it doesn't really matter that we do a full rebuild of
 # these all every time any one of them changes
 COPY *.ts ./
+COPY lib/*.ts ./lib/
 
 RUN npx esbuild lambda-entry-check.ts --bundle --outfile=check.cjs --platform=node --target=node14
 RUN npx esbuild lambda-entry-check-start.ts --bundle --outfile=check-start.cjs --platform=node --target=node14
-RUN npx esbuild lambda-entry-check-end.ts --bundle --outfile=check-end.cjs --platform=node --target=node14
 
 RUN npx esbuild lambda-entry-difference.ts --bundle --outfile=difference.cjs --platform=node --target=node14
 
