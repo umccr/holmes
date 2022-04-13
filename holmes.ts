@@ -47,6 +47,7 @@ new HolmesApplicationStack(app, "HolmesSandboxStack", {
   },
   fingerprintBucketNameToCreate: "sandbox-fingerprint-please-remove",
   bamSources: ["gds://development/analysis_data"],
+  bamLimits: ["wgs_alignment_qc"],
   referenceFastaBucketName: FASTA_BUCKET,
   referenceFastaBucketKey: FASTA_KEY,
   sitesBucketName: SITES_BUCKET,
