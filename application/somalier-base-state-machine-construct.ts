@@ -215,7 +215,7 @@ export class SomalierBaseStateMachineConstruct extends Construct {
   ): LambdaInvoke {
     const func = new DockerImageFunction(this, `${stepName}Function`, {
       memorySize: 2048,
-      timeout: Duration.seconds(180),
+      timeout: Duration.minutes(14),
       role: role,
       code: DockerImageCode.fromEcr(props.dockerImageAsset.repository, {
         tag: props.dockerImageAsset.assetHash,

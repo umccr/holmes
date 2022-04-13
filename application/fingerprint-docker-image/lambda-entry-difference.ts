@@ -71,10 +71,12 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
       else if (rootPathPrefix.endsWith("/"))
         rootPathPrefix = rootPathPrefix.slice(0, -1);
 
+      // for the actual raw GDS search we are going to look for both BAM and BAIs - and later will restrict
+      // back to only BAMs
       for await (const foundGdsFile of gdsFileSearchInVolume(
         rootUrl.hostname,
         rootPathPrefix,
-        "*.bam"
+        "*.ba?"
       )) {
         gdsEntries[`gds://${foundGdsFile.volumeName}${foundGdsFile.path}`] =
           foundGdsFile;
@@ -82,7 +84,7 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
         foundCount++;
 
         if (foundCount % 50 == 0)
-          console.log(`Currently discovered ${foundCount} BAMs`);
+          console.log(`Currently discovered ${foundCount} BA?s`);
 
         // for debug/dev purposes it is useful to be able to limit the scope of the
         // (long) recursive GDS search
@@ -97,6 +99,19 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
   const hasFingerprintingSet = new Set<string>();
 
   for (const [gdsUrl, gds] of Object.entries(gdsEntries)) {
+    // we want to determine here is we should skip this entry entirely
+
+    // bai files we only capture so we can do some checking - we NEVER want to fingerprint the bai
+    if (gdsUrl.endsWith(".bai")) continue;
+
+    // if somehow we got a .BAT file or someting we definitely never want to fingerprint
+    if (!gdsUrl.endsWith(".bam")) continue;
+
+    const bai = gdsUrl + ".bai";
+
+    // we can't process BAMs if they aren't indexed - it generally means that are temporary artifacts anyhow
+    if (!(bai in gdsEntries)) continue;
+
     if (gdsUrl in fingerPrintEntries) {
       // we also have to check the modifications times - to ensure that our fingerprint is dated after the BAM
       const gdsModified = new Date(gds.timeModified);
