@@ -4,7 +4,7 @@ import { GdsFile, gdsFileSearchInVolume } from "./lib/illumina-icav1";
 import { chunk } from "./lib/misc";
 import {
   fingerprintBucketName,
-  safeGetSources,
+  safeGetSourcesAndLimits,
   somalierSites,
   somalierSitesBucketKey,
   somalierSitesBucketName,
@@ -56,7 +56,7 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
   const gdsEntries: { [index: string]: GdsFile } = {};
   let foundCount = 0;
 
-  const sources = safeGetSources();
+  const [sources, limits] = safeGetSourcesAndLimits();
 
   for (const root of sources) {
     const rootUrl = new URL(root);
@@ -111,6 +111,15 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
 
     // we can't process BAMs if they aren't indexed - it generally means that are temporary artifacts anyhow
     if (!(bai in gdsEntries)) continue;
+
+    // if the url doesn't contain at least one Limit string then we don't want it either
+    let foundLimit = false;
+
+    for (const l of limits) {
+      if (gdsUrl.includes(l)) foundLimit = true;
+    }
+
+    if (!foundLimit) continue;
 
     if (gdsUrl in fingerPrintEntries) {
       // we also have to check the modifications times - to ensure that our fingerprint is dated after the BAM

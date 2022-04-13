@@ -15,6 +15,7 @@ rm -f /tmp/*.somalier
 SOMALIER=somalier \
    FINGERPRINT_BUCKET_NAME="$BN" \
    SOURCES="gds://development/analysis_data" \
+   LIMITS="wgs_alignment_qc" \
    SITES_BUCKET_NAME=umccr-refdata-prod \
    SITES_BUCKET_KEY=somalier/sites.hg38.rna.vcf.gz \
    FASTA_BUCKET_NAME=umccr-refdata-prod \

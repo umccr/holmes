@@ -38,6 +38,11 @@ export interface HolmesStackSettings {
    * BAM sources (url of folders)
    */
   readonly bamSources: string[];
+
+  /**
+   * BAM limits - strings that must be present in the path for the BAM to count
+   */
+  readonly bamLimits: string[];
 }
 
 export interface HolmesReferenceDataSettings {

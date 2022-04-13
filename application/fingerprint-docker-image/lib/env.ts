@@ -24,7 +24,7 @@ export const somalierFastaBucketKey = envDict["FASTA_BUCKET_KEY"];
 
 export const fingerprintBucketName = envDict["FINGERPRINT_BUCKET_NAME"];
 
-export function safeGetSources(): string[] {
+export function safeGetSourcesAndLimits(): [string[], string[]] {
   const sources = envDict["SOURCES"];
 
   if (!sources)
@@ -32,7 +32,14 @@ export function safeGetSources(): string[] {
       "Source for the difference step must be defined as part of the stack"
     );
 
-  return sources.split(" ");
+  const limits = envDict["LIMITS"];
+
+  if (!limits)
+    throw new Error(
+      "Limits for the difference step must be defined as part of the stack"
+    );
+
+  return [sources.split(" "), limits.split(" ")];
 }
 
 export async function safeGetFingerprintSites(): Promise<[string, string]> {

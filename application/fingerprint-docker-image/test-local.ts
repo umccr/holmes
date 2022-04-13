@@ -13,7 +13,7 @@ import { lambdaHandler as checkStartLambdaHandler } from "./lambda-entry-check-s
         const differenceResult = await differenceLambdaHandler(
           {
             devChunkSize: 2,
-            devMaxGdsFiles: 10,
+            devMaxGdsFiles: 100,
           },
           {}
         );

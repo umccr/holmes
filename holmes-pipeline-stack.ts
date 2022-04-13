@@ -77,6 +77,7 @@ export class HolmesPipelineStack extends Stack {
       icaSecretNamePartial: "IcaSecretsPortal", // pragma: allowlist secret
       fingerprintBucketNameToCreate: "umccr-fingerprint-dev",
       bamSources: ["gds://development/analysis_data"],
+      bamLimits: ["wgs_alignment_qc"],
       referenceFastaBucketName: FASTA_BUCKET,
       referenceFastaBucketKey: FASTA_KEY,
       sitesBucketName: SITES_BUCKET,
@@ -93,6 +94,7 @@ export class HolmesPipelineStack extends Stack {
       icaSecretNamePartial: "IcaSecretsPortal", // pragma: allowlist secret
       fingerprintBucketNameToCreate: "umccr-fingerprint-prod",
       bamSources: ["gds://production/analysis_data"],
+      bamLimits: ["wgs_alignment_qc"],
       referenceFastaBucketName: FASTA_BUCKET,
       referenceFastaBucketKey: FASTA_KEY,
       sitesBucketName: SITES_BUCKET,
