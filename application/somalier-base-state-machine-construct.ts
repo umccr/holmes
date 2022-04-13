@@ -40,6 +40,7 @@ export type SomalierBaseStateMachineProps = HolmesReferenceDataSettings & {
   icaSecret: ISecret;
   fingerprintBucket: IBucket;
   bamSources: string[];
+  bamLimits: string[];
 };
 
 /**
@@ -174,6 +175,7 @@ export class SomalierBaseStateMachineConstruct extends Construct {
   } {
     return {
       SOURCES: props.bamSources.join(" "),
+      LIMITS: props.bamLimits.join(" "),
       SECRET_ARN: props.icaSecret.secretArn,
       FINGERPRINT_BUCKET_NAME: props.fingerprintBucket.bucketName,
       FASTA_BUCKET_NAME: props.referenceFastaBucketName,
