@@ -7,6 +7,23 @@ import {
   SomalierBaseStateMachineProps,
 } from "./somalier-base-state-machine-construct";
 
+/**
+ * The 'difference then extract' state machine calculates all BAM files that are located in the configured
+ * BAM sources - and for those that needs fingerprinting - triggers a set of fargate tasks that will perform
+ * the fingerprinting.
+ *
+ * @input
+ *
+ * {
+ *
+ * }
+ *
+ * @output
+ *
+ * {
+ *
+ * }
+ */
 export class SomalierDifferenceThenExtractStateMachineConstruct extends SomalierBaseStateMachineConstruct {
   private readonly lambdaRole: IRole;
   private readonly stateMachine: StateMachine;
@@ -31,7 +48,7 @@ export class SomalierDifferenceThenExtractStateMachineConstruct extends Somalier
     // The check-start function is used to divide up the work and work out the correct sites file to use
     const differenceStep = this.createLambdaStep(
       "Difference",
-      "difference.lambdaHandler",
+      ["difference.lambdaHandler"],
       "$.Payload",
       this.lambdaRole,
       props

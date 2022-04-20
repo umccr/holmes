@@ -67,6 +67,17 @@ export class HolmesPipelineStack extends Stack {
       crossAccountKeys: true,
     });
 
+    // our secret name is consistent across all envs
+    const ICA_SEC = "IcaSecretsPortal"; // pragma: allowlist secret
+
+    // the following are dev settings *purely* meant for staging/test rather than actual dev
+    // work... see HolmesSandboxStack in holmes.ts for more dev like settings
+    const DEV_FINGERPRINT_BUCKET = "umccr-fingerprint-dev";
+    const DEV_SITES_BUCKET = "umccr-refdata-dev";
+    const DEV_SITES_KEY = "somalier/sites.hg38.rna.HOLMESTESTONLY.vcf.gz";
+    const DEV_SITES_CHECKSUM = "sdfsfdsdf";
+    const DEV_TEST_BAM_SOURCE = "gds://development/test-data/holmes-test-data";
+
     const devStage = new HolmesBuildStage(this, "Dev", {
       env: {
         account: AWS_DEV_ACCOUNT,
@@ -74,14 +85,32 @@ export class HolmesPipelineStack extends Stack {
       },
       namespaceName: NAMESPACE_NAME,
       namespaceId: NAMESPACE_DEV_ID,
-      icaSecretNamePartial: "IcaSecretsPortal", // pragma: allowlist secret
-      fingerprintBucketNameToCreate: "umccr-fingerprint-dev",
-      bamSources: ["gds://development/analysis_data"],
-      bamLimits: ["wgs_alignment_qc"],
+      icaSecretNamePartial: ICA_SEC,
+      fingerprintBucketNameToCreate: DEV_FINGERPRINT_BUCKET,
+      bamSources: [DEV_TEST_BAM_SOURCE],
+      // our full path must contain this string - in this case everything in the TEST BAM path will match
+      bamLimits: ["holmes"],
       referenceFastaBucketName: FASTA_BUCKET,
       referenceFastaBucketKey: FASTA_KEY,
-      sitesBucketName: SITES_BUCKET,
-      sitesBucketKey: SITES_KEY,
+      sitesBucketName: DEV_SITES_BUCKET,
+      sitesBucketKey: DEV_SITES_KEY,
+    });
+
+    pipeline.addStage(devStage, {
+      post: [
+        new pipelines.ShellStep("Validate Functionality", {
+          envFromCfnOutputs: {
+            CHECK_STEPS_ARN: devStage.checkStepsArnOutput,
+            EXTRACT_STEPS_ARN: devStage.extractStepsArnOutput,
+          },
+          commands: [
+            "npm ci",
+            // this is an approx 20 minute test that deletes some fingerprints, then creates some
+            // new fingerprints, then does some checks
+            `npx ts-node holmes-e2e-test.ts -- "${DEV_FINGERPRINT_BUCKET}" "${DEV_SITES_CHECKSUM}/${"a"}" "$CHECK_STEPS_ARN" "$EXTRACT_STEPS_ARN"`,
+          ],
+        }),
+      ],
     });
 
     const prodStage = new HolmesBuildStage(this, "Prod", {
@@ -91,7 +120,7 @@ export class HolmesPipelineStack extends Stack {
       },
       namespaceName: NAMESPACE_NAME,
       namespaceId: NAMESPACE_PROD_ID,
-      icaSecretNamePartial: "IcaSecretsPortal", // pragma: allowlist secret
+      icaSecretNamePartial: ICA_SEC,
       fingerprintBucketNameToCreate: "umccr-fingerprint-prod",
       bamSources: ["gds://production/analysis_data"],
       bamLimits: ["wgs_alignment_qc"],
@@ -99,23 +128,6 @@ export class HolmesPipelineStack extends Stack {
       referenceFastaBucketKey: FASTA_KEY,
       sitesBucketName: SITES_BUCKET,
       sitesBucketKey: SITES_KEY,
-    });
-
-    pipeline.addStage(devStage, {
-      post: [
-        new pipelines.ShellStep("Validate Endpoint", {
-          envFromCfnOutputs: {
-            CHECK_STEPS_ARN: devStage.checkStepsArnOutput,
-            EXTRACT_STEPS_ARN: devStage.extractStepsArnOutput,
-          },
-          commands: [
-            "echo $CHECK_STEPS_ARN",
-            //            "cd test/onto-cli",
-            //            "npm ci",
-            //            `npm run test -- "$FHIR_BASE_URL"`,
-          ],
-        }),
-      ],
     });
 
     pipeline.addStage(prodStage, {

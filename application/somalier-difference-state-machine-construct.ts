@@ -6,6 +6,36 @@ import {
   SomalierBaseStateMachineProps,
 } from "./somalier-base-state-machine-construct";
 
+/**
+ * The difference state machine calculates all BAM files that are located in the configured
+ * BAM sources - and works out if there is a corresponding up-to-date fingerprint for that
+ * BAM source.
+ *
+ * @input
+ *
+ * {
+ *
+ * }
+ *
+ * @output
+ *
+ * {
+ *  needsFingerprinting: [
+ *    [
+ *      "gds://source/1.bam",
+ *      "gds://source/2.bam",
+ *    ],
+ *    [
+ *     "gds://source/3.bam",
+ *     "gds://source/4.bam",
+ *    ]
+ *  ],
+ *  hasFingerprinting: [
+ *     "gds://source/5.bam",
+ *     "gds://source/6.bam",
+ *  ]
+ * }
+ */
 export class SomalierDifferenceStateMachineConstruct extends SomalierBaseStateMachineConstruct {
   private readonly lambdaRole: IRole;
   private readonly stateMachine: StateMachine;
@@ -21,7 +51,7 @@ export class SomalierDifferenceStateMachineConstruct extends SomalierBaseStateMa
 
     const differenceInvoke = this.createLambdaStep(
       "Difference",
-      "difference.lambdaHandler",
+      ["difference.lambdaHandler"],
       "$.Payload",
       this.lambdaRole,
       props

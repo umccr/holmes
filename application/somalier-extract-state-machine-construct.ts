@@ -1,32 +1,7 @@
 import { Construct } from "constructs";
-import { DockerImageAsset } from "aws-cdk-lib/aws-ecr-assets";
-import {
-  IntegrationPattern,
-  JsonPath,
-  Map,
-  StateMachine,
-  Succeed,
-} from "aws-cdk-lib/aws-stepfunctions";
-import {
-  EcsFargateLaunchTarget,
-  EcsRunTask,
-} from "aws-cdk-lib/aws-stepfunctions-tasks";
-import {
-  Cluster,
-  Compatibility,
-  ContainerImage,
-  CpuArchitecture,
-  FargatePlatformVersion,
-  ICluster,
-  LogDriver,
-  TaskDefinition,
-} from "aws-cdk-lib/aws-ecs";
-import { Vpc } from "aws-cdk-lib/aws-ec2";
-import { IRole, ManagedPolicy } from "aws-cdk-lib/aws-iam";
-import { RetentionDays } from "aws-cdk-lib/aws-logs";
-import { ISecret } from "aws-cdk-lib/aws-secretsmanager";
-import { Bucket, IBucket } from "aws-cdk-lib/aws-s3";
-import { HolmesReferenceDataSettings } from "../holmes-settings";
+import { StateMachine, Succeed } from "aws-cdk-lib/aws-stepfunctions";
+import { TaskDefinition } from "aws-cdk-lib/aws-ecs";
+import { IRole } from "aws-cdk-lib/aws-iam";
 import {
   SomalierBaseStateMachineConstruct,
   SomalierBaseStateMachineProps,

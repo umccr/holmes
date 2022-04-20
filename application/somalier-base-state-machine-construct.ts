@@ -17,6 +17,7 @@ import {
   ContainerImage,
   CpuArchitecture,
   FargatePlatformVersion,
+  FargateTaskDefinition,
   ICluster,
   LogDriver,
   TaskDefinition,
@@ -94,17 +95,16 @@ export class SomalierBaseStateMachineConstruct extends Construct {
     icaSecret: ISecret,
     dockerImageAsset: DockerImageAsset
   ): [TaskDefinition, ContainerDefinition] {
-    const td = new TaskDefinition(this, "Td", {
-      compatibility: Compatibility.FARGATE,
+    const td = new FargateTaskDefinition(this, "Td", {
       runtimePlatform: {
         // we lock the platform in the Dockerfiles to x64 to match up with this
         // (we have some developers on M1 macs so we need this to force intel builds)
         cpuArchitecture: CpuArchitecture.X86_64,
       },
-      cpu: "1024",
+      cpu: 1024,
       // some experimentation needed - we probably don't need this much memory but it may
       // give us better network performance...
-      memoryMiB: "4096",
+      memoryLimitMiB: 4096,
     });
 
     td.taskRole.addManagedPolicy(
@@ -158,6 +158,11 @@ export class SomalierBaseStateMachineConstruct extends Construct {
           environment: this.createFargateLambdaEnv(props),
         },
       ],
+      // we should not get *anywhere* near 6 hours for tasks - each fingerprint takes about 15 mins... and
+      // our default clumping size is 5, so 5x15 mins is about normal...
+      // but we set it here as a worst case where we have an infinite loop or something - we want steps to
+      // step in and kill the task
+      timeout: Duration.hours(6),
     });
 
     // The Map invoke step is the parallel invocation according to the dynamic array input
@@ -166,6 +171,17 @@ export class SomalierBaseStateMachineConstruct extends Construct {
       itemsPath: "$.needsFingerprinting",
       parameters: {
         "files.$": "$$.Map.Item.Value",
+      },
+      // the result of an ECS Task is a very large JSON with all the ECS details - and this will overflow
+      // the steps State limits if not pruned
+      resultSelector: {
+        "CreatedAt.$": "$.CreatedAt",
+        "ExecutionStoppedAt.$": "$.ExecutionStoppedAt",
+        "StartedAt.$": "$.StartedAt",
+        "StopCode.$": "$.StopCode",
+        "StoppedAt.$": "$.StoppedAt",
+        "StoppedReason.$": "$.StoppedReason",
+        "TaskArn.$": "$.TaskArn",
       },
     }).iterator(runTask);
   }
@@ -201,8 +217,8 @@ export class SomalierBaseStateMachineConstruct extends Construct {
   /**
    * Create an AWS Step that invokes a somalier docker based lambda.
    *
-   * @param stepName
-   * @param cmd
+   * @param stepName a unique String to distinguish the CDK name for this lambda
+   * @param cmd the CMD array for docker lambda entry
    * @param outputPath
    * @param role
    * @param props
@@ -210,7 +226,7 @@ export class SomalierBaseStateMachineConstruct extends Construct {
    */
   protected createLambdaStep(
     stepName: string,
-    cmd: string,
+    cmd: string[],
     outputPath: string,
     role: IRole,
     props: SomalierBaseStateMachineProps
@@ -221,7 +237,7 @@ export class SomalierBaseStateMachineConstruct extends Construct {
       role: role,
       code: DockerImageCode.fromEcr(props.dockerImageAsset.repository, {
         tag: props.dockerImageAsset.assetHash,
-        cmd: [cmd],
+        cmd: cmd,
       }),
       environment: this.createLambdaEnv(props),
     });
