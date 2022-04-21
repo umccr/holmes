@@ -56,16 +56,11 @@ export class HolmesPipelineStack extends Stack {
           new PolicyStatement({
             actions: ["sts:AssumeRole"],
             resources: ["*"],
-            conditions: {
-              StringEquals: {
-                "iam:ResourceTag/aws-cdk:bootstrap-role": "lookup",
-              },
-            },
-          }),
-          // allow the code pipeline stages to do some test work with fingerprint buckets
-          new PolicyStatement({
-            actions: ["s3:*"],
-            resources: ["*"],
+            //conditions: {
+            //  StringEquals: {
+            //    "iam:ResourceTag/aws-cdk:bootstrap-role": "lookup",
+            //  },
+            //},
           }),
         ],
       }),
@@ -112,11 +107,10 @@ export class HolmesPipelineStack extends Stack {
             DIFFERENCE_STEPS_ARN: devStage.differenceStepsArnOutput,
           },
           commands: [
-            "aws sts get-caller-identity",
             "npm ci",
             // this is an approx 20 minute test that deletes some fingerprints, then creates some
             // new fingerprints, then does some checks
-            `npx ts-node holmes-e2e-test.ts "${DEV_FINGERPRINT_BUCKET}" "${DEV_TEST_BAM_SOURCE}" "${DEV_SITES_CHECKSUM}" "$CHECK_STEPS_ARN" "$EXTRACT_STEPS_ARN" "$DIFFERENCE_STEPS_ARN"`,
+            `NODE_OPTIONS="--unhandled-rejections=strict" npx ts-node holmes-e2e-test.ts "arn:aws:iam::843407916570:role/HolmesTester" "${DEV_FINGERPRINT_BUCKET}" "${DEV_TEST_BAM_SOURCE}" "${DEV_SITES_CHECKSUM}" "$CHECK_STEPS_ARN" "$EXTRACT_STEPS_ARN" "$DIFFERENCE_STEPS_ARN"`,
           ],
         }),
       ],

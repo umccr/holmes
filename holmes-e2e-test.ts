@@ -9,12 +9,14 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 import * as assert from "assert";
+import { AssumeRoleCommand, STSClient } from "@aws-sdk/client-sts";
 
-const stepsClient = new SFNClient({});
-const s3Client = new S3Client({});
-
-async function doFingerprintCheck(checkStepsArn: string, bamUrl: string) {
-  const result = await doStepsExecution(checkStepsArn, {
+async function doFingerprintCheck(
+  stepsClient: SFNClient,
+  checkStepsArn: string,
+  bamUrl: string
+) {
+  const result = await doStepsExecution(stepsClient, checkStepsArn, {
     index: bamUrl,
     // note because we are doing trio testing we want to explicitly to be a pretty broad search
     relatednessThreshold: 0.4,
@@ -23,7 +25,11 @@ async function doFingerprintCheck(checkStepsArn: string, bamUrl: string) {
   console.log(result);
 }
 
-async function doStepsExecution(stepsArn: string, inp: any): Promise<any> {
+async function doStepsExecution(
+  stepsClient: SFNClient,
+  stepsArn: string,
+  inp: any
+): Promise<any> {
   const stepExecuteResult = await stepsClient.send(
     new StartExecutionCommand({
       stateMachineArn: stepsArn,
@@ -70,6 +76,8 @@ async function doStepsExecution(stepsArn: string, inp: any): Promise<any> {
  * @param differenceStepsArn the steps function for detecting which fingerprints need creating
  */
 export async function runTest(
+  stepsClient: SFNClient,
+  s3Client: S3Client,
   fingerprintBucket: string,
   gdsBase: string,
   sitesChecksum: string,
@@ -149,12 +157,16 @@ export async function runTest(
   const DIFF_CHUNK_SIZE = 2;
 
   // we now want to do a Difference operation to see what is not fingerprinted
-  const differenceResult = await doStepsExecution(differenceStepsArn, {
-    // a dev chunk size of 2 means that when we re-process our trio - we should end up
-    // with 2 on one ECS task (which tests out the multiple BAMs per task), and 1 on the other
-    // (which tests out the fact we can spawn multiple tasks)
-    devChunkSize: DIFF_CHUNK_SIZE,
-  });
+  const differenceResult = await doStepsExecution(
+    stepsClient,
+    differenceStepsArn,
+    {
+      // a dev chunk size of 2 means that when we re-process our trio - we should end up
+      // with 2 on one ECS task (which tests out the multiple BAMs per task), and 1 on the other
+      // (which tests out the fact we can spawn multiple tasks)
+      devChunkSize: DIFF_CHUNK_SIZE,
+    }
+  );
 
   console.log(differenceResult);
 
@@ -206,25 +218,57 @@ export async function runTest(
 
   //console.log(extractResult);
 
-  await doFingerprintCheck(checkStepsArn, TRIO_CHILD);
+  await doFingerprintCheck(stepsClient, checkStepsArn, TRIO_CHILD);
 
-  await doFingerprintCheck(checkStepsArn, TRIO_MOTHER);
+  await doFingerprintCheck(stepsClient, checkStepsArn, TRIO_MOTHER);
 
-  await doFingerprintCheck(checkStepsArn, TRIO_FATHER);
+  await doFingerprintCheck(stepsClient, checkStepsArn, TRIO_FATHER);
 
-  await doFingerprintCheck(checkStepsArn, INDIVIDUAL_96);
+  await doFingerprintCheck(stepsClient, checkStepsArn, INDIVIDUAL_96);
 }
 
 (async () => {
   console.log(
-    `Testing Holmes with ${process.argv[2]} ${process.argv[3]} ${process.argv[4]} ${process.argv[5]} ${process.argv[6]} ${process.argv[7]}`
+    `Testing Holmes via role ${process.argv[2]} in bucket ${process.argv[3]} and BAMs from ${process.argv[4]} with sites checksummed ${process.argv[5]} and steps ${process.argv[6]} ${process.argv[7]} ${process.argv[8]}`
   );
+
+  // annoyingly we have to bridge across from the build account - were we want to execute this test as part of
+  // the codepipeline - to the dev account where the buckets/steps live (none of which have cross-account perms).
+  // so the first argument we are passed is a role we can assume in dev that can do the actual AWS calls
+  const stsClient = new STSClient({});
+
+  const assumeRoleResult = await stsClient.send(
+    new AssumeRoleCommand({
+      RoleArn: process.argv[2],
+      RoleSessionName: "E2ETest",
+    })
+  );
+
+  const stepsClient = new SFNClient({
+    credentials: {
+      accessKeyId: assumeRoleResult.Credentials?.AccessKeyId!,
+      secretAccessKey: assumeRoleResult.Credentials?.SecretAccessKey!,
+      sessionToken: assumeRoleResult.Credentials?.SessionToken,
+      expiration: assumeRoleResult.Credentials?.Expiration,
+    },
+  });
+  const s3Client = new S3Client({
+    credentials: {
+      accessKeyId: assumeRoleResult.Credentials?.AccessKeyId!,
+      secretAccessKey: assumeRoleResult.Credentials?.SecretAccessKey!,
+      sessionToken: assumeRoleResult.Credentials?.SessionToken,
+      expiration: assumeRoleResult.Credentials?.Expiration,
+    },
+  });
+
   await runTest(
-    process.argv[2],
+    stepsClient,
+    s3Client,
     process.argv[3],
     process.argv[4],
     process.argv[5],
     process.argv[6],
-    process.argv[7]
+    process.argv[7],
+    process.argv[8]
   );
 })();
