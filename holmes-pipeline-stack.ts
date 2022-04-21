@@ -104,7 +104,7 @@ export class HolmesPipelineStack extends Stack {
 
     pipeline.addStage(devStage, {
       post: [
-        new pipelines.ManualApprovalStep("Run E2E Tests (20 mins)"),
+        // new pipelines.ManualApprovalStep("Run E2E Tests (20 mins)"),
         new pipelines.ShellStep("E2E Tests", {
           envFromCfnOutputs: {
             CHECK_STEPS_ARN: devStage.checkStepsArnOutput,
@@ -112,6 +112,7 @@ export class HolmesPipelineStack extends Stack {
             DIFFERENCE_STEPS_ARN: devStage.differenceStepsArnOutput,
           },
           commands: [
+            "aws sts get-caller-identity",
             "npm ci",
             // this is an approx 20 minute test that deletes some fingerprints, then creates some
             // new fingerprints, then does some checks
