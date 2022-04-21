@@ -175,13 +175,13 @@ export class SomalierBaseStateMachineConstruct extends Construct {
       // the result of an ECS Task is a very large JSON with all the ECS details - and this will overflow
       // the steps State limits if not pruned
       resultSelector: {
-        "CreatedAt.$": "$.CreatedAt",
-        "ExecutionStoppedAt.$": "$.ExecutionStoppedAt",
-        "StartedAt.$": "$.StartedAt",
-        "StopCode.$": "$.StopCode",
-        "StoppedAt.$": "$.StoppedAt",
-        "StoppedReason.$": "$.StoppedReason",
-        "TaskArn.$": "$.TaskArn",
+        //"CreatedAt.$": "$.CreatedAt",
+        //"ExecutionStoppedAt.$": "$.ExecutionStoppedAt",
+        //"StartedAt.$": "$.StartedAt",
+        //"StopCode.$": "$.StopCode",
+        //"StoppedAt.$": "$.StoppedAt",
+        //"StoppedReason.$": "$.StoppedReason",
+        //"TaskArn.$": "$.TaskArn",
       },
     }).iterator(runTask);
   }

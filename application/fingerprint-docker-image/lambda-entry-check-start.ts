@@ -1,5 +1,4 @@
-import { _Object } from "@aws-sdk/client-s3";
-import { keyToUrl, s3ListAllFingerprintFiles, urlToKey } from "./lib/aws";
+import { s3ListAllFingerprintFiles, urlToKey } from "./lib/aws";
 import { safeGetFingerprintSites } from "./lib/env";
 import { chunk } from "./lib/misc";
 
@@ -12,7 +11,8 @@ type EventInput = {
 // fingerprints in one invoke... with as many invokes as needed to cover all the fingerprints
 const LAMBDA_CHUNK_SIZE = 5;
 
-const DEFAULT_RELATEDNESS_THRESHOLD = 0.5;
+// by default we want to avoid kinship detection in the checking - so setting this high
+const DEFAULT_RELATEDNESS_THRESHOLD = 0.8;
 
 export const lambdaHandler = async (ev: EventInput, context: any) => {
   if (!ev.index)

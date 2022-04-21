@@ -8,6 +8,7 @@ export class HolmesBuildStage extends Stage {
   // (this is also registered into CloudMap for more general use)
   public readonly checkStepsArnOutput: CfnOutput;
   public readonly extractStepsArnOutput: CfnOutput;
+  public readonly differenceStepsArnOutput: CfnOutput;
   public readonly differenceThenExtractStepsArnOutput: CfnOutput;
 
   constructor(
@@ -23,6 +24,7 @@ export class HolmesBuildStage extends Stage {
 
     this.checkStepsArnOutput = stack.checkStepsArnOutput;
     this.extractStepsArnOutput = stack.extractStepsArnOutput;
+    this.differenceStepsArnOutput = stack.differenceStepsArnOutput;
     this.differenceThenExtractStepsArnOutput =
       stack.differenceThenExtractStepsArnOutput;
   }

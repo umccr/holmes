@@ -1,4 +1,4 @@
-import { pipelines, Stack, StackProps } from "aws-cdk-lib";
+import { pipelines, Stack, StackProps, Stage } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import { StringParameter } from "aws-cdk-lib/aws-ssm";
 import { PolicyStatement } from "aws-cdk-lib/aws-iam";
@@ -75,7 +75,7 @@ export class HolmesPipelineStack extends Stack {
     const DEV_FINGERPRINT_BUCKET = "umccr-fingerprint-dev";
     const DEV_SITES_BUCKET = "umccr-refdata-dev";
     const DEV_SITES_KEY = "somalier/sites.hg38.rna.HOLMESTESTONLY.vcf.gz";
-    const DEV_SITES_CHECKSUM = "sdfsfdsdf";
+    const DEV_SITES_CHECKSUM = "f5aa74e7abaab6dc7e88aa9f392d021d"; // pragma: allowlist secret
     const DEV_TEST_BAM_SOURCE = "gds://development/test-data/holmes-test-data";
 
     const devStage = new HolmesBuildStage(this, "Dev", {
@@ -89,7 +89,8 @@ export class HolmesPipelineStack extends Stack {
       fingerprintBucketNameToCreate: DEV_FINGERPRINT_BUCKET,
       bamSources: [DEV_TEST_BAM_SOURCE],
       // our full path must contain this string - in this case everything in the TEST BAM path will match
-      bamLimits: ["holmes"],
+      // (this feature is more useful in a folder filled with BAMs we don't want to fingerprint)
+      bamLimits: ["/"],
       referenceFastaBucketName: FASTA_BUCKET,
       referenceFastaBucketKey: FASTA_KEY,
       sitesBucketName: DEV_SITES_BUCKET,
@@ -98,16 +99,18 @@ export class HolmesPipelineStack extends Stack {
 
     pipeline.addStage(devStage, {
       post: [
-        new pipelines.ShellStep("Validate Functionality", {
+        new pipelines.ManualApprovalStep("Run E2E Tests (20 mins)"),
+        new pipelines.ShellStep("E2E Tests", {
           envFromCfnOutputs: {
             CHECK_STEPS_ARN: devStage.checkStepsArnOutput,
             EXTRACT_STEPS_ARN: devStage.extractStepsArnOutput,
+            DIFFERENCE_STEPS_ARN: devStage.differenceStepsArnOutput,
           },
           commands: [
             "npm ci",
             // this is an approx 20 minute test that deletes some fingerprints, then creates some
             // new fingerprints, then does some checks
-            `npx ts-node holmes-e2e-test.ts -- "${DEV_FINGERPRINT_BUCKET}" "${DEV_SITES_CHECKSUM}/${"a"}" "$CHECK_STEPS_ARN" "$EXTRACT_STEPS_ARN"`,
+            `npx ts-node holmes-e2e-test.ts "${DEV_FINGERPRINT_BUCKET}" "${DEV_TEST_BAM_SOURCE}" "${DEV_SITES_CHECKSUM}" "$CHECK_STEPS_ARN" "$EXTRACT_STEPS_ARN" "$DIFFERENCE_STEPS_ARN"`,
           ],
         }),
       ],

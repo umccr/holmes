@@ -43,6 +43,12 @@ export interface HolmesStackSettings {
    * BAM limits - strings that must be present in the path for the BAM to count
    */
   readonly bamLimits: string[];
+
+  /**
+   * If true tells the stack to make an extra role that can be used to execute any of the steps
+   * functions (and S3 read only).
+   */
+  readonly createTesterRole?: boolean;
 }
 
 export interface HolmesReferenceDataSettings {
