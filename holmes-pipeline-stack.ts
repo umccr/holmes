@@ -62,6 +62,11 @@ export class HolmesPipelineStack extends Stack {
               },
             },
           }),
+          // allow the code pipeline stages to do some test work with fingerprint buckets
+          new PolicyStatement({
+            actions: ["s3:*"],
+            resources: ["*"],
+          }),
         ],
       }),
       crossAccountKeys: true,
