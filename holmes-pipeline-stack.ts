@@ -64,6 +64,20 @@ export class HolmesPipelineStack extends Stack {
           }),
         ],
       }),
+      codeBuildDefaults: {
+        // Control Elastic Network Interface creation
+        //vpc: vpc,
+        //subnetSelection: { subnetType: ec2.SubnetType.PRIVATE },
+        //securityGroups: [mySecurityGroup],
+
+        // Additional policy statements for the execution role
+        rolePolicy: [
+          new PolicyStatement({
+            actions: ["sts:AssumeRole"],
+            resources: ["*"],
+          }),
+        ],
+      },
       crossAccountKeys: true,
     });
 
@@ -97,23 +111,25 @@ export class HolmesPipelineStack extends Stack {
       sitesBucketKey: DEV_SITES_KEY,
     });
 
+    const orderedSteps = pipelines.Step.sequence([
+      new pipelines.ManualApprovalStep("Run E2E Tests (20 mins)"),
+      new pipelines.ShellStep("E2E Tests", {
+        envFromCfnOutputs: {
+          CHECK_STEPS_ARN: devStage.checkStepsArnOutput,
+          EXTRACT_STEPS_ARN: devStage.extractStepsArnOutput,
+          DIFFERENCE_STEPS_ARN: devStage.differenceStepsArnOutput,
+        },
+        commands: [
+          "npm ci",
+          // this is an approx 20 minute test that deletes some fingerprints, then creates some
+          // new fingerprints, then does some checks
+          `NODE_OPTIONS="--unhandled-rejections=strict" npx ts-node holmes-e2e-test.ts "arn:aws:iam::843407916570:role/HolmesTester" "${DEV_FINGERPRINT_BUCKET}" "${DEV_TEST_BAM_SOURCE}" "${DEV_SITES_CHECKSUM}" "$CHECK_STEPS_ARN" "$EXTRACT_STEPS_ARN" "$DIFFERENCE_STEPS_ARN"`,
+        ],
+      }),
+    ]);
+
     pipeline.addStage(devStage, {
-      post: [
-        // new pipelines.ManualApprovalStep("Run E2E Tests (20 mins)"),
-        new pipelines.ShellStep("E2E Tests", {
-          envFromCfnOutputs: {
-            CHECK_STEPS_ARN: devStage.checkStepsArnOutput,
-            EXTRACT_STEPS_ARN: devStage.extractStepsArnOutput,
-            DIFFERENCE_STEPS_ARN: devStage.differenceStepsArnOutput,
-          },
-          commands: [
-            "npm ci",
-            // this is an approx 20 minute test that deletes some fingerprints, then creates some
-            // new fingerprints, then does some checks
-            `NODE_OPTIONS="--unhandled-rejections=strict" npx ts-node holmes-e2e-test.ts "arn:aws:iam::843407916570:role/HolmesTester" "${DEV_FINGERPRINT_BUCKET}" "${DEV_TEST_BAM_SOURCE}" "${DEV_SITES_CHECKSUM}" "$CHECK_STEPS_ARN" "$EXTRACT_STEPS_ARN" "$DIFFERENCE_STEPS_ARN"`,
-          ],
-        }),
-      ],
+      post: orderedSteps,
     });
 
     const prodStage = new HolmesBuildStage(this, "Prod", {
