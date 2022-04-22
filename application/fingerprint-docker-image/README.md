@@ -14,10 +14,16 @@ We could split them into separate Docker assets if need be though.
 
 ## Local
 
-The `local-test.sh` script are direct local test cases that can be executed
+The `test-local.sh` script are direct local test cases that can be executed
 on the Typescript code directly as Nodejs apps.
-This testing does require the environment have AWS_SECRET_X etc variables
-set up for a user in UMCCR dev account.
+
+This testing requires the execution environment have AWS\_\* variables
+set up for a user in the UMCCR dev account. Other settings/paths in
+both `test-local.sh` and `test-local.ts`
+may need to be refreshed from time to time to match up with the developer
+deployed versions of various artifacts. It is impossible to guarantee
+that files won't move around in these dev buckets, hence the
+BAMs chosen for testing may also change.
 
 ```shell
 ./test-local.sh extract
@@ -37,17 +43,9 @@ set up for a user in UMCCR dev account.
 
 ## Local Docker
 
-The `docker-test` folder has some scripts for doing local testing but in an environment
+The `test-docker` folder has some scripts for doing local testing but in an environment
 that _simulates_ AWS lambdas. This is good for testing packaging, lambda path issues etc.
 IT IS STILL NOT IDENTICAL TO THE REAL LAMBDA ENVIRONMENT THOUGH - as it does not enforce
-disk size or disk r/w limits like a real lambda does. This testing does require the environment have AWS_SECRET_X etc variables
+disk size or disk r/w limits like a real lambda does. This testing
+does require the environment have AWS\_\* variables
 set up for a user in UMCCR dev account.
-
-## Extract Testing (disabled)
-
-For local testing/building of the extract function (disabled due to not working
-in lambda time frames) you need to make a `sites.vcf.gz` file in the
-Docker folder (see somalier website for this file).
-
-In a real deployed version of the application this file is
-fetched from the master location as part of the CodeBuild process.

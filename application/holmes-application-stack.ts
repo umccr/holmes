@@ -14,6 +14,10 @@ import { SomalierDifferenceThenExtractStateMachineConstruct } from "./somalier-d
 import { SomalierDifferenceStateMachineConstruct } from "./somalier-difference-state-machine-construct";
 import { AccountPrincipal, ManagedPolicy, Role } from "aws-cdk-lib/aws-iam";
 
+/**
+ * The Holmes application is a stack that implements a BAM fingerprinting
+ * service.
+ */
 export class HolmesApplicationStack extends Stack {
   // the output Steps functions we create (are also registered into CloudMap)
   // we output this here so it can be used in the codepipeline build for testing
@@ -22,6 +26,7 @@ export class HolmesApplicationStack extends Stack {
   public readonly differenceStepsArnOutput: CfnOutput;
   public readonly differenceThenExtractStepsArnOutput: CfnOutput;
 
+  // an optional output CFN for any stack that has decided it wants a role to be created for testing
   public readonly testerRoleArnOutput: CfnOutput;
 
   constructor(
@@ -66,7 +71,10 @@ export class HolmesApplicationStack extends Stack {
           "A role created only in dev that allows execution of tests from the build account",
       });
 
+      // enable full access to the fingerprint bucket as the test does some deletion
       fingerprintBucket.grantReadWrite(testerRole);
+
+      // we add steps execution permissions in the state machine constructs
     }
 
     // the Docker asset shared by all steps

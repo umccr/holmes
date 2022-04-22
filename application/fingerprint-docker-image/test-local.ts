@@ -26,6 +26,17 @@ import { lambdaHandler as checkStartLambdaHandler } from "./lambda-entry-check-s
         ]);
         console.log("done extract");
         break;
+      case "check-start":
+        const checkStartResult = await checkStartLambdaHandler(
+          {
+            index:
+              "gds://development/analysis_data/SBJ00913/wgs_tumor_normal/2022031260ecc964/L2100748_L2100747_dragen/MDX210178_normal.bam",
+          },
+          {}
+        );
+
+        console.log(checkStartResult);
+        break;
       case "check":
         const checkResult = await checkLambdaHandler(
           {
@@ -45,17 +56,6 @@ import { lambdaHandler as checkStartLambdaHandler } from "./lambda-entry-check-s
         );
 
         console.log(checkResult);
-        break;
-      case "check-start":
-        const checkStartResult = await checkStartLambdaHandler(
-          {
-            index:
-              "gds://development/analysis_data/SBJ00913/wgs_tumor_normal/2022031260ecc964/L2100748_L2100747_dragen/MDX210178_normal.bam",
-          },
-          {}
-        );
-
-        console.log(checkStartResult);
         break;
       default:
         throw new Error(`Unknown lambda to test ${lambdaChoice}`);
