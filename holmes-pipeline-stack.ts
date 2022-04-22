@@ -1,7 +1,7 @@
-import { pipelines, Stack, StackProps, Stage } from "aws-cdk-lib";
+import { pipelines, Stack, StackProps } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import { StringParameter } from "aws-cdk-lib/aws-ssm";
-import { PolicyStatement } from "aws-cdk-lib/aws-iam";
+import { Effect, PolicyStatement } from "aws-cdk-lib/aws-iam";
 import { STACK_DESCRIPTION } from "./holmes-settings";
 import {
   AWS_DEV_ACCOUNT,
@@ -54,6 +54,7 @@ export class HolmesPipelineStack extends Stack {
         ],
         rolePolicyStatements: [
           new PolicyStatement({
+            effect: Effect.ALLOW,
             actions: ["sts:AssumeRole"],
             resources: ["*"],
             //conditions: {
@@ -70,8 +71,9 @@ export class HolmesPipelineStack extends Stack {
         // are quite permissive (it is limited to one non-prod account though)
         rolePolicy: [
           new PolicyStatement({
+            effect: Effect.ALLOW,
             actions: ["sts:AssumeRole"],
-            resources: [`arn:aws:iam::${AWS_DEV_ACCOUNT}/*`],
+            resources: [`arn:aws:iam::${AWS_DEV_ACCOUNT}:role/*`],
           }),
         ],
       },
