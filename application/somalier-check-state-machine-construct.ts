@@ -58,6 +58,12 @@ export class SomalierCheckStateMachineConstruct extends SomalierBaseStateMachine
         .next(checkMapInvoke)
         .next(new Succeed(this, "Succeed")),
     });
+
+    if (props.allowExecutionByTesterRole) {
+      this.stateMachine.grantExecution(props.allowExecutionByTesterRole);
+      this.stateMachine.grantStartExecution(props.allowExecutionByTesterRole);
+      this.stateMachine.grantTaskResponse(props.allowExecutionByTesterRole);
+    }
   }
 
   public get stepsArn(): string {

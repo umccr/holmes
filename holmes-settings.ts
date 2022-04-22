@@ -45,10 +45,11 @@ export interface HolmesStackSettings {
   readonly bamLimits: string[];
 
   /**
-   * If true tells the stack to make an extra role that can be used to execute any of the steps
-   * functions (and S3 read only).
+   * If set tells the stack to make an extra role that can be used to execute any of the steps
+   * functions (and S3 actions in the fingerprint bucket) - with an assume role from the given
+   * account.
    */
-  readonly createTesterRole?: boolean;
+  readonly createTesterRoleAllowingAccount?: string;
 }
 
 export interface HolmesReferenceDataSettings {

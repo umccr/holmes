@@ -10,6 +10,7 @@ export class HolmesBuildStage extends Stage {
   public readonly extractStepsArnOutput: CfnOutput;
   public readonly differenceStepsArnOutput: CfnOutput;
   public readonly differenceThenExtractStepsArnOutput: CfnOutput;
+  public readonly testerRoleArnOutput?: CfnOutput;
 
   constructor(
     scope: Construct,
@@ -27,5 +28,6 @@ export class HolmesBuildStage extends Stage {
     this.differenceStepsArnOutput = stack.differenceStepsArnOutput;
     this.differenceThenExtractStepsArnOutput =
       stack.differenceThenExtractStepsArnOutput;
+    this.testerRoleArnOutput = stack.testerRoleArnOutput;
   }
 }

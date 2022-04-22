@@ -12,6 +12,7 @@ import { Cluster } from "aws-cdk-lib/aws-ecs";
 import { SomalierExtractStateMachineConstruct } from "./somalier-extract-state-machine-construct";
 import { SomalierDifferenceThenExtractStateMachineConstruct } from "./somalier-difference-then-extract-state-machine-construct";
 import { SomalierDifferenceStateMachineConstruct } from "./somalier-difference-state-machine-construct";
+import { AccountPrincipal, Role } from "aws-cdk-lib/aws-iam";
 
 export class HolmesApplicationStack extends Stack {
   // the output Steps functions we create (are also registered into CloudMap)
@@ -20,6 +21,8 @@ export class HolmesApplicationStack extends Stack {
   public readonly extractStepsArnOutput: CfnOutput;
   public readonly differenceStepsArnOutput: CfnOutput;
   public readonly differenceThenExtractStepsArnOutput: CfnOutput;
+
+  public readonly testerRoleArnOutput: CfnOutput;
 
   constructor(
     scope: Construct,
@@ -52,6 +55,18 @@ export class HolmesApplicationStack extends Stack {
       props.icaSecretNamePartial
     );
 
+    // the testing role can be requested and will allow execution of the steps from
+    // another account
+    let testerRole: Role | undefined = undefined;
+
+    if (props.createTesterRoleAllowingAccount) {
+      testerRole = new Role(this, "TesterRole", {
+        assumedBy: new AccountPrincipal(props.createTesterRoleAllowingAccount),
+      });
+
+      fingerprintBucket.grantReadWrite(testerRole);
+    }
+
     // the Docker asset shared by all steps
     const asset = this.addFingerprintDockerAsset();
 
@@ -63,6 +78,7 @@ export class HolmesApplicationStack extends Stack {
         icaSecret: icaSecret,
         fingerprintBucket: fingerprintBucket,
         fargateCluster: cluster,
+        allowExecutionByTesterRole: testerRole,
         ...props,
       }
     );
@@ -75,6 +91,7 @@ export class HolmesApplicationStack extends Stack {
         icaSecret: icaSecret,
         fingerprintBucket: fingerprintBucket,
         fargateCluster: cluster,
+        allowExecutionByTesterRole: testerRole,
         ...props,
       }
     );
@@ -87,6 +104,7 @@ export class HolmesApplicationStack extends Stack {
         icaSecret: icaSecret,
         fingerprintBucket: fingerprintBucket,
         fargateCluster: cluster,
+        allowExecutionByTesterRole: testerRole,
         ...props,
       }
     );
@@ -100,6 +118,7 @@ export class HolmesApplicationStack extends Stack {
           icaSecret: icaSecret,
           fingerprintBucket: fingerprintBucket,
           fargateCluster: cluster,
+          allowExecutionByTesterRole: testerRole,
           ...props,
         }
       );
@@ -147,6 +166,12 @@ export class HolmesApplicationStack extends Stack {
           differenceThenExtractStateMachine.stepsArn,
       },
     });
+
+    if (testerRole) {
+      this.testerRoleArnOutput = new CfnOutput(this, "TesterRoleArn", {
+        value: testerRole.roleArn,
+      });
+    }
 
     this.checkStepsArnOutput = new CfnOutput(this, "CheckStepsArn", {
       value: checkStateMachine.stepsArn,

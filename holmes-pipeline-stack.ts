@@ -4,6 +4,7 @@ import { StringParameter } from "aws-cdk-lib/aws-ssm";
 import { Effect, PolicyStatement } from "aws-cdk-lib/aws-iam";
 import { STACK_DESCRIPTION } from "./holmes-settings";
 import {
+  AWS_BUILD_ACCOUNT,
   AWS_DEV_ACCOUNT,
   AWS_DEV_REGION,
   AWS_PROD_ACCOUNT,
@@ -108,6 +109,7 @@ export class HolmesPipelineStack extends Stack {
       referenceFastaBucketKey: FASTA_KEY,
       sitesBucketName: DEV_SITES_BUCKET,
       sitesBucketKey: DEV_SITES_KEY,
+      createTesterRoleAllowingAccount: AWS_BUILD_ACCOUNT,
     });
 
     const orderedSteps = pipelines.Step.sequence([
@@ -118,12 +120,13 @@ export class HolmesPipelineStack extends Stack {
           CHECK_STEPS_ARN: devStage.checkStepsArnOutput,
           EXTRACT_STEPS_ARN: devStage.extractStepsArnOutput,
           DIFFERENCE_STEPS_ARN: devStage.differenceStepsArnOutput,
+          TESTER_ROLE_ARN: devStage.testerRoleArnOutput!,
         },
         commands: [
           "npm ci",
           // this is an approx 20 minute test that deletes some fingerprints, then creates some
           // new fingerprints, then does some checks
-          `NODE_OPTIONS="--unhandled-rejections=strict" npx ts-node holmes-e2e-test.ts "arn:aws:iam::843407916570:role/HolmesTester" "${DEV_FINGERPRINT_BUCKET}" "${DEV_TEST_BAM_SOURCE}" "${DEV_SITES_CHECKSUM}" "$CHECK_STEPS_ARN" "$EXTRACT_STEPS_ARN" "$DIFFERENCE_STEPS_ARN"`,
+          `NODE_OPTIONS="--unhandled-rejections=strict" npx ts-node holmes-e2e-test.ts "$TESTER_ROLE_ARN" "${DEV_FINGERPRINT_BUCKET}" "${DEV_TEST_BAM_SOURCE}" "${DEV_SITES_CHECKSUM}" "$CHECK_STEPS_ARN" "$EXTRACT_STEPS_ARN" "$DIFFERENCE_STEPS_ARN"`,
         ],
       }),
     ]);

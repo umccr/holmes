@@ -42,6 +42,8 @@ export type SomalierBaseStateMachineProps = HolmesReferenceDataSettings & {
   fingerprintBucket: IBucket;
   bamSources: string[];
   bamLimits: string[];
+
+  allowExecutionByTesterRole?: Role;
 };
 
 /**
