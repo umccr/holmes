@@ -65,16 +65,13 @@ export class HolmesPipelineStack extends Stack {
         ],
       }),
       codeBuildDefaults: {
-        // Control Elastic Network Interface creation
-        //vpc: vpc,
-        //subnetSelection: { subnetType: ec2.SubnetType.PRIVATE },
-        //securityGroups: [mySecurityGroup],
-
-        // Additional policy statements for the execution role
+        // we need to give the codebuild engines permissions to assume a role in DEV - in order that they
+        // can invoke the tests - we don't know the name of the role yet (as it is built by CDK) - so we
+        // are quite permissive (it is limited to one non-prod account though)
         rolePolicy: [
           new PolicyStatement({
             actions: ["sts:AssumeRole"],
-            resources: ["*"],
+            resources: [`arn:aws:iam::${AWS_DEV_ACCOUNT}/*`],
           }),
         ],
       },
@@ -112,7 +109,8 @@ export class HolmesPipelineStack extends Stack {
     });
 
     const orderedSteps = pipelines.Step.sequence([
-      new pipelines.ManualApprovalStep("Run E2E Tests (20 mins)"),
+      // Need to work out the costs of running the long tests on every build
+      // new pipelines.ManualApprovalStep("Run E2E Tests (20 mins)"),
       new pipelines.ShellStep("E2E Tests", {
         envFromCfnOutputs: {
           CHECK_STEPS_ARN: devStage.checkStepsArnOutput,
