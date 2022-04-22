@@ -12,7 +12,7 @@ import { Cluster } from "aws-cdk-lib/aws-ecs";
 import { SomalierExtractStateMachineConstruct } from "./somalier-extract-state-machine-construct";
 import { SomalierDifferenceThenExtractStateMachineConstruct } from "./somalier-difference-then-extract-state-machine-construct";
 import { SomalierDifferenceStateMachineConstruct } from "./somalier-difference-state-machine-construct";
-import { AccountPrincipal, Role } from "aws-cdk-lib/aws-iam";
+import { AccountPrincipal, ManagedPolicy, Role } from "aws-cdk-lib/aws-iam";
 
 export class HolmesApplicationStack extends Stack {
   // the output Steps functions we create (are also registered into CloudMap)
@@ -62,6 +62,8 @@ export class HolmesApplicationStack extends Stack {
     if (props.createTesterRoleAllowingAccount) {
       testerRole = new Role(this, "TesterRole", {
         assumedBy: new AccountPrincipal(props.createTesterRoleAllowingAccount),
+        description:
+          "A role created only in dev that allows execution of tests from the build account",
       });
 
       fingerprintBucket.grantReadWrite(testerRole);

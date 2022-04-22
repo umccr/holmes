@@ -60,9 +60,8 @@ export class SomalierCheckStateMachineConstruct extends SomalierBaseStateMachine
     });
 
     if (props.allowExecutionByTesterRole) {
-      this.stateMachine.grantExecution(props.allowExecutionByTesterRole);
+      this.stateMachine.grantRead(props.allowExecutionByTesterRole);
       this.stateMachine.grantStartExecution(props.allowExecutionByTesterRole);
-      this.stateMachine.grantTaskResponse(props.allowExecutionByTesterRole);
     }
   }
 
