@@ -66,6 +66,11 @@ export class SomalierDifferenceThenExtractStateMachineConstruct extends Somalier
         .next(extractMapStep)
         .next(new Succeed(this, "Succeed")),
     });
+
+    if (props.allowExecutionByTesterRole) {
+      this.stateMachine.grantRead(props.allowExecutionByTesterRole);
+      this.stateMachine.grantStartExecution(props.allowExecutionByTesterRole);
+    }
   }
 
   public get stepsArn(): string {

@@ -35,6 +35,11 @@ export class SomalierExtractStateMachineConstruct extends SomalierBaseStateMachi
     this.stateMachine = new StateMachine(this, "StateMachine", {
       definition: extractMapStep.next(new Succeed(this, "SucceedStep")),
     });
+
+    if (props.allowExecutionByTesterRole) {
+      this.stateMachine.grantRead(props.allowExecutionByTesterRole);
+      this.stateMachine.grantStartExecution(props.allowExecutionByTesterRole);
+    }
   }
 
   public get stepsArn(): string {

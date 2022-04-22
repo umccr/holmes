@@ -60,6 +60,11 @@ export class SomalierDifferenceStateMachineConstruct extends SomalierBaseStateMa
     this.stateMachine = new StateMachine(this, "StateMachine", {
       definition: differenceInvoke.next(new Succeed(this, "Succeed")),
     });
+
+    if (props.allowExecutionByTesterRole) {
+      this.stateMachine.grantRead(props.allowExecutionByTesterRole);
+      this.stateMachine.grantStartExecution(props.allowExecutionByTesterRole);
+    }
   }
 
   public get stepsArn(): string {
