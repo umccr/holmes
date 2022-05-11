@@ -12,7 +12,7 @@ COPY lib/ ./lib/
 COPY tsconfig.json ./
 
 RUN npx esbuild lambda-entry-check.ts --bundle --outfile=check.cjs --platform=node --target=node14
-RUN npx esbuild lambda-entry-check-start.ts --bundle --outfile=check-start.cjs --platform=node --target=node14
+RUN npx esbuild lambda-entry-check-start.ts --bundle --outfile=checkstart.cjs --platform=node --target=node14
 RUN npx esbuild lambda-entry-difference.ts --bundle --outfile=difference.cjs --platform=node --target=node14
 RUN npx esbuild fargate-entry-extract.ts --bundle --outfile=extract.cjs --platform=node --target=node14
 

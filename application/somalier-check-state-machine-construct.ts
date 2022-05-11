@@ -22,7 +22,7 @@ export class SomalierCheckStateMachineConstruct extends SomalierBaseStateMachine
     // The check-start function is used to divide up the work and work out the correct sites file to use
     const checkStartInvoke = this.createLambdaStep(
       "CheckStart",
-      ["check-start.lambdaHandler"],
+      ["checkstart.lambdaHandler"],
       "$.Payload",
       this.lambdaRole,
       props
