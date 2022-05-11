@@ -14,7 +14,7 @@ RUN cd / &&    \
 RUN cd /somalier &&  \
     nim c -d:danger -d:nsb_static -d:release -d:openmp -d:blas=openblas -d:lapack=openblas -o:/usr/bin/somalier src/somalier
 
-FROM --platform=linux/amd64 public.ecr.aws/lambda/nodejs:14 AS lambda
+FROM --platform=linux/amd64 public.ecr.aws/lambda/nodejs:16 AS lambda
 
 COPY --from=somalier-builder /usr/bin/somalier ./
 
@@ -29,12 +29,12 @@ RUN npm install
 COPY *.ts ./
 COPY lib/*.ts ./lib/
 
-RUN npx esbuild lambda-entry-check.ts --bundle --outfile=check.cjs --platform=node --target=node14
-RUN npx esbuild lambda-entry-check-start.ts --bundle --outfile=check-start.cjs --platform=node --target=node14
+RUN npx esbuild lambda-entry-check.ts --bundle --outfile=check.cjs --platform=node --target=node16
+RUN npx esbuild lambda-entry-check-start.ts --bundle --outfile=check-start.cjs --platform=node --target=node16
 
-RUN npx esbuild lambda-entry-difference.ts --bundle --outfile=difference.cjs --platform=node --target=node14
+RUN npx esbuild lambda-entry-difference.ts --bundle --outfile=difference.cjs --platform=node --target=node16
 
-RUN npx esbuild fargate-entry-extract.ts --bundle --outfile=extract.cjs --platform=node --target=node14
+RUN npx esbuild fargate-entry-extract.ts --bundle --outfile=extract.cjs --platform=node --target=node16
 
 # the CMD must be set as part of the lambda definition or docker invoke.. we have no default
 CMD [ "fail" ]
