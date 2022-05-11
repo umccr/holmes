@@ -19,6 +19,8 @@ import {
   somalierSitesBucketName,
   somalierWork,
 } from "./env";
+import axios from "axios";
+import * as rax from "retry-axios";
 
 const s3Client = new S3Client({});
 
@@ -56,6 +58,18 @@ async function fingerprint(file: string, sitesChecksum: string) {
     } catch (e) {
       return;
     }
+
+    const bamHead = await axios.head(presignedUrl);
+
+    console.log(bamHead.status);
+    console.log(bamHead.statusText);
+    console.log(bamHead.headers);
+
+    const baiHead = await axios.head(presignedUrlBai);
+
+    console.log(baiHead.status);
+    console.log(baiHead.statusText);
+    console.log(baiHead.headers);
 
     // this is the undocumented mechanism of nim-htslib to have a path that also specifies the actual index file
     indexString = `${presignedUrl}##idx##${presignedUrlBai}`;
