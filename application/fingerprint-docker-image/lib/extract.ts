@@ -59,13 +59,17 @@ async function fingerprint(file: string, sitesChecksum: string) {
       return;
     }
 
-    const bamHead = await axios.head(presignedUrl);
+    const bamHead = await axios.get(presignedUrl, {
+      headers: { Range: "bytes=0-64" },
+    });
 
     console.log(bamHead.status);
     console.log(bamHead.statusText);
     console.log(bamHead.headers);
 
-    const baiHead = await axios.head(presignedUrlBai);
+    const baiHead = await axios.get(presignedUrlBai, {
+      headers: { Range: "bytes=0-64" },
+    });
 
     console.log(baiHead.status);
     console.log(baiHead.statusText);
