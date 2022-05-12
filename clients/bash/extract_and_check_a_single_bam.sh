@@ -16,7 +16,6 @@ set -euo pipefail
 
 # Set globals
 SERVICE_NAME="fingerprint"
-BAM_GDS_FILE_PATH="gds://production/analysis_data/SBJ00005/wgs_alignment_qc/20211201bd0ac3a3/L2101368__4_dragen/PTC_Tsqn211109.bam"
 EXTRACT_STEPS_ARN_KEY="extractStepsArn"
 CHECK_STEPS_ARN_KEY="checkStepsArn"
 RELATEDNESS_THRESHOLD="0.4"
@@ -55,10 +54,27 @@ if [[ "${aws_major_version}" -lt "2" ]]; then
   echo "Please install the aws v2 cli" 1>&2
   exit 1
 fi
-
 # 3. Youre logged into AWS
 if [[ ! "$(aws sts get-caller-identity --output json | jq '.Account != null')" == "true" ]]; then
   echo "Could not confirm user is logged into aws"
+  exit 1
+fi
+
+# Get inputs
+# Get args from command line
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -b | --bam-path)
+      bam_path="$2"
+      shift 1
+      ;;
+  esac
+  shift 1
+done
+
+# Check bam path var exists
+if [[ -z "${bam_path-}" ]]; then
+  echo "Please provide a gds path with the parameter '--bam-path'"
   exit 1
 fi
 
@@ -117,7 +133,7 @@ extract_step_statemachine_arn="$( \
 echo "Generate the cli input for the extract step" 1>&2
 extract_cli_input_json_str="$( \
   jq --raw-output --null-input --compact-output \
-    --arg input_bam_file "${BAM_GDS_FILE_PATH}" \
+    --arg input_bam_file "${bam_path}" \
     '
       {
         "input": {
@@ -194,7 +210,7 @@ check_step_statemachine_arn="$( \
 echo "Generate check stepfunction input" 1>&2
 check_step_cli_input_json_str="$( \
   jq --raw-output --null-input --compact-output \
-    --arg input_bam_file "${BAM_GDS_FILE_PATH}" \
+    --arg input_bam_file "${bam_path}" \
     --arg relatedness_threshold "${RELATEDNESS_THRESHOLD}" \
     '
       {
@@ -252,7 +268,7 @@ aws stepfunctions describe-execution \
   --execution-arn "${check_step_run_instance_arn}" \
   --output json |
 jq --raw-output \
-  --arg input_bam_file "${BAM_GDS_FILE_PATH}" \
+  --arg input_bam_file "${bam_path}" \
   '
     def get_subject: .file | split("/")[4];
     [
