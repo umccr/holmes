@@ -5,6 +5,7 @@ import { chunk } from "./lib/misc";
 type EventInput = {
   index: string;
   relatednessThreshold?: number;
+  excludeRegex?: string;
 };
 
 // controls the concurrency of the checking - each lambda will be asked to do LAMBDA_CHUNK_SIZE
@@ -31,6 +32,12 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
     fingerprintBucketName,
     sitesChecksum
   )) {
+    // we allow known patterns to be excluded entirely at the fingerprint discovery level
+    // so they will not partake in the comparisions at all
+    if (ev.excludeRegex) {
+      if (RegExp(ev.excludeRegex).test(file.Key!)) continue;
+    }
+
     fingerprintKeySet.add(file.Key!);
   }
 
