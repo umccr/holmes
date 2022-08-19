@@ -30,7 +30,8 @@ import { lambdaHandler as checkStartLambdaHandler } from "./lambda-entry-check-s
         const checkStartResult = await checkStartLambdaHandler(
           {
             index:
-              "gds://development/analysis_data/SBJ00913/wgs_tumor_normal/2022031260ecc964/L2100748_L2100747_dragen/MDX210178_normal.bam",
+              "gds://development/test-data/holmes-test-data/family/giab_exome_trio/HG002-ready.bam",
+            excludeRegex: ".*HG.*",
           },
           {}
         );

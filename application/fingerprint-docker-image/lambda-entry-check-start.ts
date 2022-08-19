@@ -35,7 +35,9 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
     // we allow known patterns to be excluded entirely at the fingerprint discovery level
     // so they will not partake in the comparisions at all
     if (ev.excludeRegex) {
-      if (RegExp(ev.excludeRegex).test(file.Key!)) continue;
+      const res = RegExp(ev.excludeRegex).test(file.Key!);
+      console.log(`Regex ${ev.excludeRegex} for ${file.Key!} was ${res}`);
+      if (res) continue;
     }
 
     fingerprintKeySet.add(file.Key!);

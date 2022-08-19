@@ -28,16 +28,19 @@ const SKIP_DELETING_DATA = false;
  * @param stepsClient a steps AWS client
  * @param checkStepsArn the ARN of the checking step function
  * @param bamUrl the index BAM to check
+ * @param excludeRegex if present sent as the exclude regex
  */
 async function doFingerprintCheck(
   stepsClient: SFNClient,
   checkStepsArn: string,
-  bamUrl: string
+  bamUrl: string,
+  excludeRegex?: string
 ): Promise<{ [url: string]: number }> {
   const result = await doStepsExecution(stepsClient, checkStepsArn, {
     index: bamUrl,
     // note because we are doing trio testing we want to explicitly to be a pretty broad search
     relatednessThreshold: 0.4,
+    excludeRegex: excludeRegex,
   });
 
   const related: { [url: string]: number } = {};
@@ -341,6 +344,27 @@ export async function runTest(
     assert.ok(
       motherCheck[TRIO_SON] > 0.4 && motherCheck[TRIO_SON] < 0.6,
       "Mother/son relation not found"
+    );
+  }
+
+  {
+    console.log(CONSOLE_BREAK_LINE);
+    console.log("MOTHER CHECK WITH REGEX EXCLUDE");
+    console.log(CONSOLE_BREAK_LINE);
+
+    const motherCheckRegex = await doFingerprintCheck(
+      stepsClient,
+      checkStepsArn,
+      TRIO_MOTHER,
+      // note the regex is a regex over the hex values
+      `.*${Buffer.from("HG002").toString("hex")}.*`
+    );
+
+    console.log(motherCheckRegex);
+
+    assert.ok(
+      Object.keys(motherCheckRegex).length == 0,
+      "Mother should match 0 person because the child was regex excluded"
     );
   }
 
