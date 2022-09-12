@@ -110,6 +110,9 @@ export async function* s3ListAllFingerprintFiles(
 ): AsyncGenerator<_Object> {
   let contToken = undefined;
 
+  console.log("Starting - S3 file list");
+  let count = 0;
+
   do {
     const data: ListObjectsV2Output = await s3Client.send(
       new ListObjectsV2Command({
@@ -121,6 +124,16 @@ export async function* s3ListAllFingerprintFiles(
 
     contToken = data.NextContinuationToken;
 
-    for (const file of data.Contents || []) yield file;
+    if (data.IsTruncated)
+      console.log(
+        `S3 file list was truncated so going again with continuation ${contToken}`
+      );
+
+    for (const file of data.Contents || []) {
+      count++;
+      yield file;
+    }
   } while (contToken);
+
+  console.log(`Ending - S3 file list generated ${count} files`);
 }

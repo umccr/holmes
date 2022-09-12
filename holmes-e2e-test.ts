@@ -356,8 +356,7 @@ export async function runTest(
       stepsClient,
       checkStepsArn,
       TRIO_MOTHER,
-      // note the regex is a regex over the hex values
-      `.*${Buffer.from("HG002").toString("hex")}.*`
+      `.*HG002.*`
     );
 
     console.log(motherCheckRegex);

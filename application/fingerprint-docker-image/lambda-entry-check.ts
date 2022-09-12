@@ -25,7 +25,7 @@ type EventInput = {
   // the relatedness threshold to report against
   relatednessThreshold: number;
 
-  // a set of fingerprint keys which we will check the index against
+  // a set of fingerprint URLs which we will check the index against
   fingerprints: string[];
 };
 
@@ -116,9 +116,13 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
   const results: any = {};
 
   // download and 'fix' the sample ids for all the other fingerprint files we have been passed
-  for (const fingerprintKey of ev.fingerprints) {
-    const newSampleId = await getFingerprintObject(fingerprintKey, count);
-    results[newSampleId] = fingerprintKey;
+  for (const fingerprintUrl of ev.fingerprints) {
+    const fingerprintAsKey = urlToKey(
+      ev.sitesChecksum,
+      new URL(fingerprintUrl)
+    );
+    const newSampleId = await getFingerprintObject(fingerprintAsKey, count);
+    results[newSampleId] = fingerprintAsKey;
     count++;
   }
 
