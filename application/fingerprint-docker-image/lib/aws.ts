@@ -14,6 +14,8 @@ import { URL } from "url";
 
 const s3Client = new S3Client({});
 
+const FINGERPRINT_PREFIX = "prints";
+
 /**
  * Converts a fingerprint bucket key into the URL that that fingerprint
  * came from.
@@ -21,16 +23,16 @@ const s3Client = new S3Client({});
  * @param sitesChecksum
  * @param key
  */
-export function keyToUrl(sitesChecksum: string, key: string): URL {
-  // the key is in the format <sitesChecksum>/<hexencodedurl>
-  if (!key.startsWith(sitesChecksum + "/")) {
+export function keyToUrl(key: string): URL {
+  // the key is in the format <FINGERPRINT_PREFIX>/<hexencodedurl>
+  if (!key.startsWith(FINGERPRINT_PREFIX + "/")) {
     throw new Error(
-      "Key did not belong to the same sites file output we are expecting"
+      "Key did not belong to fingerprints portion of our fingerprint bucket"
     );
   }
 
-  // decode the hex after the leading <sitesChecksum>/
-  const buf = new Buffer(key.substring(sitesChecksum.length + 1), "hex");
+  // decode the hex after the leading <FINGERPRINT_PREFIX>/
+  const buf = new Buffer(key.substring(FINGERPRINT_PREFIX.length + 1), "hex");
 
   return new URL(buf.toString("utf8"));
 }
@@ -38,14 +40,12 @@ export function keyToUrl(sitesChecksum: string, key: string): URL {
 /**
  * Turns a URL (of a BAM) into the key that its fingerprint would have
  * in the fingerprint bucket.
- *
- * @param sitesChecksum
  * @param url
  */
-export function urlToKey(sitesChecksum: string, url: URL) {
+export function urlToKey(url: URL) {
   const buf = Buffer.from(url.toString(), "ascii");
 
-  return `${sitesChecksum}/${buf.toString("hex")}`;
+  return `${FINGERPRINT_PREFIX}/${buf.toString("hex")}`;
 }
 
 /**
@@ -95,6 +95,8 @@ export async function s3Download(
 
     return createHash("md5").update(data).digest("hex");
   }
+
+  return;
 }
 
 /**
@@ -105,8 +107,7 @@ export async function s3Download(
  * @param sitesChecksum
  */
 export async function* s3ListAllFingerprintFiles(
-  bucketName: string,
-  sitesChecksum: string
+  bucketName: string
 ): AsyncGenerator<_Object> {
   let contToken = undefined;
 
@@ -117,7 +118,7 @@ export async function* s3ListAllFingerprintFiles(
     const data: ListObjectsV2Output = await s3Client.send(
       new ListObjectsV2Command({
         Bucket: bucketName,
-        Prefix: sitesChecksum,
+        Prefix: FINGERPRINT_PREFIX,
         ContinuationToken: contToken,
       })
     );

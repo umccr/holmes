@@ -1,26 +1,26 @@
 {
   "name": "holmes",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "scripts": {
     "build": "tsc",
     "watch": "tsc -w",
     "cdk": "cdk"
   },
   "dependencies": {
-    "@aws-sdk/client-sfn": "3.72.0",
-    "@aws-sdk/client-s3": "3.72.0",
-    "@aws-sdk/client-sts": "3.72.0",
-    "@aws-sdk/abort-controller": "3.55.0",
-    "aws-cdk-lib": "2.20.0",
-    "axios-retry": "3.2.4",
-    "constructs": "10.0.106",
+    "@aws-sdk/client-sfn": "3.231.0",
+    "@aws-sdk/client-s3": "3.231.0",
+    "@aws-sdk/client-sts": "3.231.0",
+    "@aws-sdk/abort-controller": "3.226.0",
+    "aws-cdk-lib": "2.55.1",
+    "axios-retry": "3.3.1",
+    "constructs": "10.1.194",
     "source-map-support": "0.5.21"
   },
   "devDependencies": {
-    "@types/node": "14.18.12",
-    "aws-cdk": "2.20.0",
-    "prettier": "2.6.2",
-    "ts-node": "10.7.0",
-    "typescript": "4.6.3"
+    "@types/node": "18.11.17",
+    "aws-cdk": "2.55.1",
+    "prettier": "2.8.1",
+    "ts-node": "10.9.1",
+    "typescript": "4.9.4"
   }
 }

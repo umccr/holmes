@@ -38,12 +38,19 @@ export class HolmesApplicationStack extends Stack {
 
     this.templateOptions.description = STACK_DESCRIPTION;
 
-    const fingerprintBucket = new Bucket(this, "FingerprintBucket", {
-      bucketName: props.fingerprintBucketNameToCreate,
-      objectOwnership: ObjectOwnership.BUCKET_OWNER_ENFORCED,
-      autoDeleteObjects: true,
-      removalPolicy: RemovalPolicy.DESTROY,
-    });
+    // for dev/testing we can defer "creating" this bucket and instead use one that already exists
+    const fingerprintBucket = props.shouldCreateFingerprintBucket
+      ? new Bucket(this, "FingerprintBucket", {
+          bucketName: props.fingerprintBucketName,
+          objectOwnership: ObjectOwnership.BUCKET_OWNER_ENFORCED,
+          autoDeleteObjects: true,
+          removalPolicy: RemovalPolicy.DESTROY,
+        })
+      : Bucket.fromBucketName(
+          this,
+          "FingerprintBucket",
+          props.fingerprintBucketName
+        );
 
     // we sometimes need to execute tasks in a VPC context
     const vpc = Vpc.fromLookup(this, "MainVpc", {

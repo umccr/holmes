@@ -35,9 +35,9 @@ new HolmesPipelineStack(app, "HolmesPipelineStack", {
  * This is a stack that can be deployed only in the dev account - and direct from
  * a developers desktop for quick turnaround on feature development.
  */
-new HolmesApplicationStack(app, "HolmesSandboxStack", {
+new HolmesApplicationStack(app, "HolmesLocalDevTestStack", {
   description:
-    "Sandbox deployment of Holmes during development - feel free to tear down",
+    "Local dev/test deployment of Holmes during development - feel free to tear down - this is *not* part of the CodePipeline deploy",
   icaSecretNamePartial: "IcaSecretsPortal", // pragma: allowlist secret
   namespaceName: "umccr-sandbox",
   namespaceId: "ns-l7oievhyca6utk2m",
@@ -45,7 +45,8 @@ new HolmesApplicationStack(app, "HolmesSandboxStack", {
     account: AWS_DEV_ACCOUNT,
     region: AWS_DEV_REGION,
   },
-  fingerprintBucketNameToCreate: "sandbox-fingerprint-please-remove",
+  fingerprintBucketName: "umccr-fingerprint-local-dev-test",
+  shouldCreateFingerprintBucket: false,
   bamSources: ["gds://development/analysis_data"],
   bamLimits: ["wgs_alignment_qc"],
   referenceFastaBucketName: FASTA_BUCKET,

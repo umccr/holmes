@@ -100,7 +100,8 @@ export class HolmesPipelineStack extends Stack {
       namespaceName: NAMESPACE_NAME,
       namespaceId: NAMESPACE_DEV_ID,
       icaSecretNamePartial: ICA_SEC,
-      fingerprintBucketNameToCreate: DEV_FINGERPRINT_BUCKET,
+      fingerprintBucketName: DEV_FINGERPRINT_BUCKET,
+      shouldCreateFingerprintBucket: true,
       bamSources: [DEV_TEST_BAM_SOURCE],
       // our full path must contain this string - in this case everything in the TEST BAM path will match
       // (this feature is more useful in a folder filled with BAMs we don't want to fingerprint)
@@ -143,7 +144,8 @@ export class HolmesPipelineStack extends Stack {
       namespaceName: NAMESPACE_NAME,
       namespaceId: NAMESPACE_PROD_ID,
       icaSecretNamePartial: ICA_SEC,
-      fingerprintBucketNameToCreate: "umccr-fingerprint-prod",
+      fingerprintBucketName: "umccr-fingerprint-prod",
+      shouldCreateFingerprintBucket: true,
       bamSources: ["gds://production/analysis_data"],
       bamLimits: ["wgs_alignment_qc"],
       referenceFastaBucketName: FASTA_BUCKET,

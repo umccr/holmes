@@ -29,10 +29,15 @@ export interface HolmesStackSettings {
   readonly icaSecretNamePartial: string;
 
   /**
-   * Fingerprint bucket name of the bucket we will create in this stack
-   * (must NOT exist)
+   * Fingerprint bucket name of the bucket
    */
-  readonly fingerprintBucketNameToCreate: string;
+  readonly fingerprintBucketName: string;
+
+  /**
+   * This allows us to setup a stack with a pre-defined bucket fingerprint (good for dev/test) -
+   * but the default here is we would leave it to the CDK stack to create the fingerprint bucket.
+   */
+  readonly shouldCreateFingerprintBucket: boolean;
 
   /**
    * BAM sources (url of folders)

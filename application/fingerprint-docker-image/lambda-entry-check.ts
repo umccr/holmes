@@ -15,18 +15,67 @@ import { keyToUrl, urlToKey } from "./lib/aws";
 const exec = promisify(execCallback);
 const pipeline = promisify(pipelineCallback);
 
+/* Example input as processed through the Step Functions Distributed Map batcher
+
+{
+    "BatchInput": {
+        "relatednessThreshold": 0.4,
+        "index": "gds://development/FAKE00001/NTC.bam"
+    },
+    "Items": [
+        {
+            "Etag": "\"e9cfb6278ca06b24ba23de07a074996f\"",
+            "Key": "prints/6764733a2f2f646576656c6f706d656e742f4f5448455246414b4530303030312f5054432e62616d",
+            "LastModified": 1671425035,
+            "Size": 207211,
+            "StorageClass": "STANDARD"
+        },
+        {
+            "Etag": "\"e9cfb6278ca06b24ba23de07a074996f\"",
+            "Key": "prints/6764733a2f2f646576656c6f706d656e742f4f5448455246414b4530303030322f5054432e62616d",
+            "LastModified": 1671425035,
+            "Size": 207211,
+            "StorageClass": "STANDARD"
+        },
+        {
+            "Etag": "\"e9cfb6278ca06b24ba23de07a074996f\"",
+            "Key": "prints/6764733a2f2f646576656c6f706d656e742f4f5448455246414b4530303030332f5054432e62616d",
+            "LastModified": 1671425036,
+            "Size": 207211,
+            "StorageClass": "STANDARD"
+        },
+        {
+            "Etag": "\"e9cfb6278ca06b24ba23de07a074996f\"",
+            "Key": "prints/6764733a2f2f646576656c6f706d656e742f4f5448455246414b4530303030342f5054432e62616d",
+            "LastModified": 1671425036,
+            "Size": 207211,
+            "StorageClass": "STANDARD"
+        },
+        {
+            "Etag": "\"e9cfb6278ca06b24ba23de07a074996f\"",
+            "Key": "prints/6764733a2f2f646576656c6f706d656e742f4f5448455246414b4530303030352f5054432e62616d",
+            "LastModified": 1671425036,
+            "Size": 207211,
+            "StorageClass": "STANDARD"
+        }
+    ]
+}
+ */
 type EventInput = {
-  // the URL of a BAM we are checking against all others
-  index: string;
+  BatchInput: {
+    // the URL of a BAM we are checking against all others
+    index: string;
 
-  // the sites file checksum we are using for all our comparisons
-  sitesChecksum: string;
-
-  // the relatedness threshold to report against
-  relatednessThreshold: number;
+    // the relatedness threshold to report against
+    relatednessThreshold: number;
+  };
 
   // a set of fingerprint URLs which we will check the index against
-  fingerprints: string[];
+  Items: {
+    Key: string;
+    LastModified: number;
+    Size: number;
+  }[];
 };
 
 const s3Client = new S3Client({});
@@ -102,10 +151,12 @@ async function getFingerprintObject(
  * @param context
  */
 export const lambdaHandler = async (ev: EventInput, context: any) => {
+  console.log(JSON.stringify(ev, null, 2));
+
   // only small areas of the lambda runtime are read/write so we need to make sure we are in a writeable working dir
   chdir(somalierWork);
 
-  const indexAsKey = urlToKey(ev.sitesChecksum, new URL(ev.index));
+  const indexAsKey = urlToKey(new URL(ev.BatchInput.index));
 
   // sample 0 is always going to be our index case
   // (and unlike the fingerprints it comes in as a URL BAM file location)
@@ -116,11 +167,12 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
   const results: any = {};
 
   // download and 'fix' the sample ids for all the other fingerprint files we have been passed
-  for (const fingerprintUrl of ev.fingerprints) {
-    const fingerprintAsKey = urlToKey(
-      ev.sitesChecksum,
-      new URL(fingerprintUrl)
-    );
+  for (const fingerprintItem of ev.Items) {
+    const fingerprintAsKey = fingerprintItem.Key;
+
+    // distributed map s3 source includes 'folders' as entries
+    if (fingerprintAsKey.endsWith("/")) continue;
+
     const newSampleId = await getFingerprintObject(fingerprintAsKey, count);
     results[newSampleId] = fingerprintAsKey;
     count++;
@@ -178,11 +230,10 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
         // (it does go negative though)
         const relatedness = parseFloat(record[2]);
 
-        if (relatedness >= ev.relatednessThreshold) {
+        if (relatedness >= ev.BatchInput.relatednessThreshold) {
           const result: any = {
-            file: keyToUrl(ev.sitesChecksum, results[record[1]]),
+            file: keyToUrl(results[record[1]]),
             relatedness: relatedness,
-            // TODO: confirm these are not directional scores
             ibs0: parseInt(record[3]),
             ibs2: parseInt(record[4]),
             hom_concordance: parseFloat(record[5]),
