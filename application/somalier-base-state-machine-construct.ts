@@ -104,9 +104,9 @@ export class SomalierBaseStateMachineConstruct extends Construct {
         cpuArchitecture: CpuArchitecture.X86_64,
       },
       cpu: 1024,
-      // some experimentation needed - we probably don't need this much memory but it may
+      // some experimentation needed - we definitely don't need this much memory but it may
       // give us better network performance...
-      memoryLimitMiB: 4096,
+      memoryLimitMiB: 8192,
     });
 
     td.taskRole.addManagedPolicy(
@@ -238,7 +238,7 @@ export class SomalierBaseStateMachineConstruct extends Construct {
       timeout: Duration.minutes(14),
       role: role,
       code: DockerImageCode.fromEcr(props.dockerImageAsset.repository, {
-        tag: props.dockerImageAsset.assetHash,
+        tagOrDigest: props.dockerImageAsset.assetHash,
         cmd: cmd,
       }),
       environment: this.createLambdaEnv(props),

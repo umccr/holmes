@@ -14,25 +14,28 @@ import { URL } from "url";
 
 const s3Client = new S3Client({});
 
-const FINGERPRINT_PREFIX = "prints";
+const FINGERPRINT_PREFIX = "fingerprints";
 
 /**
  * Converts a fingerprint bucket key into the URL that that fingerprint
  * came from.
  *
- * @param sitesChecksum
+ * @param fingerprintFolder a slash terminated folder (key) where the fingerprints are located in S3
  * @param key
  */
-export function keyToUrl(key: string): URL {
-  // the key is in the format <FINGERPRINT_PREFIX>/<hexencodedurl>
-  if (!key.startsWith(FINGERPRINT_PREFIX + "/")) {
+export function keyToUrl(fingerprintFolder: string, key: string): URL {
+  if (!fingerprintFolder.endsWith("/"))
+    throw new Error("Fingerprint folder must end with a slash");
+
+  // the key is in the format fingerprintFolder/<hexencodedurl>
+  if (!key.startsWith(fingerprintFolder)) {
     throw new Error(
       "Key did not belong to fingerprints portion of our fingerprint bucket"
     );
   }
 
-  // decode the hex after the leading <FINGERPRINT_PREFIX>/
-  const buf = new Buffer(key.substring(FINGERPRINT_PREFIX.length + 1), "hex");
+  // decode the hex after the leading fingerprintFolder
+  const buf = new Buffer(key.substring(fingerprintFolder.length), "hex");
 
   return new URL(buf.toString("utf8"));
 }
@@ -40,12 +43,16 @@ export function keyToUrl(key: string): URL {
 /**
  * Turns a URL (of a BAM) into the key that its fingerprint would have
  * in the fingerprint bucket.
+ *
  * @param url
  */
-export function urlToKey(url: URL) {
+export function urlToKey(fingerprintFolder: string, url: URL) {
+  if (!fingerprintFolder.endsWith("/"))
+    throw new Error("Fingerprint folder must end with a slash");
+
   const buf = Buffer.from(url.toString(), "ascii");
 
-  return `${FINGERPRINT_PREFIX}/${buf.toString("hex")}`;
+  return `${fingerprintFolder}${buf.toString("hex")}`;
 }
 
 /**

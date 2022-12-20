@@ -3,6 +3,7 @@ import { Effect, IRole, PolicyStatement } from "aws-cdk-lib/aws-iam";
 import {
   CustomState,
   Map,
+  Pass,
   StateMachine,
   Succeed,
 } from "aws-cdk-lib/aws-stepfunctions";
@@ -24,15 +25,6 @@ export class SomalierCheckStateMachineConstruct extends SomalierBaseStateMachine
     super(scope, id, props);
 
     this.lambdaRole = this.createLambdaRole();
-
-    // The check-start function is used to divide up the work and work out the correct sites file to use
-    /*const checkStartInvoke = this.createLambdaStep(
-      "CheckStart",
-      ["check-start.lambdaHandler"],
-      "$.Payload",
-      this.lambdaRole,
-      props
-    ); */
 
     // gds://development/FAKE00001/NTC.bam  6764733a2f2f646576656c6f706d656e742f46414b4530303030312f4e54432e62616d
     // gds://development/FAKE00002/NTC.bam  6764733a2f2f646576656c6f706d656e742f46414b4530303030322f4e54432e62616d
@@ -61,7 +53,7 @@ export class SomalierCheckStateMachineConstruct extends SomalierBaseStateMachine
     const checkLambdaStep = this.createLambdaStep(
       "Check",
       ["check.lambdaHandler"],
-      "$.Payload.matches",
+      "$.Payload",
       this.lambdaRole,
       props
     );
@@ -72,19 +64,23 @@ export class SomalierCheckStateMachineConstruct extends SomalierBaseStateMachine
     const distributedMap = new CustomState(this, "DistributedMap", {
       stateJson: {
         Type: "Map",
-        MaxConcurrency: 100,
+        // we will be limited by the concurrency of our lambda itself - which by default is 1000
+        // at this concurrency and a items per batch of 10 we easily handle more sample ids than the lab
+        // has ever currently processed
+        MaxConcurrency: 900,
         ItemReader: {
           Resource: "arn:aws:states:::s3:listObjectsV2",
           Parameters: {
             Bucket: props.fingerprintBucket.bucketName,
-            Prefix: "prints/",
+            "Prefix.$": "$.fingerprintFolder",
           },
         },
         ItemBatcher: {
-          MaxItemsPerBatch: 5,
+          MaxItemsPerBatch: 10,
           BatchInput: {
-            "index.$": "$.index",
+            "indexes.$": "$.indexes",
             "relatednessThreshold.$": "$.relatednessThreshold",
+            "fingerprintFolder.$": "$.fingerprintFolder",
           },
         },
         ItemProcessor: {
@@ -102,55 +98,46 @@ export class SomalierCheckStateMachineConstruct extends SomalierBaseStateMachine
             Prefix: "temp",
           },
         }, */
-        ResultPath: "$.map_result",
+        ResultPath: "$.matches",
       },
     });
 
-    // The Map invoke step is the parallel invocation of Check according to the dynamic array input
-    /* const checkMapInvoke = new Map(this, "FingerprintMapTask", {
-      inputPath: "$",
-      itemsPath: "$.fingerprintKeys",
-      parameters: {
-        "index.$": "$.index",
-        "sitesChecksum.$": "$.sitesChecksum",
-        "relatednessThreshold.$": "$.relatednessThreshold",
-        "fingerprints.$": "$$.Map.Item.Value",
-      },
-      // https://blog.revolve.team/2022/01/20/step-functions-array-flattening/
-      resultSelector: {
-        "flatten.$": "$[*][*]",
-      },
-      outputPath: "$.flatten",
-    }).iterator(
-      this.createLambdaStep(
-        "Check",
-        ["check.lambdaHandler"],
-        "$.Payload.matches",
-        this.lambdaRole,
-        props
-      )
-    ); */
-
+    // NOTE: we use a technique here to allow optional input parameters to the state machine
+    // by defining defaults and then JsonMerging them with the actual input params
     this.stateMachine = new StateMachine(this, "StateMachine", {
-      definition: distributedMap.next(new Succeed(this, "Succeed")),
+      definition: new Pass(this, "Define Defaults", {
+        parameters: {
+          // by default we want to avoid kinship detection in the checking - so setting this high
+          relatednessThreshold: 0.8,
+          fingerprintFolder: "fingerprints/",
+        },
+        resultPath: "$.inputDefaults",
+      })
+        .next(
+          new Pass(this, "Apply Defaults", {
+            // merge default parameters into whatever the user has sent us
+            resultPath: "$.withDefaults",
+            outputPath: "$.withDefaults.args",
+            parameters: {
+              "args.$":
+                "States.JsonMerge($.inputDefaults, $$.Execution.Input, false)",
+            },
+          })
+        )
+        .next(distributedMap)
+        .next(
+          new Pass(this, "Remove Empties", {
+            // remove all the empty {} results from any workers that matched nothing
+            // (I mean - this leaves one of the {} as the function is a ArrayUnique - not remove empty)
+            resultPath: "$.uniqued",
+            outputPath: "$.uniqued.unique",
+            parameters: {
+              "unique.$": "States.ArrayUnique($.matches)",
+            },
+          })
+        )
+        .next(new Succeed(this, "Succeed")),
     });
-
-    /*{
-      "Effect": "Allow",
-      "Action": [
-        "states:StartExecution"
-      ],
-      "Resource": [
-        "arn:aws:states:region:accountID:stateMachine:stateMachineName"
-      ]
-    },
-    {
-      "Effect": "Allow",
-      "Action": [
-
-      ],
-      "Resource": "arn:aws:states:region:accountID:execution:stateMachineName/*"
-    }*/
 
     this.stateMachine.addToRolePolicy(
       new PolicyStatement({

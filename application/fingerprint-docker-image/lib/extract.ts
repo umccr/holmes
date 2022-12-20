@@ -136,7 +136,7 @@ async function fingerprint(file: string, sitesChecksum: string) {
   // any trace of this fingerprint in the 'done' fingerprints bucket
   const bucketParams = {
     Bucket: fingerprintBucketName,
-    Key: urlToKey(sitesChecksum, url),
+    Key: urlToKey(url),
     Body: fingerprintData,
   };
 

@@ -1,19 +1,14 @@
-import { promisify } from "util";
-import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { createReadStream, createWriteStream } from "fs";
-import { readdir, readFile, unlink } from "fs/promises";
 import { chdir } from "process";
-import { exec as execCallback } from "child_process";
-import { pipeline as pipelineCallback, Readable } from "stream";
-import { parse } from "csv-parse";
 import { URL } from "url";
-import { streamToBuffer } from "./lib/misc";
-import { fingerprintBucketName, somalierBinary, somalierWork } from "./lib/env";
+import { somalierWork } from "./lib/env";
 import { keyToUrl, urlToKey } from "./lib/aws";
-
-// get this functionality as promise compatible funcs
-const exec = promisify(execCallback);
-const pipeline = promisify(pipelineCallback);
+import {
+  cleanSomalierFiles,
+  downloadAndCorrectFingerprint,
+  extractMatchesAgainstIndexes,
+  MatchType,
+  runSomalierRelate,
+} from "./lib/somalier";
 
 /* Example input as processed through the Step Functions Distributed Map batcher
 
@@ -23,27 +18,6 @@ const pipeline = promisify(pipelineCallback);
         "index": "gds://development/FAKE00001/NTC.bam"
     },
     "Items": [
-        {
-            "Etag": "\"e9cfb6278ca06b24ba23de07a074996f\"",
-            "Key": "prints/6764733a2f2f646576656c6f706d656e742f4f5448455246414b4530303030312f5054432e62616d",
-            "LastModified": 1671425035,
-            "Size": 207211,
-            "StorageClass": "STANDARD"
-        },
-        {
-            "Etag": "\"e9cfb6278ca06b24ba23de07a074996f\"",
-            "Key": "prints/6764733a2f2f646576656c6f706d656e742f4f5448455246414b4530303030322f5054432e62616d",
-            "LastModified": 1671425035,
-            "Size": 207211,
-            "StorageClass": "STANDARD"
-        },
-        {
-            "Etag": "\"e9cfb6278ca06b24ba23de07a074996f\"",
-            "Key": "prints/6764733a2f2f646576656c6f706d656e742f4f5448455246414b4530303030332f5054432e62616d",
-            "LastModified": 1671425036,
-            "Size": 207211,
-            "StorageClass": "STANDARD"
-        },
         {
             "Etag": "\"e9cfb6278ca06b24ba23de07a074996f\"",
             "Key": "prints/6764733a2f2f646576656c6f706d656e742f4f5448455246414b4530303030342f5054432e62616d",
@@ -61,13 +35,21 @@ const pipeline = promisify(pipelineCallback);
     ]
 }
  */
+
 type EventInput = {
   BatchInput: {
-    // the URL of a BAM we are checking against all others
-    index: string;
+    // the URL of the BAMs we are checking against all others
+    indexes: string[];
+
+    // the slash terminated folder where the fingerprints have been sourced in S3 (i.e. the folder key + /)
+    fingerprintFolder: string;
 
     // the relatedness threshold to report against
     relatednessThreshold: number;
+
+    // if present a regex that is matched to BAM filenames (i.e. not against the hex encoded keys)
+    // and tells us to exclude them from sending to "somalier relate"
+    excludeRegex?: string;
   };
 
   // a set of fingerprint URLs which we will check the index against
@@ -77,60 +59,6 @@ type EventInput = {
     Size: number;
   }[];
 };
-
-const s3Client = new S3Client({});
-
-/**
- * Fetches a fingerprint (somalier) object from an object store and saves it to local
- * working directory. Along the way fixes the file so its somalier id is the left padded
- * 'count' (up to the previous sample id size).
- *
- * @param fingerprintKey the key in our fingerprint of our fingerprint file to load
- * @param count the count used to generate a new id
- * @return the sample id we generated matching the count
- */
-async function getFingerprintObject(
-  fingerprintKey: string,
-  count: number
-): Promise<string> {
-  let fileBuffer: Buffer | null = null;
-
-  const data = await s3Client.send(
-    new GetObjectCommand({
-      Bucket: fingerprintBucketName,
-      Key: fingerprintKey,
-    })
-  );
-
-  fileBuffer = await streamToBuffer(data.Body);
-
-  // check the file version matches what we expect
-  const ver = fileBuffer.readInt8(0);
-  if (ver !== 2)
-    throw new Error(
-      "The fingerprint check lambda can only work with Somalier V2 fingerprint files"
-    );
-
-  // find out how much sample id space we have for our replacement sample ids
-  const sampleIdLength = fileBuffer.readInt8(1);
-
-  if (sampleIdLength < 2)
-    throw new Error(
-      "Due to the way we replace sample ids in Somalier we require all sample ids to be at least 2 characters for fingerprinting"
-    );
-
-  const newSampleId = count.toString().padStart(sampleIdLength, "0");
-  fileBuffer.fill(newSampleId, 2, 2 + sampleIdLength);
-
-  // now stream the buffer we have edited out to disk
-  let writeStream = createWriteStream(
-    `${somalierWork}/${newSampleId}.somalier`
-  );
-  await pipeline(Readable.from(fileBuffer), writeStream);
-
-  // let the caller know what sample id we ended up generating for later matching
-  return newSampleId;
-}
 
 /**
  * A lambda which does the main work of comparing fingerprint files
@@ -151,123 +79,95 @@ async function getFingerprintObject(
  * @param context
  */
 export const lambdaHandler = async (ev: EventInput, context: any) => {
-  console.log(JSON.stringify(ev, null, 2));
+  if (!ev.BatchInput.relatednessThreshold)
+    throw new Error("No relatednessThreshold specified in lambda input");
+
+  if (
+    !ev.BatchInput.fingerprintFolder ||
+    !ev.BatchInput.fingerprintFolder.endsWith("/")
+  )
+    throw new Error(
+      "No fingerprintFolder (with slash suffix) specified in lambda input"
+    );
 
   // only small areas of the lambda runtime are read/write so we need to make sure we are in a writeable working dir
   chdir(somalierWork);
 
-  const indexAsKey = urlToKey(new URL(ev.BatchInput.index));
+  // as we download all the samples into this lambda context we assign them pseudo identifiers (of this count)
+  let sampleCount = 0;
 
-  // sample 0 is always going to be our index case
-  // (and unlike the fingerprints it comes in as a URL BAM file location)
-  const indexSampleId = await getFingerprintObject(indexAsKey, 0);
+  // download all the 'index' samples that we want to compare against everything else
+  const indexSampleIdToFingerprintKeyMap: { [sid: string]: string } = {};
 
-  let count = 1;
+  for (const indexUrl of ev.BatchInput.indexes) {
+    // (NOTE: unlike the fingerprints - these all comes in as a URL BAM file location)
+    const indexAsKey = urlToKey(
+      ev.BatchInput.fingerprintFolder,
+      new URL(indexUrl)
+    );
 
-  const results: any = {};
+    const newIndexSampleId = await downloadAndCorrectFingerprint(
+      indexAsKey,
+      sampleCount
+    );
+    indexSampleIdToFingerprintKeyMap[newIndexSampleId] = indexAsKey;
+    sampleCount++;
+  }
 
   // download and 'fix' the sample ids for all the other fingerprint files we have been passed
+  const sampleIdToFingerprintKeyMap: { [sid: string]: string } = {};
+
   for (const fingerprintItem of ev.Items) {
     const fingerprintAsKey = fingerprintItem.Key;
 
     // distributed map s3 source includes 'folders' as entries
     if (fingerprintAsKey.endsWith("/")) continue;
 
-    const newSampleId = await getFingerprintObject(fingerprintAsKey, count);
-    results[newSampleId] = fingerprintAsKey;
-    count++;
-  }
-
-  // do a somalier relate run on everything we have downloaded
-  const { stdout, stderr } = await exec(`${somalierBinary} relate *.somalier`);
-
-  if (stdout) {
-    stdout.split("\n").forEach((l) => console.log(`stdout ${l}`));
-  }
-  if (stderr) {
-    stderr.split("\n").forEach((l) => console.log(`stderr ${l}`));
-  }
-
-  const samples = await readFile("somalier.samples.tsv");
-  const pairs = await readFile("somalier.pairs.tsv");
-
-  if (samples) {
-    samples
-      .toString()
-      .split("\n")
-      .forEach((l) => console.log(`samples ${l}`));
-  }
-  if (pairs) {
-    pairs
-      .toString()
-      .split("\n")
-      .forEach((l) => console.log(`pairs ${l}`));
-  }
-
-  const processFile = async () => {
-    let matches = [];
-    const parser = createReadStream("somalier.pairs.tsv").pipe(
-      parse({
-        delimiter: "\t",
-      })
+    // we want the original fingerprint file url (i.e. gds://mysource/file.bam) so we can do regex against it
+    const fingerprintAsUrl = keyToUrl(
+      ev.BatchInput.fingerprintFolder,
+      fingerprintItem.Key
     );
 
-    for await (const record of parser) {
-      if (record[0] === indexSampleId || record[1] === indexSampleId) {
-        // the pairs are not necessarily always with our index case on the left (i.e. A)
-        // so we will need to normalise the results
-        if (record[1] === indexSampleId) {
-          console.log(`Did A/B swap for sample ${indexSampleId}`);
-          // swap sample id
-          [record[0], record[1]] = [record[1], record[0]];
-          // hets a<->b
-          [record[6], record[7]] = [record[7], record[6]];
-          // hom_alts a<->b
-          [record[10], record[11]] = [record[11], record[10]];
-        }
-
-        // this score is not directional so does not need to be swapped as A<->B swap
-        // (it does go negative though)
-        const relatedness = parseFloat(record[2]);
-
-        if (relatedness >= ev.BatchInput.relatednessThreshold) {
-          const result: any = {
-            file: keyToUrl(results[record[1]]),
-            relatedness: relatedness,
-            ibs0: parseInt(record[3]),
-            ibs2: parseInt(record[4]),
-            hom_concordance: parseFloat(record[5]),
-            hets_a: parseInt(record[6]),
-            hets_b: parseInt(record[7]),
-            hets_ab: parseInt(record[8]),
-            shared_hets: parseInt(record[9]),
-            hom_alts_a: parseInt(record[10]),
-            hom_alts_b: parseInt(record[11]),
-            shared_hom_alts: parseInt(record[12]),
-            n: parseInt(record[13]),
-            // confirm these are not directional too
-            x_ibs0: parseInt(record[14]),
-            x_ibs2: parseInt(record[15]),
-          };
-
-          matches.push(result);
-        }
-      }
+    if (ev.BatchInput.excludeRegex) {
+      if (RegExp(ev.BatchInput.excludeRegex).test(fingerprintAsUrl.toString()))
+        continue;
     }
+
+    const newSampleId = await downloadAndCorrectFingerprint(
+      fingerprintAsKey,
+      sampleCount
+    );
+    sampleIdToFingerprintKeyMap[newSampleId] = fingerprintAsKey;
+    sampleCount++;
+  }
+
+  if (sampleCount > 1) {
+    await runSomalierRelate();
+
+    const matches = await extractMatchesAgainstIndexes(
+      ev.BatchInput.fingerprintFolder,
+      indexSampleIdToFingerprintKeyMap,
+      sampleIdToFingerprintKeyMap,
+      ev.BatchInput.relatednessThreshold
+    );
+
+    await cleanSomalierFiles();
+
     return matches;
-  };
+  } else {
+    // if due to our exclude regex or bad luck - we ended up with a batch that has no useable
+    // fingerprints - then we just return all the index names but without actually running somalier
+    // (we don't want to tempt fate with somalier runs of size 0 or 1)
 
-  const matches = await processFile();
+    await cleanSomalierFiles();
 
-  const allTmpFiles = await readdir(".", { withFileTypes: true });
+    const matches: { [url: string]: MatchType[] } = {};
 
-  let regex = /[.]somalier$/;
-  allTmpFiles.forEach((d) => {
-    if (regex.test(d.name)) {
-      console.log(`Removing ${d.name} from working directory`);
-      unlink(d.name);
+    for (const indexUrl of ev.BatchInput.indexes) {
+      matches[indexUrl] = [];
     }
-  });
 
-  return { matches: matches };
+    return matches;
+  }
 };
