@@ -158,8 +158,14 @@ export class SomalierExtractStateMachineConstruct extends SomalierBaseStateMachi
           // the "command" mapping ability here is a bit limited so we will pass some values
           // that I normally would have said are parameters in via ENV variables
           environment: this.createFargateLambdaEnv().concat(
-            { name: "FINGERPRINT_FOLDER", value: "$.fingerprintFolder" },
-            { name: "FINGERPRINT_REFERENCE", value: "$.reference" }
+            {
+              name: "FINGERPRINT_FOLDER",
+              value: JsonPath.stringAt("$.fingerprintFolder"),
+            },
+            {
+              name: "FINGERPRINT_REFERENCE",
+              value: JsonPath.stringAt("$.reference"),
+            }
           ),
         },
       ],
