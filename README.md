@@ -132,12 +132,13 @@ with an input of
 
 ```json
 {
-  "index": "gds://development/sample1.bam",
+  "indexes": ["gds://development/sample1.bam", "gds://development/sample2.bam"],
+  "fingerprintFolder": "fingerprints/",
   "relatednessThreshold": 0.4
 }
 ```
 
-`relatednessThreshold` is optional.
+`fingerprintFolder` and `relatednessThreshold` are optional.
 
 produces output of the form
 

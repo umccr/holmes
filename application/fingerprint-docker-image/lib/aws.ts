@@ -11,6 +11,14 @@ import { createHash } from "crypto";
 import { promisify } from "util";
 import { pipeline as pipelineCallback } from "stream";
 import { URL } from "url";
+import { parseUrl } from "@aws-sdk/url-parser";
+import {
+  getSignedUrl,
+  S3RequestPresigner,
+} from "@aws-sdk/s3-request-presigner";
+import { Hash } from "@aws-sdk/hash-node";
+import { formatUrl } from "@aws-sdk/util-format-url";
+import { HttpRequest } from "@aws-sdk/protocol-http";
 
 const s3Client = new S3Client({});
 
@@ -18,19 +26,22 @@ const s3Client = new S3Client({});
  * Converts a fingerprint bucket key into the URL that that fingerprint
  * came from.
  *
- * @param sitesChecksum
+ * @param fingerprintFolder a slash terminated folder (key) where the fingerprints are located in S3
  * @param key
  */
-export function keyToUrl(sitesChecksum: string, key: string): URL {
-  // the key is in the format <sitesChecksum>/<hexencodedurl>
-  if (!key.startsWith(sitesChecksum + "/")) {
+export function keyToUrl(fingerprintFolder: string, key: string): URL {
+  if (!fingerprintFolder.endsWith("/"))
+    throw new Error("Fingerprint folder must end with a slash");
+
+  // the key is in the format fingerprintFolder/<hexencodedurl>
+  if (!key.startsWith(fingerprintFolder)) {
     throw new Error(
-      "Key did not belong to the same sites file output we are expecting"
+      "Key did not belong to fingerprints portion of our fingerprint bucket"
     );
   }
 
-  // decode the hex after the leading <sitesChecksum>/
-  const buf = new Buffer(key.substring(sitesChecksum.length + 1), "hex");
+  // decode the hex after the leading fingerprintFolder
+  const buf = new Buffer(key.substring(fingerprintFolder.length), "hex");
 
   return new URL(buf.toString("utf8"));
 }
@@ -39,13 +50,15 @@ export function keyToUrl(sitesChecksum: string, key: string): URL {
  * Turns a URL (of a BAM) into the key that its fingerprint would have
  * in the fingerprint bucket.
  *
- * @param sitesChecksum
  * @param url
  */
-export function urlToKey(sitesChecksum: string, url: URL) {
+export function urlToKey(fingerprintFolder: string, url: URL) {
+  if (!fingerprintFolder.endsWith("/"))
+    throw new Error("Fingerprint folder must end with a slash");
+
   const buf = Buffer.from(url.toString(), "ascii");
 
-  return `${sitesChecksum}/${buf.toString("hex")}`;
+  return `${fingerprintFolder}${buf.toString("hex")}`;
 }
 
 /**
@@ -70,7 +83,7 @@ export async function s3Download(
 
   // for dev/test purposes it is useful that we might already have these files in place - and to not
   // require the download (whether this be by putting them into the docker image, or mounting via docker fs)
-  // in the real production case it is not expected that the file will exist
+  // in the real production case we would be expected to always be downloading
   if (existsSync(output)) {
     console.log(`${output} file was already in place so will skip downloading`);
   } else {
@@ -88,6 +101,8 @@ export async function s3Download(
       response.Body as NodeJS.ReadableStream,
       createWriteStream(output)
     );
+
+    console.log(`${output} was produced by downloading s3://${bucket}/${key}`);
   }
 
   if (doChecksum) {
@@ -95,29 +110,31 @@ export async function s3Download(
 
     return createHash("md5").update(data).digest("hex");
   }
+
+  return;
 }
 
 /**
- * List all the fingerprint files in a bucket for a given sites file (identified by
- * its checksum).
+ * List all the fingerprint files in a bucket for a given prefix.
  *
- * @param bucketName
- * @param sitesChecksum
+ * @param bucketName the bucket to list files from
+ * @param prefix the prefix key to restrict the list to
  */
-export async function* s3ListAllFingerprintFiles(
+export async function* s3ListAllFiles(
   bucketName: string,
-  sitesChecksum: string
+  prefix: string
 ): AsyncGenerator<_Object> {
   let contToken = undefined;
 
   console.log("Starting - S3 file list");
+
   let count = 0;
 
   do {
     const data: ListObjectsV2Output = await s3Client.send(
       new ListObjectsV2Command({
         Bucket: bucketName,
-        Prefix: sitesChecksum,
+        Prefix: prefix,
         ContinuationToken: contToken,
       })
     );
@@ -136,4 +153,38 @@ export async function* s3ListAllFingerprintFiles(
   } while (contToken);
 
   console.log(`Ending - S3 file list generated ${count} files`);
+}
+
+/**
+ * Generate a short term presigned link to the given S3 URL.
+ *
+ * @param s3url
+ */
+export async function s3Presign(s3url: string) {
+  const _match = s3url.match(/^s3?:\/\/([^\/]+)\/?(.*?)$/);
+
+  if (!_match) throw new Error("Bad S3 URL format");
+
+  const command = new GetObjectCommand({
+    Bucket: _match[1],
+    Key: _match[2],
+  });
+
+  return await getSignedUrl(s3Client, command, { expiresIn: 2 * 60 * 60 });
+
+  /*
+  const awsRegion = await s3Client.config.region();
+    const s3ObjectUrl = parseUrl(
+    `https://${_match[1]}.s3.${awsRegion}.amazonaws.com/${_match[2]}`
+  );
+const presigner = new S3RequestPresigner({
+    credentials: s3Client.config.credentials,
+    region: awsRegion,
+    sha256: Hash.bind(null, "sha256"),
+  });
+  return formatUrl(
+    await presigner.presign(new HttpRequest(s3ObjectUrl), {
+      expiresIn: 2 * 60 * 60, // some hours that should be longer than the extract process ever takes
+    })
+  ); */
 }

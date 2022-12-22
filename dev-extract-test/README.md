@@ -1,15 +1,22 @@
-# Local testing of Docker images
+# Dev testing of the extraction step
 
-We often want to test the structure of the Docker builds (missing libraries etc)
-as part of the dev cycle.
+When doing development, it is useful to be able to launch these tasks locally - at the
+minimum to avoid having to deploy to AWS before even executing the code.
 
-This set of scripts helps do that testing.
+## Setup
 
-NOTE: whilst this runs the code in the same Docker environment as it will eventually
-be run in Fargate/Lambda - we cannot _exactly_ recreate the AWS environment.
-For instance - when running in the real Lambda environment - the directory `/var/task`
-is read-only - yet when run here it is read/write. So don't be surprised if
-occasionally you need to fully deploy things into AWS to discover issues like that.
+Copy the `reference.hg38.rna.fa` and `reference.hg38.rna.fa.fai` files from any
+source into this folder. They are ignored by git so will not ever be checked in.
+
+## Test
+
+Do any dev work you want on the extract code (inside the docker image).
+
+Then execute
+
+```shell
+extract-test.sh
+```
 
 ```
 {

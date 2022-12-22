@@ -9,13 +9,12 @@ import {
   AWS_DEV_REGION,
   AWS_PROD_ACCOUNT,
   AWS_PROD_REGION,
-  FASTA_BUCKET,
-  FASTA_KEY,
+  AWS_STG_ACCOUNT,
+  AWS_STG_REGION,
   NAMESPACE_DEV_ID,
   NAMESPACE_NAME,
   NAMESPACE_PROD_ID,
-  SITES_BUCKET,
-  SITES_KEY,
+  NAMESPACE_STG_ID,
 } from "./umccr-constants";
 import { HolmesBuildStage } from "./holmes-build-stage";
 
@@ -86,29 +85,19 @@ export class HolmesPipelineStack extends Stack {
 
     // the following are dev settings *purely* meant for staging/test rather than actual dev
     // work... see HolmesSandboxStack in holmes.ts for more dev like settings
-    const DEV_FINGERPRINT_BUCKET = "umccr-fingerprint-dev";
-    const DEV_SITES_BUCKET = "umccr-refdata-dev";
-    const DEV_SITES_KEY = "somalier/sites.hg38.rna.HOLMESTESTONLY.vcf.gz";
-    const DEV_SITES_CHECKSUM = "f5aa74e7abaab6dc7e88aa9f392d021d"; // pragma: allowlist secret
-    const DEV_TEST_BAM_SOURCE = "gds://development/test-data/holmes-test-data";
+    const STG_FINGERPRINT_BUCKET = "umccr-fingerprint-stg";
 
-    const devStage = new HolmesBuildStage(this, "Dev", {
+    const stgStage = new HolmesBuildStage(this, "Stg", {
       env: {
-        account: AWS_DEV_ACCOUNT,
-        region: AWS_DEV_REGION,
+        account: AWS_STG_ACCOUNT,
+        region: AWS_STG_REGION,
       },
       namespaceName: NAMESPACE_NAME,
-      namespaceId: NAMESPACE_DEV_ID,
+      namespaceId: NAMESPACE_STG_ID,
       icaSecretNamePartial: ICA_SEC,
-      fingerprintBucketNameToCreate: DEV_FINGERPRINT_BUCKET,
-      bamSources: [DEV_TEST_BAM_SOURCE],
-      // our full path must contain this string - in this case everything in the TEST BAM path will match
-      // (this feature is more useful in a folder filled with BAMs we don't want to fingerprint)
-      bamLimits: ["/"],
-      referenceFastaBucketName: FASTA_BUCKET,
-      referenceFastaBucketKey: FASTA_KEY,
-      sitesBucketName: DEV_SITES_BUCKET,
-      sitesBucketKey: DEV_SITES_KEY,
+      fingerprintBucketName: STG_FINGERPRINT_BUCKET,
+      fingerprintConfigFolder: "config/",
+      shouldCreateFingerprintBucket: true,
       createTesterRoleAllowingAccount: AWS_BUILD_ACCOUNT,
     });
 
@@ -117,21 +106,20 @@ export class HolmesPipelineStack extends Stack {
       // new pipelines.ManualApprovalStep("Run E2E Tests (20 mins)"),
       new pipelines.ShellStep("E2E Tests", {
         envFromCfnOutputs: {
-          CHECK_STEPS_ARN: devStage.checkStepsArnOutput,
-          EXTRACT_STEPS_ARN: devStage.extractStepsArnOutput,
-          DIFFERENCE_STEPS_ARN: devStage.differenceStepsArnOutput,
-          TESTER_ROLE_ARN: devStage.testerRoleArnOutput!,
+          CHECK_STEPS_ARN: stgStage.checkStepsArnOutput,
+          EXTRACT_STEPS_ARN: stgStage.extractStepsArnOutput,
+          TESTER_ROLE_ARN: stgStage.testerRoleArnOutput!,
         },
         commands: [
           "npm ci",
           // this is an approx 20 minute test that deletes some fingerprints, then creates some
           // new fingerprints, then does some checks
-          `NODE_OPTIONS="--unhandled-rejections=strict" npx ts-node holmes-e2e-test.ts "$TESTER_ROLE_ARN" "${DEV_FINGERPRINT_BUCKET}" "${DEV_TEST_BAM_SOURCE}" "${DEV_SITES_CHECKSUM}" "$CHECK_STEPS_ARN" "$EXTRACT_STEPS_ARN" "$DIFFERENCE_STEPS_ARN"`,
+          `NODE_OPTIONS="--unhandled-rejections=strict" npx ts-node holmes-e2e-test.ts "$TESTER_ROLE_ARN" "${STG_FINGERPRINT_BUCKET}" "$CHECK_STEPS_ARN" "$EXTRACT_STEPS_ARN" `,
         ],
       }),
     ]);
 
-    pipeline.addStage(devStage, {
+    pipeline.addStage(stgStage, {
       post: orderedSteps,
     });
 
@@ -143,13 +131,9 @@ export class HolmesPipelineStack extends Stack {
       namespaceName: NAMESPACE_NAME,
       namespaceId: NAMESPACE_PROD_ID,
       icaSecretNamePartial: ICA_SEC,
-      fingerprintBucketNameToCreate: "umccr-fingerprint-prod",
-      bamSources: ["gds://production/analysis_data"],
-      bamLimits: ["wgs_alignment_qc"],
-      referenceFastaBucketName: FASTA_BUCKET,
-      referenceFastaBucketKey: FASTA_KEY,
-      sitesBucketName: SITES_BUCKET,
-      sitesBucketKey: SITES_KEY,
+      fingerprintBucketName: "umccr-fingerprint-prod",
+      shouldCreateFingerprintBucket: true,
+      fingerprintConfigFolder: "config/",
     });
 
     pipeline.addStage(prodStage, {

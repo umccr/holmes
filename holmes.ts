@@ -7,10 +7,6 @@ import {
   AWS_BUILD_REGION,
   AWS_DEV_ACCOUNT,
   AWS_DEV_REGION,
-  FASTA_BUCKET,
-  FASTA_KEY,
-  SITES_BUCKET,
-  SITES_KEY,
 } from "./umccr-constants";
 import { HolmesApplicationStack } from "./application/holmes-application-stack";
 
@@ -35,9 +31,9 @@ new HolmesPipelineStack(app, "HolmesPipelineStack", {
  * This is a stack that can be deployed only in the dev account - and direct from
  * a developers desktop for quick turnaround on feature development.
  */
-new HolmesApplicationStack(app, "HolmesSandboxStack", {
+new HolmesApplicationStack(app, "HolmesLocalDevTestStack", {
   description:
-    "Sandbox deployment of Holmes during development - feel free to tear down",
+    "Local dev/test deployment of Holmes during development - feel free to tear down - this is *not* part of the CodePipeline deploy",
   icaSecretNamePartial: "IcaSecretsPortal", // pragma: allowlist secret
   namespaceName: "umccr-sandbox",
   namespaceId: "ns-l7oievhyca6utk2m",
@@ -45,11 +41,7 @@ new HolmesApplicationStack(app, "HolmesSandboxStack", {
     account: AWS_DEV_ACCOUNT,
     region: AWS_DEV_REGION,
   },
-  fingerprintBucketNameToCreate: "sandbox-fingerprint-please-remove",
-  bamSources: ["gds://development/analysis_data"],
-  bamLimits: ["wgs_alignment_qc"],
-  referenceFastaBucketName: FASTA_BUCKET,
-  referenceFastaBucketKey: FASTA_KEY,
-  sitesBucketName: SITES_BUCKET,
-  sitesBucketKey: SITES_KEY,
+  fingerprintBucketName: "umccr-fingerprint-local-dev-test",
+  shouldCreateFingerprintBucket: false,
+  fingerprintConfigFolder: "config/",
 });

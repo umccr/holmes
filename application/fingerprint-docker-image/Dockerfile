@@ -5,17 +5,20 @@ FROM --platform=linux/amd64 brentp/somalier:v0.2.16 as somalier-real
 FROM --platform=linux/amd64 public.ecr.aws/lambda/nodejs:18 AS lambda-builder
 
 COPY package*.json ./
-RUN npm install
+RUN npm ci
 
-# esbuild is lightning quick so it doesn't really matter that we do a full rebuild of
-# these all every time any one of them changes
 COPY *.ts ./
 COPY lib/ ./lib/
 COPY tsconfig.json ./
 
+# esbuild doesn't do proper typechecking so we *should* do this proper Microsoft official compile to catch obvious errors
+RUN npx tsc lambda-entry-check.ts lambda-entry-list.ts lambda-entry-pairs.ts fargate-entry-extract.ts --noEmit
+
+# note: we bundle all the used node_modules into each output - so each CJS is about 1.5MB.. however the alternative
+# of just leaving the node_modules folder actually adds about 20 MB to the image size - tree shaking works I guess!
 RUN npx esbuild lambda-entry-check.ts --bundle --outfile=check.cjs --platform=node --target=node18
-RUN npx esbuild lambda-entry-check-start.ts --bundle --outfile=checkstart.cjs --platform=node --target=node18
-RUN npx esbuild lambda-entry-difference.ts --bundle --outfile=difference.cjs --platform=node --target=node18
+RUN npx esbuild lambda-entry-list.ts --bundle --outfile=list.cjs --platform=node --target=node18
+RUN npx esbuild lambda-entry-pairs.ts --bundle --outfile=pairs.cjs --platform=node --target=node18
 RUN npx esbuild fargate-entry-extract.ts --bundle --outfile=extract.cjs --platform=node --target=node18
 
 FROM --platform=linux/amd64 public.ecr.aws/lambda/nodejs:18 AS lambda

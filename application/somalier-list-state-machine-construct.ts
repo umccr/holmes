@@ -13,7 +13,22 @@ import {
 } from "./somalier-base-state-machine-construct";
 import { Arn, ArnFormat, Stack } from "aws-cdk-lib";
 
-export class SomalierCheckStateMachineConstruct extends SomalierBaseStateMachineConstruct {
+/**
+ *  NOTE NOTE NOTE
+ *
+ *
+ * We have a requirement for listing the fingerprints that are in the db - and we would like to do
+ * it as an "operation" (i.e. a steps invoke) rather than giving permissions to clients to read
+ * the fingerprint bucket. HOWEVER - the way the Distributed Map functionality works is that it
+ * kind of delivers output into files in a bucket anyhow. So not sure we actually gain anything
+ * as the client still has to read the bucket to put the output JSON back together. And they could
+ * instead literally just do a ListBucket.
+ *
+ * I have left this code here - but the state machine is not published into cloudmap or
+ * advertised.
+ */
+
+export class SomalierListStateMachineConstruct extends SomalierBaseStateMachineConstruct {
   private readonly lambdaRole: IRole;
   private readonly stateMachine: StateMachine;
 
@@ -26,9 +41,9 @@ export class SomalierCheckStateMachineConstruct extends SomalierBaseStateMachine
 
     this.lambdaRole = this.createLambdaRole();
 
-    const checkLambdaStep = this.createLambdaStep(
-      "Check",
-      ["check.lambdaHandler"],
+    const listLambdaStep = this.createLambdaStep(
+      "List",
+      ["list.lambdaHandler"],
       undefined,
       "$.Payload",
       this.lambdaRole
@@ -38,15 +53,11 @@ export class SomalierCheckStateMachineConstruct extends SomalierBaseStateMachine
     // https://github.com/aws/aws-cdk/issues/23216
     // awaiting native support for a Distributed Map in CDK
     const dummyMap = new Map(this, "DummyMap");
-    dummyMap.iterator(checkLambdaStep);
+    dummyMap.iterator(listLambdaStep);
 
     const distributedMap = new CustomState(this, "DistributedMap", {
       stateJson: {
         Type: "Map",
-        // we will be limited by the concurrency of our lambda itself - which by default is 1000
-        // at this concurrency and a items per batch of 10 we easily handle more sample ids than the lab
-        // has ever currently processed
-        MaxConcurrency: 900,
         ItemReader: {
           Resource: "arn:aws:states:::s3:listObjectsV2",
           Parameters: {
@@ -55,10 +66,10 @@ export class SomalierCheckStateMachineConstruct extends SomalierBaseStateMachine
           },
         },
         ItemBatcher: {
-          MaxItemsPerBatch: 10,
+          // the number of kb of input in each batch.. our "list" output is probably going to be double
+          // the input - so we set this well under the 256kb limits
+          MaxInputBytesPerBatch: 1024 * 64,
           BatchInput: {
-            "indexes.$": "$.indexes",
-            "relatednessThreshold.$": "$.relatednessThreshold",
             "fingerprintFolder.$": "$.fingerprintFolder",
           },
         },
@@ -69,15 +80,15 @@ export class SomalierCheckStateMachineConstruct extends SomalierBaseStateMachine
             ExecutionType: "STANDARD",
           },
         },
-        /* ResultWriter: {
+        ResultWriter: {
           Resource: "arn:aws:states:::s3:putObject",
           Parameters: {
             Bucket: props.fingerprintBucket.bucketName,
-            // note the prefix here should not have a trailing /
+            // note the prefix here should NOT have a trailing / (unlike some of other paths we use)
             Prefix: "temp",
           },
-        }, */
-        ResultPath: "$.matches",
+        },
+        // ResultPath: "$.matches",
       },
     });
 
@@ -86,9 +97,8 @@ export class SomalierCheckStateMachineConstruct extends SomalierBaseStateMachine
     this.stateMachine = new StateMachine(this, "StateMachine", {
       definition: new Pass(this, "Define Defaults", {
         parameters: {
-          // by default we want to avoid kinship detection in the checking - so setting this high
-          relatednessThreshold: 0.8,
           fingerprintFolder: "fingerprints/",
+          bamRegex: "^.*$",
         },
         resultPath: "$.inputDefaults",
       })
@@ -104,17 +114,6 @@ export class SomalierCheckStateMachineConstruct extends SomalierBaseStateMachine
           })
         )
         .next(distributedMap)
-        .next(
-          new Pass(this, "Remove Empties", {
-            // remove all the empty {} results from any workers that matched nothing
-            // (I mean - this leaves one of the {} as the function is a ArrayUnique - not remove empty)
-            resultPath: "$.uniqued",
-            outputPath: "$.uniqued.unique",
-            parameters: {
-              "unique.$": "States.ArrayUnique($.matches)",
-            },
-          })
-        )
         .next(new Succeed(this, "Succeed")),
     });
 
