@@ -7,10 +7,6 @@ import {
   AWS_BUILD_REGION,
   AWS_DEV_ACCOUNT,
   AWS_DEV_REGION,
-  FASTA_BUCKET,
-  FASTA_KEY,
-  SITES_BUCKET,
-  SITES_KEY,
 } from "./umccr-constants";
 import { HolmesApplicationStack } from "./application/holmes-application-stack";
 
@@ -47,10 +43,5 @@ new HolmesApplicationStack(app, "HolmesLocalDevTestStack", {
   },
   fingerprintBucketName: "umccr-fingerprint-local-dev-test",
   shouldCreateFingerprintBucket: false,
-  bamSources: ["gds://development/analysis_data"],
-  bamLimits: ["wgs_alignment_qc"],
-  referenceFastaBucketName: FASTA_BUCKET,
-  referenceFastaBucketKey: FASTA_KEY,
-  sitesBucketName: SITES_BUCKET,
-  sitesBucketKey: SITES_KEY,
+  fingerprintConfigFolder: "config/",
 });

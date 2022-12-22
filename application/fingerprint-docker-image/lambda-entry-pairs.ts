@@ -5,6 +5,7 @@ import { urlToKey } from "./lib/aws";
 import {
   cleanSomalierFiles,
   downloadAndCorrectFingerprint,
+  extractAllPairs,
   runSomalierRelate,
 } from "./lib/somalier";
 
@@ -36,6 +37,7 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
 
   // download all the 'index' samples that we want to compare against everything else
   const indexSampleIdToFingerprintKeyMap: { [sid: string]: string } = {};
+  const bamUrlToSampleId: { [sid: string]: string } = {};
 
   for (const indexUrl of ev.indexes) {
     const indexAsKey = urlToKey(ev.fingerprintFolder, new URL(indexUrl));
@@ -45,6 +47,7 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
       sampleCount
     );
     indexSampleIdToFingerprintKeyMap[newIndexSampleId] = indexAsKey;
+    bamUrlToSampleId[indexUrl] = newIndexSampleId;
     sampleCount++;
   }
 
@@ -57,5 +60,8 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
 
   await cleanSomalierFiles();
 
-  return pairs;
+  return {
+    key: bamUrlToSampleId,
+    html: pairs,
+  };
 };

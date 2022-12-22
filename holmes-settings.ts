@@ -9,9 +9,7 @@ export const TAG_STACK_VALUE = "Holmes";
 export const STACK_DESCRIPTION =
   "Holmes is a service for querying the somalier files in GDS/S3 looking for matching genomic data compared to an index file";
 
-export type HolmesSettings = HolmesStackSettings & HolmesReferenceDataSettings;
-
-export interface HolmesStackSettings {
+export interface HolmesSettings {
   /**
    * The CloudMap namespace to register the Steps function into
    */
@@ -24,12 +22,12 @@ export interface HolmesStackSettings {
   readonly namespaceId: string;
 
   /**
-   * ICA secret name
+   * ICA secret name to allow us to make calls to fetch GDS files
    */
   readonly icaSecretNamePartial: string;
 
   /**
-   * Fingerprint bucket name of the bucket
+   * Bucket name of the fingerprint bucket (to create or use - see below)
    */
   readonly fingerprintBucketName: string;
 
@@ -40,14 +38,9 @@ export interface HolmesStackSettings {
   readonly shouldCreateFingerprintBucket: boolean;
 
   /**
-   * BAM sources (url of folders)
+   * Fingerprint config folder (in bucket) - must end with slash - will generally be config/
    */
-  readonly bamSources: string[];
-
-  /**
-   * BAM limits - strings that must be present in the path for the BAM to count
-   */
-  readonly bamLimits: string[];
+  readonly fingerprintConfigFolder: string;
 
   /**
    * If set tells the stack to make an extra role that can be used to execute any of the steps
@@ -55,24 +48,4 @@ export interface HolmesStackSettings {
    * account.
    */
   readonly createTesterRoleAllowingAccount?: string;
-}
-
-export interface HolmesReferenceDataSettings {
-  /**
-   * Reference FASTA bucket name
-   */
-  readonly referenceFastaBucketName: string;
-  /**
-   * Reference FASTA key
-   */
-  readonly referenceFastaBucketKey: string;
-
-  /**
-   * Sites VCF bucket name
-   */
-  readonly sitesBucketName: string;
-  /**
-   * Sites VCF key
-   */
-  readonly sitesBucketKey: string;
 }

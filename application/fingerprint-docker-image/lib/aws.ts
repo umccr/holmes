@@ -11,10 +11,16 @@ import { createHash } from "crypto";
 import { promisify } from "util";
 import { pipeline as pipelineCallback } from "stream";
 import { URL } from "url";
+import { parseUrl } from "@aws-sdk/url-parser";
+import {
+  getSignedUrl,
+  S3RequestPresigner,
+} from "@aws-sdk/s3-request-presigner";
+import { Hash } from "@aws-sdk/hash-node";
+import { formatUrl } from "@aws-sdk/util-format-url";
+import { HttpRequest } from "@aws-sdk/protocol-http";
 
 const s3Client = new S3Client({});
-
-const FINGERPRINT_PREFIX = "fingerprints";
 
 /**
  * Converts a fingerprint bucket key into the URL that that fingerprint
@@ -77,7 +83,7 @@ export async function s3Download(
 
   // for dev/test purposes it is useful that we might already have these files in place - and to not
   // require the download (whether this be by putting them into the docker image, or mounting via docker fs)
-  // in the real production case it is not expected that the file will exist
+  // in the real production case we would be expected to always be downloading
   if (existsSync(output)) {
     console.log(`${output} file was already in place so will skip downloading`);
   } else {
@@ -95,6 +101,8 @@ export async function s3Download(
       response.Body as NodeJS.ReadableStream,
       createWriteStream(output)
     );
+
+    console.log(`${output} was produced by downloading s3://${bucket}/${key}`);
   }
 
   if (doChecksum) {
@@ -107,25 +115,26 @@ export async function s3Download(
 }
 
 /**
- * List all the fingerprint files in a bucket for a given sites file (identified by
- * its checksum).
+ * List all the fingerprint files in a bucket for a given prefix.
  *
- * @param bucketName
- * @param sitesChecksum
+ * @param bucketName the bucket to list files from
+ * @param prefix the prefix key to restrict the list to
  */
-export async function* s3ListAllFingerprintFiles(
-  bucketName: string
+export async function* s3ListAllFiles(
+  bucketName: string,
+  prefix: string
 ): AsyncGenerator<_Object> {
   let contToken = undefined;
 
   console.log("Starting - S3 file list");
+
   let count = 0;
 
   do {
     const data: ListObjectsV2Output = await s3Client.send(
       new ListObjectsV2Command({
         Bucket: bucketName,
-        Prefix: FINGERPRINT_PREFIX,
+        Prefix: prefix,
         ContinuationToken: contToken,
       })
     );
@@ -144,4 +153,38 @@ export async function* s3ListAllFingerprintFiles(
   } while (contToken);
 
   console.log(`Ending - S3 file list generated ${count} files`);
+}
+
+/**
+ * Generate a short term presigned link to the given S3 URL.
+ *
+ * @param s3url
+ */
+export async function s3Presign(s3url: string) {
+  const _match = s3url.match(/^s3?:\/\/([^\/]+)\/?(.*?)$/);
+
+  if (!_match) throw new Error("Bad S3 URL format");
+
+  const command = new GetObjectCommand({
+    Bucket: _match[1],
+    Key: _match[2],
+  });
+
+  return await getSignedUrl(s3Client, command, { expiresIn: 2 * 60 * 60 });
+
+  /*
+  const awsRegion = await s3Client.config.region();
+    const s3ObjectUrl = parseUrl(
+    `https://${_match[1]}.s3.${awsRegion}.amazonaws.com/${_match[2]}`
+  );
+const presigner = new S3RequestPresigner({
+    credentials: s3Client.config.credentials,
+    region: awsRegion,
+    sha256: Hash.bind(null, "sha256"),
+  });
+  return formatUrl(
+    await presigner.presign(new HttpRequest(s3ObjectUrl), {
+      expiresIn: 2 * 60 * 60, // some hours that should be longer than the extract process ever takes
+    })
+  ); */
 }

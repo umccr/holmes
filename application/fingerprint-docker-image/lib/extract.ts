@@ -7,16 +7,13 @@ import { getGdsFileAsPresigned } from "./illumina-icav1";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { mkdir, readdir, readFile, rm } from "fs/promises";
 import { nanoid } from "nanoid/non-secure";
-import { s3Download, urlToKey } from "./aws";
+import { s3Presign, urlToKey } from "./aws";
 import {
   fingerprintBucketName,
+  safeGetFingerprintSites,
   somalierBinary,
   somalierFasta,
-  somalierFastaBucketKey,
-  somalierFastaBucketName,
   somalierSites,
-  somalierSitesBucketKey,
-  somalierSitesBucketName,
   somalierWork,
 } from "./env";
 import axios from "axios";
@@ -24,7 +21,38 @@ import * as rax from "retry-axios";
 
 const s3Client = new S3Client({});
 
-async function fingerprint(file: string, sitesChecksum: string) {
+/**
+ * Useful proof of life of the (remote https) files we are about to send to somalier binary.
+ *
+ * @param bamPresignedUrl
+ * @param baiPresignedUrl
+ */
+async function dumpFileHead(bamPresignedUrl: string, baiPresignedUrl: string) {
+  const bamHead = await axios.get(bamPresignedUrl, {
+    headers: { Range: "bytes=0-64" },
+  });
+
+  console.log(bamHead.status);
+  console.log(bamHead.statusText);
+  console.log(bamHead.headers);
+
+  const baiHead = await axios.get(baiPresignedUrl, {
+    headers: { Range: "bytes=0-64" },
+  });
+
+  console.log(baiHead.status);
+  console.log(baiHead.statusText);
+  console.log(baiHead.headers);
+}
+
+/**
+ * For the given BAM file, performa a somalier extract to produce a
+ * fingerprint object and save it to the fingerprint store.
+ *
+ * @param file
+ * @param fingerprintFolder
+ */
+async function fingerprint(file: string, fingerprintFolder: string) {
   console.log(`Computing fingerprint for ${file}`);
 
   // the index string is the eventual string we need to pass to somalier extract..
@@ -34,46 +62,25 @@ async function fingerprint(file: string, sitesChecksum: string) {
   const url = new URL(file);
 
   if (url.protocol === "s3:") {
-    indexString = file;
+    // rather than rely on the S3 support of the somalier binary (we don't have enough control of what libraries
+    // are included for its build) - we construct presigned HTTPS links and get it to source the BAMs that way
+    const presignedUrl = await s3Presign(file);
+    const presignedUrlBai = await s3Presign(file + ".bai");
 
-    // rather than rely on somalier binary S3 support - we should do the same as GDS here - turn
-    // both bam and bai into signed s3 urls - and pass them
+    await dumpFileHead(presignedUrl, presignedUrlBai);
 
-    throw new Error(
-      "S3 links are currently disabled as the somalier binary seems to have a problem streaming them in AWS"
-    );
+    indexString = `${presignedUrl}##idx##${presignedUrlBai}`;
   } else if (url.protocol === "gds:") {
     const presignedUrl = await getGdsFileAsPresigned(
       url.hostname,
       url.pathname
     );
+    const presignedUrlBai = await getGdsFileAsPresigned(
+      url.hostname,
+      url.pathname + ".bai"
+    );
 
-    // we have some BAM files we will find with no index.. these we can ignore.. TEMP FIX
-    let presignedUrlBai;
-    try {
-      presignedUrlBai = await getGdsFileAsPresigned(
-        url.hostname,
-        url.pathname + ".bai"
-      );
-    } catch (e) {
-      return;
-    }
-
-    const bamHead = await axios.get(presignedUrl, {
-      headers: { Range: "bytes=0-64" },
-    });
-
-    console.log(bamHead.status);
-    console.log(bamHead.statusText);
-    console.log(bamHead.headers);
-
-    const baiHead = await axios.get(presignedUrlBai, {
-      headers: { Range: "bytes=0-64" },
-    });
-
-    console.log(baiHead.status);
-    console.log(baiHead.statusText);
-    console.log(baiHead.headers);
+    await dumpFileHead(presignedUrl, presignedUrlBai);
 
     // this is the undocumented mechanism of nim-htslib to have a path that also specifies the actual index file
     indexString = `${presignedUrl}##idx##${presignedUrlBai}`;
@@ -90,20 +97,26 @@ async function fingerprint(file: string, sitesChecksum: string) {
   // do a somalier extract to generate the fingerprint
   // TODO: send failure events to event bridge?
   try {
-    const { stdout, stderr } = await execFilePromise(
-      somalierBinary,
-      [
-        "extract",
-        indexString,
-        "-s",
-        somalierSites,
-        "-f",
-        somalierFasta,
-        "-d",
-        randomString,
-      ],
-      { maxBuffer: 1024 * 1024 * 64 }
-    );
+    const args = [
+      "extract",
+      indexString,
+      "-s",
+      somalierSites,
+      "-f",
+      somalierFasta,
+      "-d",
+      randomString,
+    ];
+
+    console.log(`Executing ${somalierBinary} ${args.join(" ")}`);
+
+    const promiseInvoke = execFilePromise(somalierBinary, args, {
+      maxBuffer: 1024 * 1024 * 64,
+    });
+
+    const { stdout, stderr } = await promiseInvoke;
+
+    console.log(`Error code = ${promiseInvoke.child.exitCode}`);
 
     if (stdout) {
       stdout.split("\n").forEach((l) => console.log(`stdout ${l}`));
@@ -112,7 +125,8 @@ async function fingerprint(file: string, sitesChecksum: string) {
       stderr.split("\n").forEach((l) => console.log(`stderr ${l}`));
     }
   } catch (e) {
-    console.log(e);
+    console.error("somalier extract invoke failed");
+    console.error(e);
     return;
   }
 
@@ -136,43 +150,38 @@ async function fingerprint(file: string, sitesChecksum: string) {
   // any trace of this fingerprint in the 'done' fingerprints bucket
   const bucketParams = {
     Bucket: fingerprintBucketName,
-    Key: urlToKey(url),
+    Key: urlToKey(fingerprintFolder, url),
     Body: fingerprintData,
   };
 
   await s3Client.send(new PutObjectCommand(bucketParams));
 }
 
-export async function extract(files: string[]) {
+/**
+ * Perform the fingerprint extract for a set of files, according the the
+ * given reference. The reference should match the inner portion of the sites filenames
+ * that are located in the config/ folder of the fingerprint bucket. See docs
+ * for more details but essentially for "config/sites.hg19.rna.vcf.gz" - the "reference" is
+ * "hg19.rna".
+ *
+ * @param reference the string representing the genome build our BAM matches up with
+ * @param fingerprintFolder the slash terminated folder path for where the fingerprints will be sent
+ * @param files the list of source BAMs
+ */
+export async function extract(
+  reference: string,
+  fingerprintFolder: string,
+  files: string[]
+) {
   console.log("Starting extract task");
 
   // whether it is lambda or fargate we do our work in a folder we know to be read/write
   chdir(somalierWork);
 
-  // bring down the reference data files locally
-  // (because for debug we can place these files directly in the docker image - we are loose about
-  //  whether the FASTA_BUCKET_NAME environment variables etc are actually defined -
-  //  we check them if we need them inside download() )
-  console.log("Obtaining reference genome fasta");
-  await s3Download(
-    somalierFastaBucketName,
-    somalierFastaBucketKey,
-    somalierFasta
-  );
-
-  console.log("Obtaining reference Somalier sites");
-  const sitesChecksum = await s3Download(
-    somalierSitesBucketName,
-    somalierSitesBucketKey,
-    somalierSites,
-    true
-  );
-
-  if (!sitesChecksum) {
-    throw new Error("Sites file checksum could not be computed");
-  }
+  // setup the local env for extraction
+  await safeGetFingerprintSites(reference);
 
   for (const file of files) {
-    await fingerprint(file, sitesChecksum);
+    await fingerprint(file, fingerprintFolder);
   }
 }

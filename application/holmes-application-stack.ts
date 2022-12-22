@@ -1,5 +1,11 @@
 import * as path from "path";
-import { CfnOutput, RemovalPolicy, Stack, StackProps } from "aws-cdk-lib";
+import {
+  CfnOutput,
+  Duration,
+  RemovalPolicy,
+  Stack,
+  StackProps,
+} from "aws-cdk-lib";
 import { Construct } from "constructs";
 import { DockerImageAsset } from "aws-cdk-lib/aws-ecr-assets";
 import { Secret } from "aws-cdk-lib/aws-secretsmanager";
@@ -10,9 +16,9 @@ import { Bucket, ObjectOwnership } from "aws-cdk-lib/aws-s3";
 import { Vpc } from "aws-cdk-lib/aws-ec2";
 import { Cluster } from "aws-cdk-lib/aws-ecs";
 import { SomalierExtractStateMachineConstruct } from "./somalier-extract-state-machine-construct";
-import { SomalierDifferenceThenExtractStateMachineConstruct } from "./somalier-difference-then-extract-state-machine-construct";
-import { SomalierDifferenceStateMachineConstruct } from "./somalier-difference-state-machine-construct";
 import { AccountPrincipal, ManagedPolicy, Role } from "aws-cdk-lib/aws-iam";
+import { SomalierListStateMachineConstruct } from "./somalier-list-state-machine-construct";
+import { SomalierPairsStateMachineConstruct } from "./somalier-pairs-state-machine-construct";
 
 /**
  * The Holmes application is a stack that implements a BAM fingerprinting
@@ -23,8 +29,6 @@ export class HolmesApplicationStack extends Stack {
   // we output this here so it can be used in the codepipeline build for testing
   public readonly checkStepsArnOutput: CfnOutput;
   public readonly extractStepsArnOutput: CfnOutput;
-  public readonly differenceStepsArnOutput: CfnOutput;
-  public readonly differenceThenExtractStepsArnOutput: CfnOutput;
 
   // an optional output CFN for any stack that has decided it wants a role to be created for testing
   public readonly testerRoleArnOutput: CfnOutput;
@@ -38,13 +42,28 @@ export class HolmesApplicationStack extends Stack {
 
     this.templateOptions.description = STACK_DESCRIPTION;
 
-    // for dev/testing we can defer "creating" this bucket and instead use one that already exists
+    // for local dev/testing we can defer "creating" this bucket and instead use one that already exists
     const fingerprintBucket = props.shouldCreateFingerprintBucket
       ? new Bucket(this, "FingerprintBucket", {
           bucketName: props.fingerprintBucketName,
           objectOwnership: ObjectOwnership.BUCKET_OWNER_ENFORCED,
-          autoDeleteObjects: true,
-          removalPolicy: RemovalPolicy.DESTROY,
+          lifecycleRules: [
+            // we give the test suites the ability to create folders like fingerprint-tests-01231432/
+            // and we will auto delete them later
+            {
+              prefix: "fingerprint-tests",
+              expiration: Duration.days(1),
+            },
+            // not used but if we do ever need to make temp files this is where they would live
+            {
+              prefix: "temp",
+              expiration: Duration.days(1),
+            },
+          ],
+          // because there is some though of deleting some source bams after fingerprinting - we
+          // don't even want the more production buckets to autodelete
+          autoDeleteObjects: false,
+          removalPolicy: RemovalPolicy.RETAIN,
         })
       : Bucket.fromBucketName(
           this,
@@ -52,7 +71,7 @@ export class HolmesApplicationStack extends Stack {
           props.fingerprintBucketName
         );
 
-    // we sometimes need to execute tasks in a VPC context
+    // we sometimes need to execute tasks in a VPC context so we need one of these
     const vpc = Vpc.fromLookup(this, "MainVpc", {
       vpcName: "main-vpc",
     });
@@ -85,76 +104,65 @@ export class HolmesApplicationStack extends Stack {
     }
 
     // the Docker asset shared by all steps
-    const asset = this.addFingerprintDockerAsset();
+    const dockerImageFolder = path.join(__dirname, "fingerprint-docker-image");
+
+    const asset = new DockerImageAsset(this, "FingerprintDockerImage", {
+      directory: dockerImageFolder,
+      buildArgs: {},
+    });
+
+    const stateProps = {
+      dockerImageAsset: asset,
+      icaSecret: icaSecret,
+      fingerprintBucket: fingerprintBucket,
+      fargateCluster: cluster,
+      allowExecutionByTesterRole: testerRole,
+      ...props,
+    };
 
     const checkStateMachine = new SomalierCheckStateMachineConstruct(
       this,
       "SomalierCheck",
-      {
-        dockerImageAsset: asset,
-        icaSecret: icaSecret,
-        fingerprintBucket: fingerprintBucket,
-        fargateCluster: cluster,
-        allowExecutionByTesterRole: testerRole,
-        ...props,
-      }
+      stateProps
     );
 
     const extractStateMachine = new SomalierExtractStateMachineConstruct(
       this,
       "SomalierExtract",
-      {
-        dockerImageAsset: asset,
-        icaSecret: icaSecret,
-        fingerprintBucket: fingerprintBucket,
-        fargateCluster: cluster,
-        allowExecutionByTesterRole: testerRole,
-        ...props,
-      }
+      stateProps
     );
 
-    const differenceStateMachine = new SomalierDifferenceStateMachineConstruct(
+    const listStateMachine = new SomalierListStateMachineConstruct(
       this,
-      "SomalierDifference",
-      {
-        dockerImageAsset: asset,
-        icaSecret: icaSecret,
-        fingerprintBucket: fingerprintBucket,
-        fargateCluster: cluster,
-        allowExecutionByTesterRole: testerRole,
-        ...props,
-      }
+      "SomalierList",
+      stateProps
     );
 
-    const differenceThenExtractStateMachine =
-      new SomalierDifferenceThenExtractStateMachineConstruct(
-        this,
-        "SomalierDifferenceThenExtract",
-        {
-          dockerImageAsset: asset,
-          icaSecret: icaSecret,
-          fingerprintBucket: fingerprintBucket,
-          fargateCluster: cluster,
-          allowExecutionByTesterRole: testerRole,
-          ...props,
-        }
-      );
+    const pairsStateMachine = new SomalierPairsStateMachineConstruct(
+      this,
+      "SomalierPairs",
+      stateProps
+    );
 
     icaSecret.grantRead(checkStateMachine.taskRole);
     icaSecret.grantRead(extractStateMachine.taskRole);
-    icaSecret.grantRead(differenceStateMachine.taskRole);
-    icaSecret.grantRead(differenceThenExtractStateMachine.taskRole);
-    icaSecret.grantRead(differenceThenExtractStateMachine.lambdaTaskRole);
+    icaSecret.grantRead(listStateMachine.taskRole);
+    icaSecret.grantRead(pairsStateMachine.taskRole);
+    //icaSecret.grantRead(differenceStateMachine.taskRole);
+    //icaSecret.grantRead(differenceThenExtractStateMachine.taskRole);
+    //icaSecret.grantRead(differenceThenExtractStateMachine.lambdaTaskRole);
 
     fingerprintBucket.grantRead(checkStateMachine.taskRole);
-    fingerprintBucket.grantRead(differenceStateMachine.taskRole);
+    fingerprintBucket.grantRead(listStateMachine.taskRole);
+    fingerprintBucket.grantRead(pairsStateMachine.taskRole);
+    //fingerprintBucket.grantRead(differenceStateMachine.taskRole);
     fingerprintBucket.grantReadWrite(extractStateMachine.taskRole);
-    fingerprintBucket.grantReadWrite(
-      differenceThenExtractStateMachine.taskRole
-    );
-    fingerprintBucket.grantReadWrite(
-      differenceThenExtractStateMachine.lambdaTaskRole
-    );
+    //fingerprintBucket.grantReadWrite(
+    //  differenceThenExtractStateMachine.taskRole
+    // );
+    // fingerprintBucket.grantReadWrite(
+    //   differenceThenExtractStateMachine.lambdaTaskRole
+    // );
 
     /* I don't understand CloudMap - there seems no way for me to import in a namespace that
         already exists... other than providing *all* the details... and a blank arn?? */
@@ -178,9 +186,7 @@ export class HolmesApplicationStack extends Stack {
       customAttributes: {
         checkStepsArn: checkStateMachine.stepsArn,
         extractStepsArn: extractStateMachine.stepsArn,
-        differenceStepsArn: differenceStateMachine.stepsArn,
-        differenceThenExtractStepsArn:
-          differenceThenExtractStateMachine.stepsArn,
+        pairsStepsArn: pairsStateMachine.stepsArn,
       },
     });
 
@@ -196,33 +202,6 @@ export class HolmesApplicationStack extends Stack {
 
     this.extractStepsArnOutput = new CfnOutput(this, "ExtractStepsArn", {
       value: extractStateMachine.stepsArn,
-    });
-
-    this.differenceStepsArnOutput = new CfnOutput(this, "DifferenceStepsArn", {
-      value: differenceStateMachine.stepsArn,
-    });
-
-    this.differenceThenExtractStepsArnOutput = new CfnOutput(
-      this,
-      "DifferenceThenExtractStepsArn",
-      {
-        value: differenceThenExtractStateMachine.stepsArn,
-      }
-    );
-  }
-
-  /**
-   * The fingerprint docker asset is a lambda containing multiple entry points for various stages of
-   * the steps function.
-   *
-   * @private
-   */
-  private addFingerprintDockerAsset(): DockerImageAsset {
-    const dockerImageFolder = path.join(__dirname, "fingerprint-docker-image");
-
-    return new DockerImageAsset(this, "FingerprintDockerImage", {
-      directory: dockerImageFolder,
-      buildArgs: {},
     });
   }
 }
