@@ -17,6 +17,7 @@ import {
   NAMESPACE_STG_ID,
 } from "./umccr-constants";
 import { HolmesBuildStage } from "./holmes-build-stage";
+import { LinuxBuildImage } from "aws-cdk-lib/aws-codebuild";
 
 /**
  * Stack to hold the self mutating pipeline, and all the relevant settings for deployments
@@ -66,6 +67,9 @@ export class HolmesPipelineStack extends Stack {
         ],
       }),
       codeBuildDefaults: {
+        buildEnvironment: {
+          buildImage: LinuxBuildImage.STANDARD_6_0,
+        },
         // we need to give the codebuild engines permissions to assume a role in DEV - in order that they
         // can invoke the tests - we don't know the name of the role yet (as it is built by CDK) - so we
         // are quite permissive (it is limited to one non-prod account though)
@@ -112,7 +116,7 @@ export class HolmesPipelineStack extends Stack {
           "npm ci",
           // this is an approx 20 minute test that deletes some fingerprints, then creates some
           // new fingerprints, then does some checks
-          `NODE_OPTIONS="--unhandled-rejections=strict" npx ts-node holmes-e2e-test.ts "$TESTER_ROLE_ARN" "${STG_FINGERPRINT_BUCKET}" "$CHECK_STEPS_ARN" "$EXTRACT_STEPS_ARN" `,
+          `NODE_OPTIONS="--unhandled-rejections=strict" npx ts-node holmes-e2e-test.ts "$TESTER_ROLE_ARN" "${STG_FINGERPRINT_BUCKET}" "${GDS_BASE}" "$CHECK_STEPS_ARN" "$EXTRACT_STEPS_ARN" `,
         ],
       }),
     ]);
