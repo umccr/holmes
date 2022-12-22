@@ -30,10 +30,6 @@ import {
   EcsRunTask,
 } from "aws-cdk-lib/aws-stepfunctions-tasks";
 import { Duration } from "aws-cdk-lib";
-import {
-  ENV_NAME_FINGERPRINT_FOLDER,
-  ENV_NAME_FINGERPRINT_REFERENCE,
-} from "./fingerprint-docker-image/lib/env";
 
 export class SomalierExtractStateMachineConstruct extends SomalierBaseStateMachineConstruct {
   readonly stateMachine: StateMachine;
@@ -162,8 +158,8 @@ export class SomalierExtractStateMachineConstruct extends SomalierBaseStateMachi
           // the "command" mapping ability here is a bit limited so we will pass some values
           // that I normally would have said are parameters in via ENV variables
           environment: this.createFargateLambdaEnv().concat(
-            { name: ENV_NAME_FINGERPRINT_FOLDER, value: "$.fingerprintFolder" },
-            { name: ENV_NAME_FINGERPRINT_REFERENCE, value: "$.reference" }
+            { name: "FINGERPRINT_FOLDER", value: "$.fingerprintFolder" },
+            { name: "FINGERPRINT_REFERENCE", value: "$.reference" }
           ),
         },
       ],

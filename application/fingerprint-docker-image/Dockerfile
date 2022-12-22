@@ -2,7 +2,7 @@ FROM --platform=linux/amd64 brentp/somalier:v0.2.16 as somalier-real
 
 # we are going to grab the compile somalier binary out of the docker image
 
-FROM --platform=linux/amd64 public.ecr.aws/lambda/nodejs:16 AS lambda-builder
+FROM --platform=linux/amd64 public.ecr.aws/lambda/nodejs:18 AS lambda-builder
 
 COPY package*.json ./
 RUN npm ci

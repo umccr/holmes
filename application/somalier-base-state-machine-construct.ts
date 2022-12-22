@@ -1,34 +1,16 @@
 import { Construct } from "constructs";
 import { DockerImageAsset } from "aws-cdk-lib/aws-ecr-assets";
 import {
-  IntegrationPattern,
-  JsonPath,
-  Map,
-} from "aws-cdk-lib/aws-stepfunctions";
-import {
-  EcsFargateLaunchTarget,
-  EcsRunTask,
   LambdaInvoke,
   TaskEnvironmentVariable,
 } from "aws-cdk-lib/aws-stepfunctions-tasks";
-import {
-  Compatibility,
-  ContainerDefinition,
-  ContainerImage,
-  CpuArchitecture,
-  FargatePlatformVersion,
-  FargateTaskDefinition,
-  ICluster,
-  LogDriver,
-  TaskDefinition,
-} from "aws-cdk-lib/aws-ecs";
+import { ICluster } from "aws-cdk-lib/aws-ecs";
 import {
   IRole,
   ManagedPolicy,
   Role,
   ServicePrincipal,
 } from "aws-cdk-lib/aws-iam";
-import { RetentionDays } from "aws-cdk-lib/aws-logs";
 import { ISecret } from "aws-cdk-lib/aws-secretsmanager";
 import { IBucket } from "aws-cdk-lib/aws-s3";
 import { DockerImageCode, DockerImageFunction } from "aws-cdk-lib/aws-lambda";
