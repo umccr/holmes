@@ -3,6 +3,7 @@ import {
   IntegrationPattern,
   JsonPath,
   Map,
+  Pass,
   StateMachine,
   Succeed,
 } from "aws-cdk-lib/aws-stepfunctions";
@@ -29,6 +30,10 @@ import {
   EcsRunTask,
 } from "aws-cdk-lib/aws-stepfunctions-tasks";
 import { Duration } from "aws-cdk-lib";
+import {
+  ENV_NAME_FINGERPRINT_FOLDER,
+  ENV_NAME_FINGERPRINT_REFERENCE,
+} from "./fingerprint-docker-image/lib/env";
 
 export class SomalierExtractStateMachineConstruct extends SomalierBaseStateMachineConstruct {
   readonly stateMachine: StateMachine;
@@ -56,7 +61,25 @@ export class SomalierExtractStateMachineConstruct extends SomalierBaseStateMachi
     );
 
     this.stateMachine = new StateMachine(this, "StateMachine", {
-      definition: extractMapStep.next(new Succeed(this, "SucceedStep")),
+      definition: new Pass(this, "Define Defaults", {
+        parameters: {
+          fingerprintFolder: "fingerprints/",
+        },
+        resultPath: "$.inputDefaults",
+      })
+        .next(
+          new Pass(this, "Apply Defaults", {
+            // merge default parameters into whatever the user has sent us
+            resultPath: "$.withDefaults",
+            outputPath: "$.withDefaults.args",
+            parameters: {
+              "args.$":
+                "States.JsonMerge($.inputDefaults, $$.Execution.Input, false)",
+            },
+          })
+        )
+        .next(extractMapStep)
+        .next(new Succeed(this, "SucceedStep")),
     });
 
     if (props.allowExecutionByTesterRole) {
@@ -124,8 +147,8 @@ export class SomalierExtractStateMachineConstruct extends SomalierBaseStateMachi
     taskDefinition: TaskDefinition,
     containerDefinition: ContainerDefinition,
     props: SomalierBaseStateMachineProps
-  ): Map {
-    const runTask = new EcsRunTask(this, "Job", {
+  ): EcsRunTask {
+    return new EcsRunTask(this, "Job", {
       integrationPattern: IntegrationPattern.RUN_JOB,
       cluster: fargateCluster,
       taskDefinition: taskDefinition,
@@ -135,12 +158,12 @@ export class SomalierExtractStateMachineConstruct extends SomalierBaseStateMachi
       containerOverrides: [
         {
           containerDefinition: containerDefinition,
-          command: JsonPath.listAt("$.files"),
+          command: JsonPath.listAt("$.indexes"),
           // the "command" mapping ability here is a bit limited so we will pass some values
           // that I normally would have said are parameters in via ENV variables
           environment: this.createFargateLambdaEnv().concat(
-            { name: "", value: "" },
-            { name: "", value: "" }
+            { name: ENV_NAME_FINGERPRINT_FOLDER, value: "$.fingerprintFolder" },
+            { name: ENV_NAME_FINGERPRINT_REFERENCE, value: "$.reference" }
           ),
         },
       ],
@@ -152,7 +175,7 @@ export class SomalierExtractStateMachineConstruct extends SomalierBaseStateMachi
     });
 
     // The Map invoke step is the parallel invocation according to the dynamic array input
-    return new Map(this, "MapTask", {
+    /*return new Map(this, "MapTask", {
       inputPath: "$",
       itemsPath: "$.needsFingerprinting",
       parameters: {
@@ -169,7 +192,7 @@ export class SomalierExtractStateMachineConstruct extends SomalierBaseStateMachi
         //"StoppedReason.$": "$.StoppedReason",
         //"TaskArn.$": "$.TaskArn",
       },
-    }).iterator(runTask);
+    }).iterator(runTask); */
   }
 
   public get stepsArn(): string {

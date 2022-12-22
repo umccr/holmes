@@ -48,10 +48,10 @@ export class HolmesApplicationStack extends Stack {
           bucketName: props.fingerprintBucketName,
           objectOwnership: ObjectOwnership.BUCKET_OWNER_ENFORCED,
           lifecycleRules: [
-            // we give the test suites the ability to create folders like fingerprint-tests-01231432/
+            // we give the test suites the ability to create folders like fingerprints-test-01231432/
             // and we will auto delete them later
             {
-              prefix: "fingerprint-tests",
+              prefix: "fingerprints-test",
               expiration: Duration.days(1),
             },
             // not used but if we do ever need to make temp files this is where they would live
@@ -148,21 +148,11 @@ export class HolmesApplicationStack extends Stack {
     icaSecret.grantRead(extractStateMachine.taskRole);
     icaSecret.grantRead(listStateMachine.taskRole);
     icaSecret.grantRead(pairsStateMachine.taskRole);
-    //icaSecret.grantRead(differenceStateMachine.taskRole);
-    //icaSecret.grantRead(differenceThenExtractStateMachine.taskRole);
-    //icaSecret.grantRead(differenceThenExtractStateMachine.lambdaTaskRole);
 
     fingerprintBucket.grantRead(checkStateMachine.taskRole);
     fingerprintBucket.grantRead(listStateMachine.taskRole);
     fingerprintBucket.grantRead(pairsStateMachine.taskRole);
-    //fingerprintBucket.grantRead(differenceStateMachine.taskRole);
     fingerprintBucket.grantReadWrite(extractStateMachine.taskRole);
-    //fingerprintBucket.grantReadWrite(
-    //  differenceThenExtractStateMachine.taskRole
-    // );
-    // fingerprintBucket.grantReadWrite(
-    //   differenceThenExtractStateMachine.lambdaTaskRole
-    // );
 
     /* I don't understand CloudMap - there seems no way for me to import in a namespace that
         already exists... other than providing *all* the details... and a blank arn?? */
