@@ -11,14 +11,7 @@ import { createHash } from "crypto";
 import { promisify } from "util";
 import { pipeline as pipelineCallback } from "stream";
 import { URL } from "url";
-import { parseUrl } from "@aws-sdk/url-parser";
-import {
-  getSignedUrl,
-  S3RequestPresigner,
-} from "@aws-sdk/s3-request-presigner";
-import { Hash } from "@aws-sdk/hash-node";
-import { formatUrl } from "@aws-sdk/util-format-url";
-import { HttpRequest } from "@aws-sdk/protocol-http";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const s3Client = new S3Client({});
 
@@ -171,20 +164,4 @@ export async function s3Presign(s3url: string) {
   });
 
   return await getSignedUrl(s3Client, command, { expiresIn: 2 * 60 * 60 });
-
-  /*
-  const awsRegion = await s3Client.config.region();
-    const s3ObjectUrl = parseUrl(
-    `https://${_match[1]}.s3.${awsRegion}.amazonaws.com/${_match[2]}`
-  );
-const presigner = new S3RequestPresigner({
-    credentials: s3Client.config.credentials,
-    region: awsRegion,
-    sha256: Hash.bind(null, "sha256"),
-  });
-  return formatUrl(
-    await presigner.presign(new HttpRequest(s3ObjectUrl), {
-      expiresIn: 2 * 60 * 60, // some hours that should be longer than the extract process ever takes
-    })
-  ); */
 }
