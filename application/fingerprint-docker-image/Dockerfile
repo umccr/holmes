@@ -12,7 +12,7 @@ COPY lib/ ./lib/
 COPY tsconfig.json ./
 
 # esbuild doesn't do proper typechecking so we *should* do this proper Microsoft official compile to catch obvious errors
-RUN npx tsc lambda-entry-check.ts lambda-entry-list.ts lambda-entry-pairs.ts fargate-entry-extract.ts --noEmit
+# RUN npx tsc lambda-entry-check.ts lambda-entry-list.ts lambda-entry-pairs.ts fargate-entry-extract.ts --noEmit
 
 # note: we bundle all the used node_modules into each output - so each CJS is about 1.5MB.. however the alternative
 # of just leaving the node_modules folder actually adds about 20 MB to the image size - tree shaking works I guess!
