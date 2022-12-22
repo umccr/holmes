@@ -73,7 +73,7 @@ export class HolmesPipelineStack extends Stack {
           new PolicyStatement({
             effect: Effect.ALLOW,
             actions: ["sts:AssumeRole"],
-            resources: [`arn:aws:iam::${AWS_DEV_ACCOUNT}:role/*`],
+            resources: [`arn:aws:iam::${AWS_STG_ACCOUNT}:role/*`],
           }),
         ],
       },
@@ -82,10 +82,8 @@ export class HolmesPipelineStack extends Stack {
 
     // our secret name is consistent across all envs
     const ICA_SEC = "IcaSecretsPortal"; // pragma: allowlist secret
-
-    // the following are dev settings *purely* meant for staging/test rather than actual dev
-    // work... see HolmesSandboxStack in holmes.ts for more dev like settings
     const STG_FINGERPRINT_BUCKET = "umccr-fingerprint-stg";
+    const GDS_BASE = "gds://development/test-data/holmes-test-data";
 
     const stgStage = new HolmesBuildStage(this, "Stg", {
       env: {
