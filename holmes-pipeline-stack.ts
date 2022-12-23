@@ -110,13 +110,14 @@ export class HolmesPipelineStack extends Stack {
         envFromCfnOutputs: {
           CHECK_STEPS_ARN: stgStage.checkStepsArnOutput,
           EXTRACT_STEPS_ARN: stgStage.extractStepsArnOutput,
+          PAIRS_STEPS_ARN: stgStage.pairsStepsArnOutput,
           TESTER_ROLE_ARN: stgStage.testerRoleArnOutput!,
         },
         commands: [
           "npm ci",
           // this is an approx 20 minute test that deletes some fingerprints, then creates some
           // new fingerprints, then does some checks
-          `NODE_OPTIONS="--unhandled-rejections=strict" npx ts-node holmes-e2e-test.ts "$TESTER_ROLE_ARN" "${STG_FINGERPRINT_BUCKET}" "${GDS_BASE}" "$CHECK_STEPS_ARN" "$EXTRACT_STEPS_ARN" `,
+          `NODE_OPTIONS="--unhandled-rejections=strict" npx ts-node holmes-e2e-test.ts "$TESTER_ROLE_ARN" "${STG_FINGERPRINT_BUCKET}" "${GDS_BASE}" "$CHECK_STEPS_ARN" "$EXTRACT_STEPS_ARN" "$PAIRS_STEPS_ARN" `,
         ],
       }),
     ]);

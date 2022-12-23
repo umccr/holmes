@@ -29,6 +29,7 @@ export class HolmesApplicationStack extends Stack {
   // we output this here so it can be used in the codepipeline build for testing
   public readonly checkStepsArnOutput: CfnOutput;
   public readonly extractStepsArnOutput: CfnOutput;
+  public readonly pairsStepsArnOutput: CfnOutput;
 
   // an optional output CFN for any stack that has decided it wants a role to be created for testing
   public readonly testerRoleArnOutput: CfnOutput;
@@ -192,6 +193,10 @@ export class HolmesApplicationStack extends Stack {
 
     this.extractStepsArnOutput = new CfnOutput(this, "ExtractStepsArn", {
       value: extractStateMachine.stepsArn,
+    });
+
+    this.pairsStepsArnOutput = new CfnOutput(this, "PairsStepsArn", {
+      value: pairsStateMachine.stepsArn,
     });
   }
 }
