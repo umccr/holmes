@@ -116,6 +116,8 @@ export async function getGdsFileAsPresigned(
 ): Promise<string> {
   const icaJwt = await getIcaJwt();
 
+  console.log(`GDS API call for details of file vol=${volume} path=${path}`);
+
   const preSignedResponse = await axios.get(
     `${ICA_BASE_URL}/files?include=PresignedUrl&volume.name=${volume}&path=${path}`,
     {
@@ -131,7 +133,7 @@ export async function getGdsFileAsPresigned(
     // in the unusual case this happens we mind as well log the entire response
     console.log(preSignedResponse.data);
     throw new Error(
-      `Could not find file gds://${volume}/${path} in GDS using the given ICA JWT permissions`
+      `Could not find file gds://${volume}${path} in GDS using the given ICA JWT permissions`
     );
   }
 
@@ -141,7 +143,7 @@ export async function getGdsFileAsPresigned(
     // in the unusual case this happens we mind as well log the entire response
     console.log(preSignedResponse.data);
     throw new Error(
-      `Could not construct pre-signed S3 URL for gds://${volume}/${path}`
+      `Could not construct pre-signed S3 URL for gds://${volume}${path}`
     );
   }
 

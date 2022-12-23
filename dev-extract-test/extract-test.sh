@@ -10,7 +10,7 @@ docker build --platform linux/amd64 -t $DI ../application/fingerprint-docker-ima
 # (those starting 676473 i.e gds:// and those starting 7333 i.e. s3://)
 aws s3 rm "s3://$BN/temp/" --exclude "*" --include "676473*" --include "7333*"
 
-echo "There should be three fingerprint files generated - it should take 5 mins"
+echo "This should take 5 mins"
 
 # notes: we bind in our local copies of the reference files so that we can skip the download step
 # we don't bind in a copy of the sites file as it is small *and* this tests out the download step
@@ -31,14 +31,12 @@ docker run --rm --platform linux/amd64 \
            "/var/task/extract.cjs" \
             "s3://umccr-fingerprint-local-dev-test/test-bams/HG002-ready.bam"
 
-
-
 aws s3 ls "s3://$BN/temp/"
 
-#           "gds://development/test-data/holmes-test-data/family/giab_exome_trio/HG002-ready.bam"
-#            "s3://umccr-fingerprint-local-dev-test/test-bams/HG003.bam" \
-#           "gds://umccr-research/test_data/CCR180149_tumor_mini.bam"
-  #         "gds://development/test-data/holmes-test-data/individual/HG00096.bam" \
- #          "gds://development/test-data/holmes-test-data/family/giab_exome_trio/HG002-ready.bam" \
-#            "s3://umccr-fingerprint-local-dev-test/test-bams/HG003.bam" \
-  #           "s3://umccr-fingerprint-local-dev-test/test-bams/HG004.bam" \
+#         "gds://development/test-data/holmes-test-data/family/giab_exome_trio/HG002-ready.bam"
+#         "s3://umccr-fingerprint-local-dev-test/test-bams/HG003.bam" \
+#         "gds://umccr-research/test_data/CCR180149_tumor_mini.bam"
+#         "gds://development/test-data/holmes-test-data/individual/HG00096.bam" \
+#         "gds://development/test-data/holmes-test-data/family/giab_exome_trio/HG002-ready.bam" \
+#         "s3://umccr-fingerprint-local-dev-test/test-bams/HG003.bam" \
+#         "s3://umccr-fingerprint-local-dev-test/test-bams/HG004.bam" \

@@ -56,10 +56,13 @@ export class SomalierCheckStateMachineConstruct extends SomalierBaseStateMachine
         },
         ItemBatcher: {
           MaxItemsPerBatch: 10,
+          // map all our params across as batch input
+          // we can do this with confidence because our steps ensures that everyone of these has a default
           BatchInput: {
             "indexes.$": "$.indexes",
             "relatednessThreshold.$": "$.relatednessThreshold",
             "fingerprintFolder.$": "$.fingerprintFolder",
+            "excludeRegex.$": "$.excludeRegex",
           },
         },
         ItemProcessor: {
@@ -69,14 +72,6 @@ export class SomalierCheckStateMachineConstruct extends SomalierBaseStateMachine
             ExecutionType: "STANDARD",
           },
         },
-        /* ResultWriter: {
-          Resource: "arn:aws:states:::s3:putObject",
-          Parameters: {
-            Bucket: props.fingerprintBucket.bucketName,
-            // note the prefix here should not have a trailing /
-            Prefix: "temp",
-          },
-        }, */
         ResultPath: "$.matches",
       },
     });
@@ -88,6 +83,8 @@ export class SomalierCheckStateMachineConstruct extends SomalierBaseStateMachine
         parameters: {
           // by default we want to avoid kinship detection in the checking - so setting this high
           relatednessThreshold: 0.8,
+          // this is a regex that by default *won't* exclude anything
+          excludeRegex: "^\\b$",
           fingerprintFolder: "fingerprints/",
         },
         resultPath: "$.inputDefaults",
