@@ -33,6 +33,7 @@ docker run --rm --platform linux/amd64 \
 
 aws s3 ls "s3://$BN/temp/"
 
+# Some example files that can be used for Extract testing
 #         "gds://development/test-data/holmes-test-data/family/giab_exome_trio/HG002-ready.bam"
 #         "s3://umccr-fingerprint-local-dev-test/test-bams/HG003.bam" \
 #         "gds://umccr-research/test_data/CCR180149_tumor_mini.bam"

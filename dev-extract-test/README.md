@@ -17,3 +17,6 @@ Then execute
 ```shell
 extract-test.sh
 ```
+
+The result of the extract step should be some valid fingerprint files in
+the local dev/test bucket.
