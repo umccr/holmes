@@ -122,11 +122,10 @@ extract_step_statemachine_arn="$( \
 # Generate the cli-input-json for the statemachine to have the following jsonised input
 : '
 {
-  "needsFingerprinting": [
-    [
-      "gds://development/path/to/bam/file"
-    ]
-  ]
+  "indexes": [
+    "gds://development/path/to/bam/file"
+  ],
+  "reference": "hg38.rna"
 }
 '
 
@@ -137,11 +136,10 @@ extract_cli_input_json_str="$( \
     '
       {
         "input": {
-          "needsFingerprinting": [
-            [
-              $input_bam_file
-            ]
-          ]
+          "indexes": [
+            $input_bam_file
+          ],
+          "reference": "hg38.rna"
         } | tojson
       }
     '
@@ -203,7 +201,7 @@ check_step_statemachine_arn="$( \
 # Should look something
 : '
 {
-  "index": "gds://path/to/bam/path",
+  "indexes": ["gds://path/to/bam/path"],
   "relatednessThreshold": 0.4
 }
 '
@@ -215,7 +213,7 @@ check_step_cli_input_json_str="$( \
     '
       {
         "input": {
-          "index": $input_bam_file,
+          "indexes": [$input_bam_file],
           "relatednessThreshold": $relatedness_threshold | tonumber
         } | tojson
       }
