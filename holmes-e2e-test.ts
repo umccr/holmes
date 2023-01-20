@@ -44,10 +44,12 @@ async function doFingerprintExtract(
 
     return Promise.resolve({});
   } catch (e: any) {
-    if (e?.Code !== "NoSuchKey")
+    if (e?.Code !== "NoSuchKey") {
+      console.error(e);
       throw Error(
         "Unexpected S3 error trying to determine if fingerprint exists"
       );
+    }
 
     const timeLabel = `EXTRACT ${bamUrl}`;
     console.time(timeLabel);

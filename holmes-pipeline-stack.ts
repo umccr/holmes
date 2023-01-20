@@ -5,13 +5,10 @@ import { Effect, PolicyStatement } from "aws-cdk-lib/aws-iam";
 import { STACK_DESCRIPTION } from "./holmes-settings";
 import {
   AWS_BUILD_ACCOUNT,
-  AWS_DEV_ACCOUNT,
-  AWS_DEV_REGION,
   AWS_PROD_ACCOUNT,
   AWS_PROD_REGION,
   AWS_STG_ACCOUNT,
   AWS_STG_REGION,
-  NAMESPACE_DEV_ID,
   NAMESPACE_NAME,
   NAMESPACE_PROD_ID,
   NAMESPACE_STG_ID,
@@ -86,61 +83,75 @@ export class HolmesPipelineStack extends Stack {
 
     // our secret name is consistent across all envs
     const ICA_SEC = "IcaSecretsPortal"; // pragma: allowlist secret
-    const STG_FINGERPRINT_BUCKET = "umccr-fingerprint-stg";
-    const GDS_BASE = "gds://development/test-data/holmes-test-data";
 
-    const stgStage = new HolmesBuildStage(this, "Stg", {
-      env: {
-        account: AWS_STG_ACCOUNT,
-        region: AWS_STG_REGION,
-      },
-      namespaceName: NAMESPACE_NAME,
-      namespaceId: NAMESPACE_STG_ID,
-      icaSecretNamePartial: ICA_SEC,
-      fingerprintBucketName: STG_FINGERPRINT_BUCKET,
-      fingerprintConfigFolder: "config/",
-      shouldCreateFingerprintBucket: true,
-      createTesterRoleAllowingAccount: AWS_BUILD_ACCOUNT,
-    });
+    // staging
+    {
+      // other aspects are specific to staging
+      const STG_FINGERPRINT_BUCKET = "umccr-fingerprint-stg";
+      const STG_GDS_TEST_DATA_BASE = "gds://staging/test-data/holmes-test-data";
 
-    const orderedSteps = pipelines.Step.sequence([
-      // Need to work out the costs of running the long tests on every build
-      // new pipelines.ManualApprovalStep("Run E2E Tests (20 mins)"),
-      new pipelines.ShellStep("E2E Tests", {
-        envFromCfnOutputs: {
-          CHECK_STEPS_ARN: stgStage.checkStepsArnOutput,
-          EXTRACT_STEPS_ARN: stgStage.extractStepsArnOutput,
-          PAIRS_STEPS_ARN: stgStage.pairsStepsArnOutput,
-          TESTER_ROLE_ARN: stgStage.testerRoleArnOutput!,
+      const stgStage = new HolmesBuildStage(this, "Stg", {
+        env: {
+          account: AWS_STG_ACCOUNT,
+          region: AWS_STG_REGION,
         },
-        commands: [
-          "npm ci",
-          // this is an approx 20 minute test that deletes some fingerprints, then creates some
-          // new fingerprints, then does some checks
-          `NODE_OPTIONS="--unhandled-rejections=strict" npx ts-node holmes-e2e-test.ts "$TESTER_ROLE_ARN" "${STG_FINGERPRINT_BUCKET}" "${GDS_BASE}" "$CHECK_STEPS_ARN" "$EXTRACT_STEPS_ARN" "$PAIRS_STEPS_ARN" `,
-        ],
-      }),
-    ]);
+        namespaceName: NAMESPACE_NAME,
+        namespaceId: NAMESPACE_STG_ID,
+        icaSecretNamePartial: ICA_SEC,
+        fingerprintBucketName: STG_FINGERPRINT_BUCKET,
+        fingerprintConfigFolder: "config/",
+        shouldCreateFingerprintBucket: true,
+        createTesterRoleAllowingAccount: AWS_BUILD_ACCOUNT,
+      });
 
-    pipeline.addStage(stgStage, {
-      post: orderedSteps,
-    });
+      const orderedSteps = pipelines.Step.sequence([
+        // Need to work out the costs of running the long tests on every build
+        // new pipelines.ManualApprovalStep("Run E2E Tests (20 mins)"),
+        new pipelines.ShellStep("E2E Tests", {
+          envFromCfnOutputs: {
+            CHECK_STEPS_ARN: stgStage.checkStepsArnOutput,
+            EXTRACT_STEPS_ARN: stgStage.extractStepsArnOutput,
+            PAIRS_STEPS_ARN: stgStage.pairsStepsArnOutput,
+            TESTER_ROLE_ARN: stgStage.testerRoleArnOutput!,
+          },
+          commands: [
+            "npm ci",
+            // this is an approx 20 minute test that deletes some fingerprints, then creates some
+            // new fingerprints, then does some checks
+            `NODE_OPTIONS="--unhandled-rejections=strict" npx ts-node holmes-e2e-test.ts "$TESTER_ROLE_ARN" "${STG_FINGERPRINT_BUCKET}" "${STG_GDS_TEST_DATA_BASE}" "$CHECK_STEPS_ARN" "$EXTRACT_STEPS_ARN" "$PAIRS_STEPS_ARN" `,
+          ],
+        }),
+      ]);
 
-    const prodStage = new HolmesBuildStage(this, "Prod", {
-      env: {
-        account: AWS_PROD_ACCOUNT,
-        region: AWS_PROD_REGION,
-      },
-      namespaceName: NAMESPACE_NAME,
-      namespaceId: NAMESPACE_PROD_ID,
-      icaSecretNamePartial: ICA_SEC,
-      fingerprintBucketName: "umccr-fingerprint-prod",
-      shouldCreateFingerprintBucket: true,
-      fingerprintConfigFolder: "config/",
-    });
+      pipeline.addStage(stgStage, {
+        post: orderedSteps,
+      });
+    }
 
-    pipeline.addStage(prodStage, {
-      pre: [new pipelines.ManualApprovalStep("PromoteToProd")],
-    });
+    // production
+    {
+      const prodStage = new HolmesBuildStage(this, "Prod", {
+        env: {
+          account: AWS_PROD_ACCOUNT,
+          region: AWS_PROD_REGION,
+        },
+        namespaceName: NAMESPACE_NAME,
+        namespaceId: NAMESPACE_PROD_ID,
+        icaSecretNamePartial: ICA_SEC,
+        fingerprintBucketName: "umccr-fingerprint-prod",
+        shouldCreateFingerprintBucket: true,
+        fingerprintConfigFolder: "config/",
+      });
+
+      pipeline.addStage(prodStage, {
+        pre: [new pipelines.ManualApprovalStep("PromoteToProd")],
+      });
+
+      // note: we don't automatically run tests in production as the tests in staging are meant to prove
+      // things are working before we promote the build
+      // HOWEVER it is possible to log in to prod and run
+      // homes-e2e-test.sh
+      // which will safely run a production test
+    }
   }
 }
