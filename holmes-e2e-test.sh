@@ -23,9 +23,9 @@ case $ACCOUNT in
      . \
      "umccr-fingerprint-prod" \
      "gds://production/test-data/holmes-test-data" \
-     "arn:aws:states:ap-southeast-2:472057503814:stateMachine:SomalierCheckStateMachineFILLMEIN" \
-     "arn:aws:states:ap-southeast-2:472057503814:stateMachine:SomalierExtractStateMachineFILLMEIN" \
-     "arn:aws:states:ap-southeast-2:472057503814:stateMachine:SomalierPairsStateMachineFILLMEIN"
+     "arn:aws:states:ap-southeast-2:472057503814:stateMachine:SomalierCheckStateMachine1DDB4CFA-3DKpngpDWtbz" \
+     "arn:aws:states:ap-southeast-2:472057503814:stateMachine:SomalierExtractStateMachine59E102CC-HQfcp9I1CPkZ" \
+     "arn:aws:states:ap-southeast-2:472057503814:stateMachine:SomalierPairsStateMachine5E171314-GC2WYfq9FEDc"
     ;;
 
   "455634345446")
