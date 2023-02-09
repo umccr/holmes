@@ -125,6 +125,9 @@ export async function extractMatchesAgainstIndexes(
   const matches: { [url: string]: MatchType[] } = {};
 
   for (const indexSampleId of Object.keys(indexSampleIdToKeyMap)) {
+    console.log(
+      `Extracting matches for index sample id ${indexSampleId} which = ${indexSampleIdToKeyMap[indexSampleId]}`
+    );
     const indexUrlAsString = keyToUrl(
       fingerprintFolder,
       indexSampleIdToKeyMap[indexSampleId]
@@ -156,6 +159,23 @@ export async function extractMatchesAgainstIndexes(
 
         if (relatedness >= relatednessThreshold) {
           if (!(indexUrlAsString in matches)) matches[indexUrlAsString] = [];
+
+          // note it is possible to match against other 'indexes' (not just 'samples')
+          // however - we expect that those matches will otherwise be reported correctly when the index
+          // *is* eventually compared to the "index as a sample" (maybe in a completely different lambda)
+          // so basically when we discover this condition we skip reporting here
+          // lets suppose this example steps invoke and distribution map
+          // indexes 1=s3://aaa and 2=s3://bbb
+          // lambda #1 fingerprints 3=s3://aaa, 4=s3://ccc
+          // if s3://aaa and s3://bbb are related to each other - we only need to report 1v3 and 2v3.. there
+          // is no value in us reporting 1v2 (it is a duplicate of 2v3 and we are guaranteed this exists)
+          if (!(record[1] in sampleIdToKeyMap)) continue;
+
+          console.log(
+            `Match at ${relatedness} to sample id ${record[1]} which = ${
+              sampleIdToKeyMap[record[1]]
+            }`
+          );
 
           matches[indexUrlAsString].push(
             tsvRecordToMatchType(

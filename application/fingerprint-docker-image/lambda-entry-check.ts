@@ -114,6 +114,9 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
     sampleCount++;
   }
 
+  // log the exact details of our index samples and sample id map
+  console.log(JSON.stringify(indexSampleIdToFingerprintKeyMap, null, 2));
+
   // download and 'fix' the sample ids for all the other fingerprint files we have been passed
   const sampleIdToFingerprintKeyMap: { [sid: string]: string } = {};
 
@@ -141,6 +144,9 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
     sampleIdToFingerprintKeyMap[newSampleId] = fingerprintAsKey;
     sampleCount++;
   }
+
+  // log the exact details of our database fingerprints and sample id map
+  console.log(JSON.stringify(sampleIdToFingerprintKeyMap, null, 2));
 
   if (sampleCount > 1) {
     await runSomalierRelate();

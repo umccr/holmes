@@ -35,8 +35,8 @@ new HolmesApplicationStack(app, "HolmesLocalDevTestStack", {
   description:
     "Local dev/test deployment of Holmes during development - feel free to tear down - this is *not* part of the CodePipeline deploy",
   icaSecretNamePartial: "IcaSecretsPortal", // pragma: allowlist secret
-  namespaceName: "umccr-sandbox",
-  namespaceId: "ns-l7oievhyca6utk2m",
+  namespaceName: "umccr",
+  namespaceId: "ns-mjt63c4ppdrly4jd",
   env: {
     account: AWS_DEV_ACCOUNT,
     region: AWS_DEV_REGION,
