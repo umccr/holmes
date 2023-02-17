@@ -8,6 +8,7 @@ import { parse } from "csv-parse";
 import { keyToUrl } from "./aws";
 import { readdir, readFile, unlink } from "fs/promises";
 import { exec as execCallback } from "child_process";
+import { EitherMatchOrNoMatchType, MatchType } from "./somalier-types";
 
 // get this functionality as promise compatible function
 const pipeline = promisify(pipelineCallback);
@@ -67,25 +68,6 @@ export async function downloadAndCorrectFingerprint(
   return newSampleId;
 }
 
-export type MatchType = {
-  file: string;
-  relatedness: number;
-  ibs0: number;
-  ibs2: number;
-  hom_concordance: number;
-  hets_a: number;
-  hets_b: number;
-  hets_ab: number;
-  shared_hets: number;
-  hom_alts_a: number;
-  hom_alts_b: number;
-  shared_hom_alts: number;
-  n: number;
-  // confirm these are not directional too
-  x_ibs0: number;
-  x_ibs2: number;
-};
-
 function tsvRecordToMatchType(record: any, f: string): MatchType {
   return {
     file: f,
@@ -121,8 +103,8 @@ export async function extractMatchesAgainstIndexes(
   indexSampleIdToKeyMap: { [sid: string]: string },
   sampleIdToKeyMap: { [sid: string]: string },
   relatednessThreshold: number
-): Promise<{ [sid: string]: MatchType[] }> {
-  const matches: { [url: string]: MatchType[] } = {};
+): Promise<{ [sid: string]: EitherMatchOrNoMatchType[] }> {
+  const matches: { [url: string]: EitherMatchOrNoMatchType[] } = {};
 
   for (const indexSampleId of Object.keys(indexSampleIdToKeyMap)) {
     console.log(
@@ -199,34 +181,6 @@ export async function extractAllPairs(
   indexSampleIdToKeyMap: { [sid: string]: string }
 ): Promise<string> {
   return await readFile("somalier.html", "utf-8");
-
-  // { [sid: string]: MatchType[] }
-
-  /*  const matches: { [url: string]: MatchType[] } = {};
-
-  const parser = createReadStream("somalier.pairs.tsv").pipe(
-    parse({
-      delimiter: "\t",
-    })
-  );
-
-  for await (const record of parser) {
-    const indexUrlAsString = keyToUrl(
-      fingerprintFolder,
-      indexSampleIdToKeyMap[record[0]]
-    ).toString();
-
-    const result = tsvRecordToMatchType(
-      record,
-      keyToUrl(fingerprintFolder, indexSampleIdToKeyMap[record[1]]).toString()
-    );
-
-    if (!(indexUrlAsString in matches)) matches[indexUrlAsString] = [];
-
-    matches[indexUrlAsString].push(result);
-  }
-
-  return matches; */
 }
 
 /**

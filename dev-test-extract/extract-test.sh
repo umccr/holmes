@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 SECRET_ARN="arn:aws:secretsmanager:ap-southeast-2:843407916570:secret:IcaSecretsPortal" # pragma: allowlist secret
 BN="umccr-fingerprint-local-dev-test"                                                   # pragma: allowlist secret
@@ -11,6 +11,8 @@ docker build --platform linux/amd64 -t $DI ../application/fingerprint-docker-ima
 aws s3 rm "s3://$BN/temp/" --exclude "*" --include "676473*" --include "7333*"
 
 echo "This should take 5 mins"
+
+"s3://umccr-fingerprint-local-dev-test/test-bams/HG002-ready.bam"
 
 # notes: we bind in our local copies of the reference files so that we can skip the download step
 # we don't bind in a copy of the sites file as it is small *and* this tests out the download step

@@ -85,6 +85,8 @@ export class SomalierCheckStateMachineConstruct extends SomalierBaseStateMachine
           relatednessThreshold: 0.8,
           // this is a regex that by default *won't* exclude anything
           excludeRegex: "^\\b$",
+          // this is a regex that by default *won't* match anything - and hence will do no "expected" related checks
+          expectRelatedRegex: "^\\b$",
           fingerprintFolder: "fingerprints/",
         },
         resultPath: "$.inputDefaults",
