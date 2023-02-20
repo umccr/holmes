@@ -22,6 +22,9 @@ echo "Extract running - this should take 5 mins - and a resulting fingerprint fi
 # realistic test GDS
 #docker_start_extract "gds://development/test-data/holmes-test-data/family/giab_exome_trio/HG002-ready.bam" "temp/" "hg38.rna"
 
+# real HG19 cttso
+docker_start_extract "gds://development/test-data/holmes-test-data/ctdna/PTC_ctTSO220404_L2200417.bam" "temp/" "hg19.rna"
+
 # quick test
 #docker_start_extract "gds://umccr-research/test_data/CCR180149_tumor_mini.bam" "temp/" "hg38.rna"
 
