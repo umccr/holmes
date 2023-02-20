@@ -21,14 +21,14 @@ import { EitherMatchOrNoMatchType } from "./lib/somalier-types";
     "Items": [
         {
             "Etag": "\"e9cfb6278ca06b24ba23de07a074996f\"",
-            "Key": "prints/6764733a2f2f646576656c6f706d656e742f4f5448455246414b4530303030342f5054432e62616d",
+            "Key": "fingerprints/6764733a2f2f646576656c6f706d656e742f4f5448455246414b4530303030342f5054432e62616d",
             "LastModified": 1671425036,
             "Size": 207211,
             "StorageClass": "STANDARD"
         },
         {
             "Etag": "\"e9cfb6278ca06b24ba23de07a074996f\"",
-            "Key": "prints/6764733a2f2f646576656c6f706d656e742f4f5448455246414b4530303030352f5054432e62616d",
+            "Key": "fingerprints/6764733a2f2f646576656c6f706d656e742f4f5448455246414b4530303030352f5054432e62616d",
             "LastModified": 1671425036,
             "Size": 207211,
             "StorageClass": "STANDARD"

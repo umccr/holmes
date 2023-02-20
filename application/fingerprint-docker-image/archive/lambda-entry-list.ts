@@ -1,4 +1,4 @@
-import { keyToUrl } from "./lib/aws";
+import { keyToUrl } from "../lib/aws";
 
 /* Example input as processed through the Step Functions Distributed Map batcher
 

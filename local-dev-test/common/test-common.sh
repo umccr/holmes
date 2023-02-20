@@ -25,18 +25,18 @@ function check_is_dev() {
 
 function docker_build() {
   # somalier binary is only set up for AMD64 images so we have to force that platform
-  docker build --platform linux/amd64 -t $DOCKER_IMAGE_NAME "$(dirname "${BASH_SOURCE[0]}")/../application/fingerprint-docker-image"
+  docker build --platform linux/amd64 -t $DOCKER_IMAGE_NAME "$(dirname "${BASH_SOURCE[0]}")/../../application/fingerprint-docker-image"
 }
 
 function docker_start_check() {
   if [[ "X$1" = "X" ]]; then
-    echo >&2 "docker_start requires the CMD to be passed as the first argument"
+    echo >&2 "docker_start_check requires the CMD to be passed as the first argument"
 
     return 1
   fi
 
   if [[ "X$2" = "X" ]]; then
-    echo >&2 "docker_start requires the fingerprint folder to be passed as the second argument"
+    echo >&2 "docker_start_check requires the fingerprint folder to be passed as the second argument"
 
     return 1
   fi
@@ -67,12 +67,12 @@ function docker_start_extract() {
   fi
 
   if [[ "X$2" = "X" ]]; then
-    echo >&2 "docker_start_extract requires the fingerprint folder to be passed as the second argument"
+    echo >&2 "docker_start_extract requires the destination fingerprint folder to be passed as the second argument"
 
     return 1
   fi
 
-  if [[ "X$2" = "X" ]]; then
+  if [[ "X$3" = "X" ]]; then
     echo >&2 "docker_start_extract requires the reference genome to be passed as the third argument"
 
     return 1
@@ -82,8 +82,9 @@ function docker_start_extract() {
   local US_PATH="$(realpath $(dirname "${BASH_SOURCE[0]}"))"
 
   # somalier binary is only set up for AMD64 images so we have to force that platform
-  C=$(docker run --platform linux/amd64 -d --rm -p 9000:8080 \
-    --mount type=bind,source=$US_PATH/reference.$3.fa,target=/tmp/reference.fasta \
+  C=$(docker run --platform linux/amd64 --rm \
+    --mount type=bind,source=$US_PATH/reference.$3.fa,target=/tmp/reference.fa \
+    --mount type=bind,source=$US_PATH/reference.$3.fa.fai,target=/tmp/reference.fa.fai \
     --mount type=bind,source=$US_PATH/sites.$3.vcf.gz,target=/tmp/sites.vcf.gz \
     --env AWS_REGION=ap-southeast-2 \
     --env AWS_ACCESS_KEY_ID \

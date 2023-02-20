@@ -17,7 +17,6 @@ import { Vpc } from "aws-cdk-lib/aws-ec2";
 import { Cluster } from "aws-cdk-lib/aws-ecs";
 import { SomalierExtractStateMachineConstruct } from "./somalier-extract-state-machine-construct";
 import { AccountPrincipal, ManagedPolicy, Role } from "aws-cdk-lib/aws-iam";
-import { SomalierListStateMachineConstruct } from "./somalier-list-state-machine-construct";
 import { SomalierPairsStateMachineConstruct } from "./somalier-pairs-state-machine-construct";
 
 /**
@@ -133,12 +132,6 @@ export class HolmesApplicationStack extends Stack {
       stateProps
     );
 
-    const listStateMachine = new SomalierListStateMachineConstruct(
-      this,
-      "SomalierList",
-      stateProps
-    );
-
     const pairsStateMachine = new SomalierPairsStateMachineConstruct(
       this,
       "SomalierPairs",
@@ -147,11 +140,9 @@ export class HolmesApplicationStack extends Stack {
 
     icaSecret.grantRead(checkStateMachine.taskRole);
     icaSecret.grantRead(extractStateMachine.taskRole);
-    icaSecret.grantRead(listStateMachine.taskRole);
     icaSecret.grantRead(pairsStateMachine.taskRole);
 
     fingerprintBucket.grantRead(checkStateMachine.taskRole);
-    fingerprintBucket.grantRead(listStateMachine.taskRole);
     fingerprintBucket.grantRead(pairsStateMachine.taskRole);
     fingerprintBucket.grantReadWrite(extractStateMachine.taskRole);
 

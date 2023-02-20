@@ -15,35 +15,15 @@ is high, and therefore the `relatedness` score can help guard against
 sample mix-ups - by uncovering where unexpected relationships exist between
 samples.
 
+## Developers
+
+Before doing any development work - please see [here](docs/DEV.md) for dev setup instructions.
+
 ## Service
-
-### Abstract
-
-This service provides a variety of stages - sometimes standalone but
-also sometimes joined together (such that one stages output feeds into another
-stage). The stages broadly speaking are:
-
-- Difference - searches for BAM files in a set of source folders and then determines
-  which of them does not have a corresponding up to date fingerpint
-  recorded
-- Extract - for a given list of BAM files generates fingerprints and records them
-  in the system
-- Check - for any index fingerprint (already in the system), compares that to all other
-  fingerprints and returns those which are closely related
-
-The current joined stages are:
-
-- Difference Then Extract - finds all the BAM files that need fingerprinting and then
-  creates the fingerprints for them
-
-Considering adding
-
-- Extract Then Check - generate fingerprints for a given set of files and then return a report
-  where they have all been checked against the entire database
 
 ### Invoke
 
-The service providers all entry points as AWS Steps functions.
+The service provides all entry points as AWS Steps functions.
 
 These functions are registered into the `umccr` namespace.
 
@@ -52,39 +32,6 @@ the technique for service discovery is to locate the `fingerprint`
 service - and then select the one and only service instance present.
 Then choose the custom attribute that matches the Steps function Arn
 to invoke.
-
----
-
-#### Difference
-
-`umccr -> fingerprint -> (single service) -> differenceStepsArn`
-
-with an input of
-
-```json
-{}
-```
-
-and produces output of the form
-
-```json
-{
-  "needsFingerprinting": [
-    ["gds://development/sample1.bam", "gds://development/sample2.bam"],
-    ["gds://development/sample3.bam"]
-  ],
-  "hasFingerprinting": [
-    "gds://development/sample4.bam",
-    "gds://development/sample5.bam"
-  ]
-}
-```
-
-Note that the output `needsFingerprinting` is an array of arrays
-with a fan out controlled by some default settings. This is because
-choosing the parallelisation level is useful for controlling the
-extraction (and we want this output to feed directly in as an input to
-that stage).
 
 ---
 
@@ -174,27 +121,13 @@ This service takes approximately 15 seconds to run.
 
 ## Costing
 
-Estimates are available [here](COSTS.md). They have been shown in
+Estimates are available [here](docs/COSTS.md). They have been shown in
 practice to be roughly correct.
 
 ## Design
 
-The service maintains an S3 bucket that stores fingerprint files (~200k per BAM).
-
-Because fingerprints must be produced using the same `sites.vcf.gz` file to
-be compatible in `somalier` for the checking operation - we use the MD5 checksum of the
-sites file to partition the fingerprints. All fingerprints for an
-identical sites file will live in the same folder in our fingerprint store.
-
-Any change to the sites file content _will result in needing to recreate all
-existing fingerprints_ - though this is an operation that does not happen
-very often.
-
-We can see this in a hypothetical world where one sites files has
-checksum `ABCDEF`, and another has checksum `GHIJKL`. We can see that
-in this scenario the `bam3.bam` has not been fingerprinted at all, where
-`bam1.bam` has only been fingerprinted with one sites file. `bam2.bam`
-has a fingerprint for both sites files.
+The service maintains an S3 bucket that stores fingerprint files (~200k per BAM) and then
+provides AWS Steps functions that operate to run `somalier` over these files.
 
 ```mermaid
   graph TD;
@@ -208,9 +141,6 @@ has a fingerprint for both sites files.
           f1("ABCDEF/hex encoded URL of BAM1")
           f2("ABCDEF/hex encoded URL of BAM2")
         end
-        subgraph S3 folder GHIJKL/
-          f3("GHIJKL/hex encoded URL of BAM2")
-        end
       end
       bam1-->f1
       bam2-->f2
@@ -218,16 +148,15 @@ has a fingerprint for both sites files.
 ```
 
 The operations provided by the service are focussed around
-a) determining which fingerprints are missing
-b) producing new fingerprints
-c) checking fingerprints against others
+a) producing new fingerprints
+b) checking fingerprints against others
 
 There is no other data store for the service - the existence of a fingerprint
 in S3 with a path matching the sites checksum and BAM URL (hex encoded) is
 the canonical definition that a BAM has been fingerprinted.
 
 The check operation will always operate against all fingerprints that
-exist (albeit only those matching the current sites file checksum).
+exist in the designated fingerprint folder.
 
 ### Lambdas
 
@@ -237,7 +166,7 @@ This lambda image has the `somalier` tool compiled directly into the Docker imag
 
 `somalier` cannot source fingerprints via network - so each lambda must download
 the subset of fingerprints it is working on to the lambda /tmp directory - call
-somalier and then return the results.
+`somalier` and then return the results.
 
 The lambdas are distributed concurrently using Steps Map - which means that no
 one lambda is required to spend too much time downloading files, nor can the files
@@ -264,47 +193,3 @@ input: >
     "index": "gds://development/analysis_data/SBJ00480/wgs_alignment_qc/20211128e4a69bdb/L2000966__1_dragen_somalier/PTC_Tsqn201109MB.somalier",
   }
 ```
-
-## Deployment
-
-- `cdk deploy` deploy this stack to your default AWS account/region
-- `cdk diff` compare deployed stack with current state
-- `cdk synth` emits the synthesized CloudFormation template
-
-## Local
-
-The `test-local.sh` script are direct local test cases that can be executed
-on the Typescript code directly as Nodejs apps.
-
-This testing requires the execution environment have AWS\_\* variables
-set up for a user in the UMCCR dev account. Other settings/paths in
-both `test-local.sh` and `test-local.ts`
-may need to be refreshed from time to time to match up with the developer
-deployed versions of various artifacts. It is impossible to guarantee
-that files won't move around in these dev buckets, hence the
-BAMs chosen for testing may also change.
-
-```shell
-./test-local.sh extract
-```
-
-```shell
-./test-local.sh check
-```
-
-```shell
-./test-local.sh check-start
-```
-
-```shell
-./test-local.sh difference
-```
-
-## Local Docker
-
-The `test-docker` folder has some scripts for doing local testing but in an environment
-that _simulates_ AWS lambdas. This is good for testing packaging, lambda path issues etc.
-IT IS STILL NOT IDENTICAL TO THE REAL LAMBDA ENVIRONMENT THOUGH - as it does not enforce
-disk size or disk r/w limits like a real lambda does. This testing
-does require the environment have AWS\_\* variables
-set up for a user in UMCCR dev account.
