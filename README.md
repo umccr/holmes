@@ -43,18 +43,15 @@ with an input of
 
 ```json
 {
-  "needsFingerprinting": [
-    [
-      "gds://development/sample1.bam",
-      "gds://development/sample2.bam"
-    ],
-    [
-      "gds://development/sample3.bam"
-    ]
-  ],
-  "...": ...
+  "indexes": ["bamUrl1", ..],
+  "reference": "hg38.rna",
+  "fingerprintFolder": "fingerprints/"
 }
 ```
+
+`reference` must match references and sites that are present in the `config/` folder of the fingerprint bucket - in practice `hg38.rna` or `hg19.rna`.
+
+`fingerprintFolder` is optional.
 
 and produces output of the form
 
@@ -62,8 +59,7 @@ and produces output of the form
 {}
 ```
 
-Each entry in the `needsFingerprinting` array will cause a new ECS Task
-to be invoked for performing the fingerprinting. There are some advantages to
+Each entry in the `indexes` array will be fingerprinted. There are some advantages to
 doing multiple fingerprints sequentially in the task, so it is up to the
 invoker to chose how many BAMs to process on each Task.
 
@@ -116,6 +112,38 @@ the service is working. Any other BAMs that have a relatedness above the thresho
 will also be returned.
 
 This service takes approximately 15 seconds to run.
+
+We can also search for 'expected' matches using a very primitive regular expression file name matching
+algorithm. This means that where two files have a regular expression where all matching groups
+also match - their fingerprints MUST also be related.
+
+```json
+{
+  "indexes": ["gds://development/sample1.bam", "gds://development/sample2.bam"],
+  "expectRelatedRegex": "^.*SBJ_(\\d\\d\\d\\d\\d).*\\.bam$"
+}
+```
+
+If the expected relatedness check fails then the following entry will be returned (where regex is the
+regular expression passed in).
+
+```json
+[
+  {
+    "file": "gds://development/sampleX.bam",
+    "unrelatedness": "regex"
+  }
+]
+```
+
+We can also remove from consideration any file that matches a regular expression.
+
+```json
+{
+  "indexes": ["gds://development/sample1.bam", "gds://development/sample2.bam"],
+  "excludeRegex": "^.*PTC.*\\.bam$"
+}
+```
 
 ---
 
@@ -181,7 +209,7 @@ The step function can be executed with the equivalent of
 
 ```
 aws stepfunctions start-execution \
- --state-machine-arn arn:aws:states:ap-southeast-2:843407916570:stateMachine:StateMachine2E01A3A5-mOp8QLUdyXFQ \
+ --state-machine-arn arn:aws:states:ap-southeast-2:843407916570:stateMachine:StateMachineAAAAAA-XXXXXX \
  --cli-input-yaml file://adhoc-test-invoke-input.yaml
 ```
 
@@ -190,6 +218,6 @@ where the test input is
 ```yaml
 input: >
   {
-    "index": "gds://development/analysis_data/SBJ00480/wgs_alignment_qc/20211128e4a69bdb/L2000966__1_dragen_somalier/PTC_Tsqn201109MB.somalier",
+    "indexes": ["gds://development/analysis_data/SBJ00480/wgs_alignment_qc/20211128e4a69bdb/L2000966__1_dragen_somalier/PTC_Tsqn201109MB.somalier"]
   }
 ```

@@ -19,7 +19,7 @@ case $ACCOUNT in
 
   "472057503814")
      # prod
-     NODE_OPTIONS="--unhandled-rejections=strict" npx ts-node holmes-e2e-test.ts \
+     NODE_OPTIONS="--unhandled-rejections=strict" npx ts-node "$(dirname "$0")/holmes-e2e-test.ts" \
      . \
      "umccr-fingerprint-prod" \
      "gds://production/test-data/holmes-test-data" \
@@ -30,7 +30,7 @@ case $ACCOUNT in
 
   "455634345446")
      # stg
-     NODE_OPTIONS="--unhandled-rejections=strict" npx ts-node holmes-e2e-test.ts \
+     NODE_OPTIONS="--unhandled-rejections=strict" npx ts-node "$(dirname "$0")/holmes-e2e-test.ts" \
      . \
      "umccr-fingerprint-stg" \
      "gds://staging/test-data/holmes-test-data" \
@@ -41,7 +41,7 @@ case $ACCOUNT in
 
   "843407916570")
      # dev (local dev/test)
-     NODE_OPTIONS="--unhandled-rejections=strict" npx ts-node holmes-e2e-test.ts \
+     NODE_OPTIONS="--unhandled-rejections=strict" npx ts-node "$(dirname "$0")/holmes-e2e-test.ts" \
      . \
      "umccr-fingerprint-local-dev-test" \
      "gds://development/test-data/holmes-test-data" \
