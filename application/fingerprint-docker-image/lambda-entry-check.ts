@@ -96,6 +96,12 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
       "No fingerprintFolder (with slash suffix) specified in lambda input"
     );
 
+  console.log(`Fingerprint folder = ${ev.BatchInput.fingerprintFolder}`);
+  console.log(`Relatedness threshold = ${ev.BatchInput.relatednessThreshold}`);
+  console.log(`Exclude regex = ${ev.BatchInput.excludeRegex}`);
+  console.log(`Expect related regex = ${ev.BatchInput.expectRelatedRegex}`);
+  // console.log(indexes).. these will be printed as part of the debug for the somalier invoke
+
   // only small areas of the lambda runtime are read/write so we need to make sure we are in a writeable working dir
   chdir(somalierWork);
 
