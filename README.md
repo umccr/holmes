@@ -15,35 +15,15 @@ is high, and therefore the `relatedness` score can help guard against
 sample mix-ups - by uncovering where unexpected relationships exist between
 samples.
 
+## Developers
+
+Before doing any development work - please see [here](docs/DEV.md) for dev setup instructions.
+
 ## Service
-
-### Abstract
-
-This service provides a variety of stages - sometimes standalone but
-also sometimes joined together (such that one stages output feeds into another
-stage). The stages broadly speaking are:
-
-- Difference - searches for BAM files in a set of source folders and then determines
-  which of them does not have a corresponding up to date fingerpint
-  recorded
-- Extract - for a given list of BAM files generates fingerprints and records them
-  in the system
-- Check - for any index fingerprint (already in the system), compares that to all other
-  fingerprints and returns those which are closely related
-
-The current joined stages are:
-
-- Difference Then Extract - finds all the BAM files that need fingerprinting and then
-  creates the fingerprints for them
-
-Considering adding
-
-- Extract Then Check - generate fingerprints for a given set of files and then return a report
-  where they have all been checked against the entire database
 
 ### Invoke
 
-The service providers all entry points as AWS Steps functions.
+The service provides all entry points as AWS Steps functions.
 
 These functions are registered into the `umccr` namespace.
 
@@ -55,39 +35,6 @@ to invoke.
 
 ---
 
-#### Difference
-
-`umccr -> fingerprint -> (single service) -> differenceStepsArn`
-
-with an input of
-
-```json
-{}
-```
-
-and produces output of the form
-
-```json
-{
-  "needsFingerprinting": [
-    ["gds://development/sample1.bam", "gds://development/sample2.bam"],
-    ["gds://development/sample3.bam"]
-  ],
-  "hasFingerprinting": [
-    "gds://development/sample4.bam",
-    "gds://development/sample5.bam"
-  ]
-}
-```
-
-Note that the output `needsFingerprinting` is an array of arrays
-with a fan out controlled by some default settings. This is because
-choosing the parallelisation level is useful for controlling the
-extraction (and we want this output to feed directly in as an input to
-that stage).
-
----
-
 #### Extract
 
 `umccr -> fingerprint -> (single service) -> extractStepsArn`
@@ -96,18 +43,15 @@ with an input of
 
 ```json
 {
-  "needsFingerprinting": [
-    [
-      "gds://development/sample1.bam",
-      "gds://development/sample2.bam"
-    ],
-    [
-      "gds://development/sample3.bam"
-    ]
-  ],
-  "...": ...
+  "indexes": ["bamUrl1", ..],
+  "reference": "hg38.rna",
+  "fingerprintFolder": "fingerprints/"
 }
 ```
+
+`reference` must match references and sites that are present in the `config/` folder of the fingerprint bucket - in practice `hg38.rna` or `hg19.rna`.
+
+`fingerprintFolder` is optional.
 
 and produces output of the form
 
@@ -115,8 +59,7 @@ and produces output of the form
 {}
 ```
 
-Each entry in the `needsFingerprinting` array will cause a new ECS Task
-to be invoked for performing the fingerprinting. There are some advantages to
+Each entry in the `indexes` array will be fingerprinted. There are some advantages to
 doing multiple fingerprints sequentially in the task, so it is up to the
 invoker to chose how many BAMs to process on each Task.
 
@@ -170,37 +113,49 @@ will also be returned.
 
 This service takes approximately 15 seconds to run.
 
+We can also search for 'expected' matches using a very primitive regular expression file name matching
+algorithm. This means that where two files have a regular expression where all matching groups
+also match - their fingerprints MUST also be related.
+
+```json
+{
+  "indexes": ["gds://development/sample1.bam", "gds://development/sample2.bam"],
+  "expectRelatedRegex": "^.*SBJ_(\\d\\d\\d\\d\\d).*\\.bam$"
+}
+```
+
+If the expected relatedness check fails then the following entry will be returned (where regex is the
+regular expression passed in).
+
+```json
+[
+  {
+    "file": "gds://development/sampleX.bam",
+    "unrelatedness": "regex"
+  }
+]
+```
+
+We can also remove from consideration any file that matches a regular expression.
+
+```json
+{
+  "indexes": ["gds://development/sample1.bam", "gds://development/sample2.bam"],
+  "excludeRegex": "^.*PTC.*\\.bam$"
+}
+```
+
 ---
-
-#### Difference Then Extract
-
-`umccr -> fingerprint -> (single service) -> differenceThenExtractStepsArn`
-
-This operation takes empty input and returns empty output.
 
 ## Costing
 
-Estimates are available [here](COSTS.md). They have been shown in
+Estimates are available [here](docs/COSTS.md). They have been shown in
 practice to be roughly correct.
 
 ## Design
 
-The service maintains an S3 bucket that stores fingerprint files (~200k per BAM).
-
-Because fingerprints must be produced using the same `sites.vcf.gz` file to
-be compatible in `somalier` for the checking operation - we use the MD5 checksum of the
-sites file to partition the fingerprints. All fingerprints for an
-identical sites file will live in the same folder in our fingerprint store.
-
-Any change to the sites file content _will result in needing to recreate all
-existing fingerprints_ - though this is an operation that does not happen
-very often.
-
-We can see this in a hypothetical world where one sites files has
-checksum `ABCDEF`, and another has checksum `GHIJKL`. We can see that
-in this scenario the `bam3.bam` has not been fingerprinted at all, where
-`bam1.bam` has only been fingerprinted with one sites file. `bam2.bam`
-has a fingerprint for both sites files.
+The service maintains an S3 bucket that stores fingerprint files (~200k per BAM) and then
+provides AWS Steps functions that operate to run `somalier` over these files.
 
 ```mermaid
   graph TD;
@@ -214,9 +169,6 @@ has a fingerprint for both sites files.
           f1("ABCDEF/hex encoded URL of BAM1")
           f2("ABCDEF/hex encoded URL of BAM2")
         end
-        subgraph S3 folder GHIJKL/
-          f3("GHIJKL/hex encoded URL of BAM2")
-        end
       end
       bam1-->f1
       bam2-->f2
@@ -224,16 +176,15 @@ has a fingerprint for both sites files.
 ```
 
 The operations provided by the service are focussed around
-a) determining which fingerprints are missing
-b) producing new fingerprints
-c) checking fingerprints against others
+a) producing new fingerprints
+b) checking fingerprints against others
 
 There is no other data store for the service - the existence of a fingerprint
 in S3 with a path matching the sites checksum and BAM URL (hex encoded) is
 the canonical definition that a BAM has been fingerprinted.
 
 The check operation will always operate against all fingerprints that
-exist (albeit only those matching the current sites file checksum).
+exist in the designated fingerprint folder.
 
 ### Lambdas
 
@@ -243,7 +194,7 @@ This lambda image has the `somalier` tool compiled directly into the Docker imag
 
 `somalier` cannot source fingerprints via network - so each lambda must download
 the subset of fingerprints it is working on to the lambda /tmp directory - call
-somalier and then return the results.
+`somalier` and then return the results.
 
 The lambdas are distributed concurrently using Steps Map - which means that no
 one lambda is required to spend too much time downloading files, nor can the files
@@ -258,7 +209,7 @@ The step function can be executed with the equivalent of
 
 ```
 aws stepfunctions start-execution \
- --state-machine-arn arn:aws:states:ap-southeast-2:843407916570:stateMachine:StateMachine2E01A3A5-mOp8QLUdyXFQ \
+ --state-machine-arn arn:aws:states:ap-southeast-2:843407916570:stateMachine:StateMachineAAAAAA-XXXXXX \
  --cli-input-yaml file://adhoc-test-invoke-input.yaml
 ```
 
@@ -267,12 +218,6 @@ where the test input is
 ```yaml
 input: >
   {
-    "index": "gds://development/analysis_data/SBJ00480/wgs_alignment_qc/20211128e4a69bdb/L2000966__1_dragen_somalier/PTC_Tsqn201109MB.somalier",
+    "indexes": ["gds://development/analysis_data/SBJ00480/wgs_alignment_qc/20211128e4a69bdb/L2000966__1_dragen_somalier/PTC_Tsqn201109MB.somalier"]
   }
 ```
-
-## Deployment
-
-- `cdk deploy` deploy this stack to your default AWS account/region
-- `cdk diff` compare deployed stack with current state
-- `cdk synth` emits the synthesized CloudFormation template

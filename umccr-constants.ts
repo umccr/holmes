@@ -12,6 +12,5 @@ export const AWS_PROD_REGION = "ap-southeast-2";
 
 export const NAMESPACE_NAME = "umccr";
 
-export const NAMESPACE_DEV_ID = "ns-mjt63c4ppdrly4jd";
 export const NAMESPACE_STG_ID = "ns-ay2qsv5bi2djv64m";
 export const NAMESPACE_PROD_ID = "ns-z7kktgazzvwokcvz";

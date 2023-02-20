@@ -169,32 +169,11 @@ export class SomalierExtractStateMachineConstruct extends SomalierBaseStateMachi
           ),
         },
       ],
-      // we should not get *anywhere* near 6 hours for tasks - each fingerprint takes about 15 mins... and
-      // our default clumping size is 5, so 5x15 mins is about normal...
+      // we should not get *anywhere* near 6 hours for tasks - each fingerprint takes about 15 mins...
       // but we set it here as a worst case where we have an infinite loop or something - we want steps to
       // step in and kill the task
       timeout: Duration.hours(6),
     });
-
-    // The Map invoke step is the parallel invocation according to the dynamic array input
-    /*return new Map(this, "MapTask", {
-      inputPath: "$",
-      itemsPath: "$.needsFingerprinting",
-      parameters: {
-        "files.$": "$$.Map.Item.Value",
-      },
-      // the result of an ECS Task is a very large JSON with all the ECS details - and this will overflow
-      // the steps State limits if not pruned
-      resultSelector: {
-        //"CreatedAt.$": "$.CreatedAt",
-        //"ExecutionStoppedAt.$": "$.ExecutionStoppedAt",
-        //"StartedAt.$": "$.StartedAt",
-        //"StopCode.$": "$.StopCode",
-        //"StoppedAt.$": "$.StoppedAt",
-        //"StoppedReason.$": "$.StoppedReason",
-        //"TaskArn.$": "$.TaskArn",
-      },
-    }).iterator(runTask); */
   }
 
   public get stepsArn(): string {

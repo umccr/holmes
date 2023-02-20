@@ -6,28 +6,29 @@ import {
   cleanSomalierFiles,
   downloadAndCorrectFingerprint,
   extractMatchesAgainstIndexes,
-  MatchType,
   runSomalierRelate,
 } from "./lib/somalier";
+import { EitherMatchOrNoMatchType } from "./lib/somalier-types";
 
 /* Example input as processed through the Step Functions Distributed Map batcher
 
 {
     "BatchInput": {
-        "relatednessThreshold": 0.4,
-        "index": "gds://development/FAKE00001/NTC.bam"
+        "indexes": ["gds://development/FAKE00001/NTC.bam"],
+        "fingerprintFolder": "fingerprints/",
+        "relatednessThreshold": 0.4
     },
     "Items": [
         {
             "Etag": "\"e9cfb6278ca06b24ba23de07a074996f\"",
-            "Key": "prints/6764733a2f2f646576656c6f706d656e742f4f5448455246414b4530303030342f5054432e62616d",
+            "Key": "fingerprints/6764733a2f2f646576656c6f706d656e742f4f5448455246414b4530303030342f5054432e62616d",
             "LastModified": 1671425036,
             "Size": 207211,
             "StorageClass": "STANDARD"
         },
         {
             "Etag": "\"e9cfb6278ca06b24ba23de07a074996f\"",
-            "Key": "prints/6764733a2f2f646576656c6f706d656e742f4f5448455246414b4530303030352f5054432e62616d",
+            "Key": "fingerprints/6764733a2f2f646576656c6f706d656e742f4f5448455246414b4530303030352f5054432e62616d",
             "LastModified": 1671425036,
             "Size": 207211,
             "StorageClass": "STANDARD"
@@ -50,6 +51,11 @@ type EventInput = {
     // if present a regex that is matched to BAM filenames (i.e. not against the hex encoded keys)
     // and tells us to exclude them from sending to "somalier relate"
     excludeRegex?: string;
+
+    // if present a regex that generates match groups - and expects all fingerprints with group matches
+    // to the index - to also be 'related' genomically.. this is used to detect fingerprints that *should*
+    // be related but come back not related
+    expectRelatedRegex?: string;
   };
 
   // a set of fingerprint URLs which we will check the index against
@@ -119,6 +125,7 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
 
   // download and 'fix' the sample ids for all the other fingerprint files we have been passed
   const sampleIdToFingerprintKeyMap: { [sid: string]: string } = {};
+  const fingerprintsAsUrlStrings: string[] = [];
 
   for (const fingerprintItem of ev.Items) {
     const fingerprintAsKey = fingerprintItem.Key;
@@ -137,6 +144,10 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
         continue;
     }
 
+    // useful to have all the fingerprint urls for some later logic
+    fingerprintsAsUrlStrings.push(fingerprintAsUrl.toString());
+
+    // build a map to help us correlate sample ids and fingerprint files
     const newSampleId = await downloadAndCorrectFingerprint(
       fingerprintAsKey,
       sampleCount
@@ -158,6 +169,60 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
       ev.BatchInput.relatednessThreshold
     );
 
+    // we have now detected all the files genomically similar... if asked to, we should also
+    // detect those that are genomically NOT similar - but where we expect they should be
+    if (ev.BatchInput.expectRelatedRegex) {
+      const r = new RegExp(ev.BatchInput.expectRelatedRegex);
+
+      // just doing some *string* matching to see if we expect them to be related
+      for (const indexUrl of ev.BatchInput.indexes) {
+        for (const fingerprintUrl of fingerprintsAsUrlStrings) {
+          const indexRegexMatch = r.exec(indexUrl);
+          const fingerprintRegexMatch = r.exec(fingerprintUrl);
+
+          if (!indexRegexMatch || !fingerprintRegexMatch) continue;
+
+          if (indexRegexMatch.length != fingerprintRegexMatch.length) continue;
+
+          if (indexRegexMatch.length < 2) continue;
+
+          // all the match groups of the regex need to match for us to declare this to be a "regex match"
+          let allMatch = true;
+          for (let i = 1; i < indexRegexMatch.length; i = i + 1) {
+            if (indexRegexMatch[i] !== fingerprintRegexMatch[i]) {
+              allMatch = false;
+            }
+          }
+
+          if (allMatch) {
+            // so our regex tells us that the index and fingerprint are related (in a pure string naming sense)
+            // so now we need to ensure that is true in a genomic sense..
+            let relatedMatch = false;
+
+            // can we find a related result?
+            for (const f of matches[indexUrl] || []) {
+              if (f.file === fingerprintUrl) relatedMatch = true;
+            }
+
+            if (!relatedMatch) {
+              console.log(
+                `${indexUrl} should be related to ${fingerprintUrl} but doesn't appear to be`
+              );
+
+              // possibly not needed..
+              if (!(indexUrl in matches)) matches[indexUrl] = [];
+
+              // push a special type of result that declares our unrelatedness
+              matches[indexUrl].push({
+                file: fingerprintUrl,
+                unrelatedness: r.source,
+              });
+            }
+          }
+        }
+      }
+    }
+
     await cleanSomalierFiles();
 
     return matches;
@@ -168,7 +233,7 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
 
     await cleanSomalierFiles();
 
-    const matches: { [url: string]: MatchType[] } = {};
+    const matches: { [url: string]: EitherMatchOrNoMatchType[] } = {};
 
     for (const indexUrl of ev.BatchInput.indexes) {
       matches[indexUrl] = [];

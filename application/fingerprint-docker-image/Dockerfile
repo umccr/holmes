@@ -17,7 +17,6 @@ RUN npx tsc --noEmit
 # note: we bundle all the used node_modules into each output - so each CJS is about 1.5MB.. however the alternative
 # of just leaving the node_modules folder actually adds about 20 MB to the image size - tree shaking works I guess!
 RUN npx esbuild lambda-entry-check.ts --bundle --outfile=check.cjs --platform=node --target=node18
-RUN npx esbuild lambda-entry-list.ts --bundle --outfile=list.cjs --platform=node --target=node18
 RUN npx esbuild lambda-entry-pairs.ts --bundle --outfile=pairs.cjs --platform=node --target=node18
 RUN npx esbuild fargate-entry-extract.ts --bundle --outfile=extract.cjs --platform=node --target=node18
 
@@ -31,4 +30,3 @@ RUN ln -s /etc/ssl/certs/ca-bundle.crt /etc/ssl/certs/ca-certificates.crt
 
 # the CMD must be set as part of the lambda definition or docker invoke.. we have no default
 CMD [ "fail" ]
-

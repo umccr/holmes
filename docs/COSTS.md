@@ -1,4 +1,4 @@
-## AWS base cost estimates
+# AWS Cost Estimates
 
 Sydney pricing
 

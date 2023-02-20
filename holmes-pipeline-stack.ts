@@ -118,7 +118,7 @@ export class HolmesPipelineStack extends Stack {
             "npm ci",
             // this is an approx 20 minute test that deletes some fingerprints, then creates some
             // new fingerprints, then does some checks
-            `NODE_OPTIONS="--unhandled-rejections=strict" npx ts-node holmes-e2e-test.ts "$TESTER_ROLE_ARN" "${STG_FINGERPRINT_BUCKET}" "${STG_GDS_TEST_DATA_BASE}" "$CHECK_STEPS_ARN" "$EXTRACT_STEPS_ARN" "$PAIRS_STEPS_ARN" `,
+            `NODE_OPTIONS="--unhandled-rejections=strict" npx ts-node test-e2e/holmes-e2e-test.ts "$TESTER_ROLE_ARN" "${STG_FINGERPRINT_BUCKET}" "${STG_GDS_TEST_DATA_BASE}" "$CHECK_STEPS_ARN" "$EXTRACT_STEPS_ARN" "$PAIRS_STEPS_ARN" `,
           ],
         }),
       ]);

@@ -1,6 +1,6 @@
 # Holmes - a low cost fingerprint solution for genomic labs
 
-WIP
+WIP (this is a potential paper speaking about the design of the system)
 
 ## Fingerprinting
 
