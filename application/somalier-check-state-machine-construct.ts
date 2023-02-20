@@ -63,6 +63,7 @@ export class SomalierCheckStateMachineConstruct extends SomalierBaseStateMachine
             "relatednessThreshold.$": "$.relatednessThreshold",
             "fingerprintFolder.$": "$.fingerprintFolder",
             "excludeRegex.$": "$.excludeRegex",
+            "expectRelatedRegex.$": "$.expectRelatedRegex",
           },
         },
         ItemProcessor: {
