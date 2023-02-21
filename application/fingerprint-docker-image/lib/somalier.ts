@@ -140,8 +140,6 @@ export async function extractMatchesAgainstIndexes(
         const relatedness = parseFloat(record[2]);
 
         if (relatedness >= relatednessThreshold) {
-          if (!(indexUrlAsString in matches)) matches[indexUrlAsString] = [];
-
           // note it is possible to match against other 'indexes' (not just 'samples')
           // however - we expect that those matches will otherwise be reported correctly when the index
           // *is* eventually compared to the "index as a sample" (maybe in a completely different lambda)
@@ -152,6 +150,8 @@ export async function extractMatchesAgainstIndexes(
           // if s3://aaa and s3://bbb are related to each other - we only need to report 1v3 and 2v3.. there
           // is no value in us reporting 1v2 (it is a duplicate of 2v3 and we are guaranteed this exists)
           if (!(record[1] in sampleIdToKeyMap)) continue;
+
+          if (!(indexUrlAsString in matches)) matches[indexUrlAsString] = [];
 
           console.log(
             `Match at ${relatedness} to sample id ${record[1]} which = ${
