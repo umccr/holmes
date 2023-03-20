@@ -61,6 +61,7 @@ export class SomalierCheckStateMachineConstruct extends SomalierBaseStateMachine
           BatchInput: {
             "indexes.$": "$.indexes",
             "relatednessThreshold.$": "$.relatednessThreshold",
+            "minimumNCount.$": "$.minimumNCount",
             "fingerprintFolder.$": "$.fingerprintFolder",
             "excludeRegex.$": "$.excludeRegex",
             "expectRelatedRegex.$": "$.expectRelatedRegex",
@@ -84,6 +85,8 @@ export class SomalierCheckStateMachineConstruct extends SomalierBaseStateMachine
         parameters: {
           // by default we want to avoid kinship detection in the checking - so setting this high
           relatednessThreshold: 0.8,
+          // by default we get very little value out of comparisons between samples where N is low
+          minimumNCount: 50,
           // this is a regex that by default *won't* exclude anything
           excludeRegex: "^\\b$",
           // this is a regex that by default *won't* match anything - and hence will do no "expected" related checks

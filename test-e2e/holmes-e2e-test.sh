@@ -45,9 +45,9 @@ case $ACCOUNT in
      . \
      "umccr-fingerprint-local-dev-test" \
      "gds://development/test-data/holmes-test-data" \
-     "arn:aws:states:ap-southeast-2:843407916570:stateMachine:SomalierCheckStateMachine1DDB4CFA-VwX5ObSh6X8Y" \
-     "arn:aws:states:ap-southeast-2:843407916570:stateMachine:SomalierExtractStateMachine59E102CC-RelluQBfMEYn" \
-     "arn:aws:states:ap-southeast-2:843407916570:stateMachine:SomalierPairsStateMachine5E171314-A7MjHNBqvMhJ"
+     "arn:aws:states:ap-southeast-2:843407916570:stateMachine:SomalierCheckStateMachine1DDB4CFA-QlEQkSUmc8Qp" \
+     "arn:aws:states:ap-southeast-2:843407916570:stateMachine:SomalierExtractStateMachine59E102CC-Lrl1LV43kDPD" \
+     "arn:aws:states:ap-southeast-2:843407916570:stateMachine:SomalierPairsStateMachine5E171314-2f7kcAc92ZDt"
     ;;
 
   *)
