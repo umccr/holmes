@@ -48,6 +48,9 @@ type EventInput = {
     // the relatedness threshold to report against
     relatednessThreshold: number;
 
+    // a minimum N count that we need to meet to report against
+    minimumNCount: number;
+
     // if present a regex that is matched to BAM filenames (i.e. not against the hex encoded keys)
     // and tells us to exclude them from sending to "somalier relate"
     excludeRegex?: string;
@@ -172,7 +175,8 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
       ev.BatchInput.fingerprintFolder,
       indexSampleIdToFingerprintKeyMap,
       sampleIdToFingerprintKeyMap,
-      ev.BatchInput.relatednessThreshold
+      ev.BatchInput.relatednessThreshold,
+      ev.BatchInput.minimumNCount
     );
 
     // we have now detected all the files genomically similar... if asked to, we should also

@@ -97,12 +97,14 @@ function tsvRecordToMatchType(record: any, f: string): MatchType {
  * @param indexSampleIdToKeyMap the details of the indexes
  * @param sampleIdToKeyMap the details of the comparison samples
  * @param relatednessThreshold the threshold to apply for reporting
+ * @param minimumNCount minimum N count of match to apply for reporting
  */
 export async function extractMatchesAgainstIndexes(
   fingerprintFolder: string,
   indexSampleIdToKeyMap: { [sid: string]: string },
   sampleIdToKeyMap: { [sid: string]: string },
-  relatednessThreshold: number
+  relatednessThreshold: number,
+  minimumNCount: number
 ): Promise<{ [sid: string]: EitherMatchOrNoMatchType[] }> {
   const matches: { [url: string]: EitherMatchOrNoMatchType[] } = {};
 
@@ -135,11 +137,15 @@ export async function extractMatchesAgainstIndexes(
           [record[10], record[11]] = [record[11], record[10]];
         }
 
+        // this is score of sites matching the sites file locations - where this gets very
+        // low the results are less than useful
+        const n = parseInt(record[13]);
+
         // this score is not directional so does not need to be swapped as A<->B swap
         // (it does go negative though - but that just means they really aren't related!)
         const relatedness = parseFloat(record[2]);
 
-        if (relatedness >= relatednessThreshold) {
+        if (relatedness >= relatednessThreshold && n >= minimumNCount) {
           // note it is possible to match against other 'indexes' (not just 'samples')
           // however - we expect that those matches will otherwise be reported correctly when the index
           // *is* eventually compared to the "index as a sample" (maybe in a completely different lambda)
