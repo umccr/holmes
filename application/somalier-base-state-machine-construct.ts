@@ -111,7 +111,7 @@ export class SomalierBaseStateMachineConstruct extends Construct {
     const func = new DockerImageFunction(this, `${stepName}Function`, {
       // as an example - processing a batch size of about 10 takes < 10 seconds
       // and requires in practice about 128k of memory
-      memorySize: 1024,
+      memorySize: 4096,
       timeout: Duration.minutes(1),
       role: role,
       code: DockerImageCode.fromEcr(this.props.dockerImageAsset.repository, {

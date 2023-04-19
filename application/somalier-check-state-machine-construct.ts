@@ -13,6 +13,10 @@ import {
 } from "./somalier-base-state-machine-construct";
 import { Arn, ArnFormat, Stack } from "aws-cdk-lib";
 
+/**
+ * A statemachine thats checks for somalier similarity between a large set of BAM files
+ * and some passed in 'index' BAM files.
+ */
 export class SomalierCheckStateMachineConstruct extends SomalierBaseStateMachineConstruct {
   private readonly lambdaRole: IRole;
   private readonly stateMachine: StateMachine;
@@ -20,7 +24,7 @@ export class SomalierCheckStateMachineConstruct extends SomalierBaseStateMachine
   constructor(
     scope: Construct,
     id: string,
-    props: SomalierBaseStateMachineProps
+    props: SomalierBaseStateMachineProps & { resultWriter?: any }
   ) {
     super(scope, id, props);
 
@@ -55,7 +59,7 @@ export class SomalierCheckStateMachineConstruct extends SomalierBaseStateMachine
           },
         },
         ItemBatcher: {
-          MaxItemsPerBatch: 10,
+          MaxItemsPerBatch: 50,
           // map all our params across as batch input
           // we can do this with confidence because our steps ensures that everyone of these has a default
           BatchInput: {
@@ -67,6 +71,9 @@ export class SomalierCheckStateMachineConstruct extends SomalierBaseStateMachine
             "expectRelatedRegex.$": "$.expectRelatedRegex",
           },
         },
+        // if result writer is set - this allows us to chose to write the (potentially large) result
+        // set out to S3 for parsing
+        ResultWriter: props.resultWriter,
         ItemProcessor: {
           ...(dummyMap.toStateJson() as any).Iterator,
           ProcessorConfig: {
@@ -107,17 +114,18 @@ export class SomalierCheckStateMachineConstruct extends SomalierBaseStateMachine
           })
         )
         .next(distributedMap)
-        .next(
-          new Pass(this, "Remove Empties", {
-            // remove all the empty {} results from any workers that matched nothing
-            // (I mean - this leaves one of the {} as the function is a ArrayUnique - not remove empty)
-            resultPath: "$.uniqued",
-            outputPath: "$.uniqued.unique",
-            parameters: {
-              "unique.$": "States.ArrayUnique($.matches)",
-            },
-          })
-        )
+        // DISABLED AS WE ARE TRYING TO PIVOT OVER TO RESULT WRITER OUTPUT
+        //.next(
+        //  new Pass(this, "Remove Empties", {
+        //    // remove all the empty {} results from any workers that matched nothing
+        //    // (I mean - this leaves one of the {} as the function is a ArrayUnique - not remove empty)
+        //    resultPath: "$.uniqued",
+        //    outputPath: "$.uniqued.unique",
+        //    parameters: {
+        //      "unique.$": "States.ArrayUnique($.matches)",
+        //    },
+        //  })
+        //)
         .next(new Succeed(this, "Succeed")),
     });
 
