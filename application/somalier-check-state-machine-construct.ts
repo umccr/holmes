@@ -85,48 +85,56 @@ export class SomalierCheckStateMachineConstruct extends SomalierBaseStateMachine
       },
     });
 
+    let def = new Pass(this, "Define Defaults", {
+      parameters: {
+        // by default we want to avoid kinship detection in the checking - so setting this high
+        relatednessThreshold: 0.8,
+        // by default we get very little value out of comparisons between samples where N is low
+        minimumNCount: 50,
+        // this is a regex that by default *won't* exclude anything
+        excludeRegex: "^\\b$",
+        // this is a regex that by default *won't* match anything - and hence will do no "expected" related checks
+        expectRelatedRegex: "^\\b$",
+        fingerprintFolder: "fingerprints/",
+      },
+      resultPath: "$.inputDefaults",
+    })
+      .next(
+        new Pass(this, "Apply Defaults", {
+          // merge default parameters into whatever the user has sent us
+          resultPath: "$.withDefaults",
+          outputPath: "$.withDefaults.args",
+          parameters: {
+            "args.$":
+              "States.JsonMerge($.inputDefaults, $$.Execution.Input, false)",
+          },
+        })
+      )
+      .next(distributedMap);
+
+    if (!props.resultWriter) {
+      // if we have a ResultWriter - then the distributed map returns the location of the output
+      // and we just want to pass that through
+      // otherwise we want to collapse the results down to a unique array
+      def = def.next(
+        new Pass(this, "Remove Empties", {
+          // remove all the empty {} results from any workers that matched nothing
+          // (I mean - this leaves one of the {} as the function is a ArrayUnique - not remove empty)
+          resultPath: "$.uniqued",
+          outputPath: "$.uniqued.unique",
+          parameters: {
+            "unique.$": "States.ArrayUnique($.matches)",
+          },
+        })
+      );
+    }
+
+    def = def.next(new Succeed(this, "Succeed"));
+
     // NOTE: we use a technique here to allow optional input parameters to the state machine
     // by defining defaults and then JsonMerging them with the actual input params
     this.stateMachine = new StateMachine(this, "StateMachine", {
-      definition: new Pass(this, "Define Defaults", {
-        parameters: {
-          // by default we want to avoid kinship detection in the checking - so setting this high
-          relatednessThreshold: 0.8,
-          // by default we get very little value out of comparisons between samples where N is low
-          minimumNCount: 50,
-          // this is a regex that by default *won't* exclude anything
-          excludeRegex: "^\\b$",
-          // this is a regex that by default *won't* match anything - and hence will do no "expected" related checks
-          expectRelatedRegex: "^\\b$",
-          fingerprintFolder: "fingerprints/",
-        },
-        resultPath: "$.inputDefaults",
-      })
-        .next(
-          new Pass(this, "Apply Defaults", {
-            // merge default parameters into whatever the user has sent us
-            resultPath: "$.withDefaults",
-            outputPath: "$.withDefaults.args",
-            parameters: {
-              "args.$":
-                "States.JsonMerge($.inputDefaults, $$.Execution.Input, false)",
-            },
-          })
-        )
-        .next(distributedMap)
-        // DISABLED AS WE ARE TRYING TO PIVOT OVER TO RESULT WRITER OUTPUT
-        //.next(
-        //  new Pass(this, "Remove Empties", {
-        //    // remove all the empty {} results from any workers that matched nothing
-        //    // (I mean - this leaves one of the {} as the function is a ArrayUnique - not remove empty)
-        //    resultPath: "$.uniqued",
-        //    outputPath: "$.uniqued.unique",
-        //    parameters: {
-        //      "unique.$": "States.ArrayUnique($.matches)",
-        //    },
-        //  })
-        //)
-        .next(new Succeed(this, "Succeed")),
+      definition: def,
     });
 
     this.stateMachine.addToRolePolicy(
