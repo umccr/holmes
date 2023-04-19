@@ -55,13 +55,13 @@ export class HolmesApplicationStack extends Stack {
               prefix: "fingerprints-test",
               expiration: Duration.days(1),
             },
-            // not used but if we do ever need to make temp files this is where they would live
+            // space for us to make temp file results from the DistributedMap
             {
               prefix: "temp",
               expiration: Duration.days(1),
             },
           ],
-          // because there is some though of deleting some source bams after fingerprinting - we
+          // because there is some thought of deleting some source bams after fingerprinting - we
           // don't even want the more production buckets to autodelete
           autoDeleteObjects: false,
           removalPolicy: RemovalPolicy.RETAIN,
@@ -134,7 +134,7 @@ export class HolmesApplicationStack extends Stack {
         resultWriter: {
           Resource: "arn:aws:states:::s3:putObject",
           Parameters: {
-            Bucket: fingerprintBucket,
+            Bucket: fingerprintBucket.bucketName,
             Prefix: "temp",
           },
         },
