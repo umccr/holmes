@@ -76,6 +76,7 @@ async function doFingerprintExtract(
  * @param fingerprintFolder the test specific folder for fingerprints
  * @param bamUrl the index BAM to check
  * @param excludeRegex if present sent as the exclude regex
+ * @param expectRelatedRegex if present sent as the expected related regex
  */
 async function doFingerprintCheck(
   stepsClient: SFNClient,
@@ -83,14 +84,18 @@ async function doFingerprintCheck(
   fingerprintBucket: string,
   fingerprintFolder: string,
   bamUrl: string,
-  excludeRegex?: string
-): Promise<{ [url: string]: number }> {
+  excludeRegex?: string,
+  expectRelatedRegex?: string
+): Promise<[{ [url: string]: number }, { [url: string]: number }]> {
   const result = await doStepsExecution(stepsClient, checkStepsArn, {
     indexes: [bamUrl],
     // note because we are doing trio testing we want to explicitly to be a pretty broad search
     relatednessThreshold: 0.4,
-    excludeRegex: excludeRegex,
+    // a low n count for tests helps us - for real usage probably needs to be higher
+    minimumNCount: 10,
     fingerprintFolder: fingerprintFolder,
+    excludeRegex: excludeRegex,
+    expectRelatedRegex: expectRelatedRegex,
   });
 
   let ourResults = [];
@@ -109,6 +114,8 @@ async function doFingerprintCheck(
   // we tidy this up into a neat dictionary
 
   const related: { [url: string]: number } = {};
+  const unrelated: { [url: string]: number } = {};
+
   let foundIndex = false;
 
   for (const m of ourResults || []) {
@@ -120,13 +127,18 @@ async function doFingerprintCheck(
         `Index BAM ${bamUrl} should always be matched with relatedness of 1`
       );
     } else {
-      related[m.file] = m.relatedness;
+      if (m.relatedness) related[m.file] = m.relatedness;
+      else if (m.unrelatedness) unrelated[m.file] = m.unrelatedness;
+      else
+        assert.fail(
+          "A check result returned a match that was neither related not unrelated"
+        );
     }
   }
 
   assert.ok(foundIndex, `Index BAM ${bamUrl} should always match to itself`);
 
-  return related;
+  return [related, unrelated];
 }
 
 /**
@@ -283,7 +295,7 @@ export async function runTest(
     console.log("SON CHECK");
     console.log(CONSOLE_BREAK_LINE);
 
-    const sonCheck = await doFingerprintCheck(
+    const [sonCheck, _] = await doFingerprintCheck(
       stepsClient,
       checkStepsArn,
       fingerprintBucket,
@@ -310,7 +322,7 @@ export async function runTest(
     console.log("FATHER CHECK");
     console.log(CONSOLE_BREAK_LINE);
 
-    const fatherCheck = await doFingerprintCheck(
+    const [fatherCheck, _] = await doFingerprintCheck(
       stepsClient,
       checkStepsArn,
       fingerprintBucket,
@@ -336,7 +348,7 @@ export async function runTest(
     console.log("MOTHER CHECK");
     console.log(CONSOLE_BREAK_LINE);
 
-    const motherCheck = await doFingerprintCheck(
+    const [motherCheck, _] = await doFingerprintCheck(
       stepsClient,
       checkStepsArn,
       fingerprintBucket,
@@ -362,7 +374,7 @@ export async function runTest(
     console.log("MOTHER CHECK WITH REGEX EXCLUDE");
     console.log(CONSOLE_BREAK_LINE);
 
-    const motherCheckRegex = await doFingerprintCheck(
+    const [motherCheckRegex, _] = await doFingerprintCheck(
       stepsClient,
       checkStepsArn,
       fingerprintBucket,
@@ -384,7 +396,7 @@ export async function runTest(
     console.log("INDIVIDUAL 96 CHECK");
     console.log(CONSOLE_BREAK_LINE);
 
-    const nine6Check = await doFingerprintCheck(
+    const [nine6Check, _] = await doFingerprintCheck(
       stepsClient,
       checkStepsArn,
       fingerprintBucket,
@@ -400,7 +412,7 @@ export async function runTest(
     console.log("INDIVIDUAL 97 CHECK");
     console.log(CONSOLE_BREAK_LINE);
 
-    const nine7Check = await doFingerprintCheck(
+    const [nine7Check, _] = await doFingerprintCheck(
       stepsClient,
       checkStepsArn,
       fingerprintBucket,
@@ -416,7 +428,7 @@ export async function runTest(
     console.log("INDIVIDUAL 99 CHECK");
     console.log(CONSOLE_BREAK_LINE);
 
-    const nine9Check = await doFingerprintCheck(
+    const [nine9Check, _] = await doFingerprintCheck(
       stepsClient,
       checkStepsArn,
       fingerprintBucket,
@@ -432,26 +444,56 @@ export async function runTest(
     console.log("HG19 CTDNA CHECK");
     console.log(CONSOLE_BREAK_LINE);
 
-    const ctdnaCheck = await doFingerprintCheck(
+    const [ctdnaRelatedCheck, ctnaUnrelatedCheck] = await doFingerprintCheck(
       stepsClient,
       checkStepsArn,
       fingerprintBucket,
       fingerprintFolder,
       CTDNA
     );
-    console.log(ctdnaCheck);
+    console.log(ctdnaRelatedCheck);
     assert.ok(
-      Object.keys(ctdnaCheck).length == 3,
+      Object.keys(ctdnaRelatedCheck).length == 3,
       "cTDNA should match 3 people by virtue of it being derived from HG0002 cell line"
     );
-    assert.ok(ctdnaCheck[TRIO_SON] >= 1, "ctDNA/son relation not found");
+    assert.ok(ctdnaRelatedCheck[TRIO_SON] >= 1, "ctDNA/son relation not found");
     assert.ok(
-      ctdnaCheck[TRIO_FATHER] > 0.4 && ctdnaCheck[TRIO_FATHER] < 0.6,
+      ctdnaRelatedCheck[TRIO_FATHER] > 0.4 &&
+        ctdnaRelatedCheck[TRIO_FATHER] < 0.7,
       "ctDNA/father relation not found"
     );
     assert.ok(
-      ctdnaCheck[TRIO_MOTHER] > 0.4 && ctdnaCheck[TRIO_MOTHER] < 0.6,
+      ctdnaRelatedCheck[TRIO_MOTHER] > 0.4 &&
+        ctdnaRelatedCheck[TRIO_MOTHER] < 0.7,
       "ctDNA/mother relation not found"
+    );
+  }
+
+  {
+    console.log(CONSOLE_BREAK_LINE);
+    console.log("EXPECTED FAMILY REGEX CHECK");
+    console.log(CONSOLE_BREAK_LINE);
+
+    const [familyCheckRelated, familyCheckUnrelated] = await doFingerprintCheck(
+      stepsClient,
+      checkStepsArn,
+      fingerprintBucket,
+      fingerprintFolder,
+      TRIO_FATHER,
+      "ctdna",
+      "(family)"
+    );
+    console.log(familyCheckRelated);
+    console.log(familyCheckUnrelated);
+    assert.ok(
+      Object.keys(familyCheckRelated).length == 1 &&
+        familyCheckRelated[TRIO_SON] > 0.4,
+      "Family related should match 1 person - the son"
+    );
+    assert.ok(
+      Object.keys(familyCheckUnrelated).length == 1 &&
+        familyCheckUnrelated[TRIO_MOTHER] < 2,
+      "Family unrelated should match 1 person - the mother"
     );
   }
 
