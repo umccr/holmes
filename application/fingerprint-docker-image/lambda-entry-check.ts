@@ -176,62 +176,9 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
       indexSampleIdToFingerprintKeyMap,
       sampleIdToFingerprintKeyMap,
       ev.BatchInput.relatednessThreshold,
-      ev.BatchInput.minimumNCount
+      ev.BatchInput.minimumNCount,
+      ev.BatchInput.expectRelatedRegex
     );
-
-    // we have now detected all the files genomically similar... if asked to, we should also
-    // detect those that are genomically NOT similar - but where we expect they should be
-    if (ev.BatchInput.expectRelatedRegex) {
-      const r = new RegExp(ev.BatchInput.expectRelatedRegex);
-
-      // just doing some *string* matching to see if we expect them to be related
-      for (const indexUrl of ev.BatchInput.indexes) {
-        for (const fingerprintUrl of fingerprintsAsUrlStrings) {
-          const indexRegexMatch = r.exec(indexUrl);
-          const fingerprintRegexMatch = r.exec(fingerprintUrl);
-
-          if (!indexRegexMatch || !fingerprintRegexMatch) continue;
-
-          if (indexRegexMatch.length != fingerprintRegexMatch.length) continue;
-
-          if (indexRegexMatch.length < 2) continue;
-
-          // all the match groups of the regex need to match for us to declare this to be a "regex match"
-          let allMatch = true;
-          for (let i = 1; i < indexRegexMatch.length; i = i + 1) {
-            if (indexRegexMatch[i] !== fingerprintRegexMatch[i]) {
-              allMatch = false;
-            }
-          }
-
-          if (allMatch) {
-            // so our regex tells us that the index and fingerprint are related (in a pure string naming sense)
-            // so now we need to ensure that is true in a genomic sense..
-            let relatedMatch = false;
-
-            // can we find a related result?
-            for (const f of matches[indexUrl] || []) {
-              if (f.file === fingerprintUrl) relatedMatch = true;
-            }
-
-            if (!relatedMatch) {
-              console.log(
-                `${indexUrl} should be related to ${fingerprintUrl} but doesn't appear to be`
-              );
-
-              // possibly not needed..
-              if (!(indexUrl in matches)) matches[indexUrl] = [];
-
-              // push a special type of result that declares our unrelatedness
-              matches[indexUrl].push({
-                file: fingerprintUrl,
-                unrelatedness: r.source,
-              });
-            }
-          }
-        }
-      }
-    }
 
     await cleanSomalierFiles();
 

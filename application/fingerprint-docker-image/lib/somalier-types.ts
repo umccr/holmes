@@ -1,16 +1,5 @@
-export type NoMatchType = {
-  file: string;
-
-  // if present, indicates that a regex comparison succeeded for this file
-  // but there was *no* relation found in somalier (well, if there was a relationship, it was below the
-  // threshhold)
-  unrelatedness?: string;
-};
-
-export type MatchType = {
-  file: string;
-
-  relatedness: number;
+// a direct type of the somalier values
+export type SomalierType = {
   ibs0: number;
   ibs2: number;
   hom_concordance: number;
@@ -22,9 +11,20 @@ export type MatchType = {
   hom_alts_b: number;
   shared_hom_alts: number;
   n: number;
-  // confirm these are not directional too
   x_ibs0: number;
   x_ibs2: number;
 };
+
+export type NoMatchType = {
+  file: string;
+  regexRelated: boolean;
+  unrelatedness: number;
+} & SomalierType;
+
+export type MatchType = {
+  file: string;
+  regexRelated: boolean;
+  relatedness: number;
+} & SomalierType;
 
 export type EitherMatchOrNoMatchType = MatchType | NoMatchType;
