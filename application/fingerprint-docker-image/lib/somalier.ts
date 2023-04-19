@@ -143,15 +143,15 @@ export async function extractMatchesAgainstIndexes(
     : new RegExp("^\\b$");
 
   for (const indexSampleId of Object.keys(indexSampleIdToKeyMap)) {
-    console.log(
-      `Extracting matches for index sample id ${indexSampleId} which = ${indexSampleIdToKeyMap[indexSampleId]}`
-    );
-
     // the printable URL name of the index sample we are processing i.e. gds://foo/bar.bam
     const indexUrlAsString = keyToUrl(
       fingerprintFolder,
       indexSampleIdToKeyMap[indexSampleId]
     ).toString();
+
+    console.log(
+      `Extracting matches for index sample id ${indexSampleId} which = ${indexUrlAsString}/${indexSampleIdToKeyMap[indexSampleId]}`
+    );
 
     const parser = createReadStream("somalier.pairs.tsv").pipe(
       parse({
@@ -227,26 +227,34 @@ export async function extractMatchesAgainstIndexes(
 
         if (relatedness >= relatednessThreshold && n >= minimumNCount) {
           // if they are genomically related according to the threshold we want to report that
-          // (even if the regex says we expect this - we still report) (revisit??)
+          // (even if the regex says we expect this - we still report so that we know the actual amount) (revisit??)
           console.log(
-            `Match at ${relatedness} to sample id ${record[1]} which = ${
-              sampleIdToKeyMap[record[1]]
-            }`
+            `Match of ${relatedness} to sample id ${
+              record[1]
+            } which = ${sampleUrlAsString}/${sampleIdToKeyMap[record[1]]}`
           );
 
           matches[indexUrlAsString].push(
             tsvRecordToMatchType(record, sampleUrlAsString, regexMatch)
           );
-        } else {
+        } else if (regexMatch) {
           // if they are NOT genomically related - but ARE regex related we also need to report
           console.log(
-            `NoMatch at ${relatedness} to sample id ${record[1]} which = ${
-              sampleIdToKeyMap[record[1]]
-            }`
+            `NoMatch of ${relatedness} to sample id ${
+              record[1]
+            } which = ${sampleUrlAsString}/${sampleIdToKeyMap[record[1]]}`
           );
 
           matches[indexUrlAsString].push(
             tsvRecordToNoMatchType(record, sampleUrlAsString)
+          );
+        } else {
+          // everyone else falls through here - those that are genomically unrelated and where the regex didn't
+          // think they were related either
+          console.log(
+            `Fall through sample id ${record[1]} which = ${sampleUrlAsString}/${
+              sampleIdToKeyMap[record[1]]
+            }`
           );
         }
       }

@@ -134,7 +134,6 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
 
   // download and 'fix' the sample ids for all the other fingerprint files we have been passed
   const sampleIdToFingerprintKeyMap: { [sid: string]: string } = {};
-  const fingerprintsAsUrlStrings: string[] = [];
 
   for (const fingerprintItem of ev.Items) {
     const fingerprintAsKey = fingerprintItem.Key;
@@ -148,13 +147,11 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
       fingerprintItem.Key
     );
 
+    // we can exclude sample based on name
     if (ev.BatchInput.excludeRegex) {
       if (RegExp(ev.BatchInput.excludeRegex).test(fingerprintAsUrl.toString()))
         continue;
     }
-
-    // useful to have all the fingerprint urls for some later logic
-    fingerprintsAsUrlStrings.push(fingerprintAsUrl.toString());
 
     // build a map to help us correlate sample ids and fingerprint files
     const newSampleId = await downloadAndCorrectFingerprint(
