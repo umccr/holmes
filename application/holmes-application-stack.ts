@@ -27,6 +27,7 @@ export class HolmesApplicationStack extends Stack {
   // the output Steps functions we create (are also registered into CloudMap)
   // we output this here so it can be used in the codepipeline build for testing
   public readonly checkStepsArnOutput: CfnOutput;
+  public readonly checkLargeStepsArnOutput: CfnOutput;
   public readonly extractStepsArnOutput: CfnOutput;
   public readonly pairsStepsArnOutput: CfnOutput;
 
@@ -126,6 +127,21 @@ export class HolmesApplicationStack extends Stack {
       stateProps
     );
 
+    const checkLargeStateMachine = new SomalierCheckStateMachineConstruct(
+      this,
+      "SomalierCheckLarge",
+      {
+        resultWriter: {
+          Resource: "arn:aws:states:::s3:putObject",
+          Parameters: {
+            Bucket: fingerprintBucket,
+            Prefix: "temp",
+          },
+        },
+        ...stateProps,
+      }
+    );
+
     const extractStateMachine = new SomalierExtractStateMachineConstruct(
       this,
       "SomalierExtract",
@@ -139,10 +155,14 @@ export class HolmesApplicationStack extends Stack {
     );
 
     icaSecret.grantRead(checkStateMachine.taskRole);
+    icaSecret.grantRead(checkLargeStateMachine.taskRole);
     icaSecret.grantRead(extractStateMachine.taskRole);
     icaSecret.grantRead(pairsStateMachine.taskRole);
 
+    // check needs to be able to read fingerprints
     fingerprintBucket.grantRead(checkStateMachine.taskRole);
+    // check large needs to read fingerprints BUT ALSO write back the Large results to the same S3 bucket
+    fingerprintBucket.grantReadWrite(checkLargeStateMachine.taskRole);
     fingerprintBucket.grantRead(pairsStateMachine.taskRole);
     fingerprintBucket.grantReadWrite(extractStateMachine.taskRole);
 
@@ -167,6 +187,7 @@ export class HolmesApplicationStack extends Stack {
     service.registerNonIpInstance("NonIp", {
       customAttributes: {
         checkStepsArn: checkStateMachine.stepsArn,
+        checkLargeStepsArn: checkLargeStateMachine.stepsArn,
         extractStepsArn: extractStateMachine.stepsArn,
         pairsStepsArn: pairsStateMachine.stepsArn,
       },
@@ -180,6 +201,10 @@ export class HolmesApplicationStack extends Stack {
 
     this.checkStepsArnOutput = new CfnOutput(this, "CheckStepsArn", {
       value: checkStateMachine.stepsArn,
+    });
+
+    this.checkLargeStepsArnOutput = new CfnOutput(this, "CheckLargeStepsArn", {
+      value: checkLargeStateMachine.stepsArn,
     });
 
     this.extractStepsArnOutput = new CfnOutput(this, "ExtractStepsArn", {
