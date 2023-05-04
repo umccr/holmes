@@ -2,6 +2,7 @@
  * The values returned/defined by somalier itself in its report back between two samples
  */
 export type SomalierCommonType = {
+  relatedness: number;
   ibs0: number;
   ibs2: number;
   hom_concordance: number;
@@ -17,32 +18,35 @@ export type SomalierCommonType = {
   x_ibs2: number;
 };
 
-/**
- * Our custom fields we add in for match that is unexpectedly unrelated
- */
-export type NoMatchType = {
+export type HolmesCommonType = {
   // the file URL
   file: string;
 
-  // whether our regex of expected related matched (this will always be true for NoMatch)
-  regexRelated: boolean;
+  // the JSONify dump of the regex match
+  regexJson: string;
+};
 
-  // the degree of unrelatedness between the samples
-  unrelatedness: number;
-} & SomalierCommonType;
+export type ExpectedRelatedType = HolmesCommonType &
+  SomalierCommonType & {
+    type: "ExpectedRelated";
+  };
 
-/**
- * Our custom fields we add in for a match that is unexpectedly related
- */
-export type MatchType = {
-  // the file URL
-  file: string;
+export type ExpectedUnrelatedType = HolmesCommonType &
+  SomalierCommonType & {
+    type: "ExpectedUnrelated";
+  };
 
-  // whether our regex of expected related matched
-  regexRelated: boolean;
+export type UnexpectedUnrelatedType = HolmesCommonType &
+  SomalierCommonType & {
+    type: "UnexpectedUnrelated";
+  };
 
-  // the degree of relatedness between the samples
-  relatedness: number;
-} & SomalierCommonType;
+export type UnexpectedRelatedType = HolmesCommonType &
+  SomalierCommonType & {
+    type: "UnexpectedRelated";
+  };
 
-export type EitherMatchOrNoMatchType = MatchType | NoMatchType;
+export type HolmesReturnType =
+  | ExpectedRelatedType
+  | UnexpectedUnrelatedType
+  | UnexpectedRelatedType;

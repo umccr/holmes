@@ -5,10 +5,11 @@ import { keyToUrl, urlToKey } from "./lib/aws";
 import {
   cleanSomalierFiles,
   downloadAndCorrectFingerprint,
-  extractMatchesAgainstIndexes,
   runSomalierRelate,
 } from "./lib/somalier";
-import { EitherMatchOrNoMatchType } from "./lib/somalier-types";
+import { HolmesReturnType } from "./lib/somalier-types";
+import { pairsAnalyse } from "./lib/somalier-pairs-analyse";
+import { createReadStream } from "fs";
 
 /* Example input as processed through the Step Functions Distributed Map batcher
 
@@ -168,13 +169,18 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
   if (sampleCount > 1) {
     await runSomalierRelate();
 
-    const matches = await extractMatchesAgainstIndexes(
+    const expectRelatedRegex = ev.BatchInput.expectRelatedRegex
+      ? new RegExp(ev.BatchInput.expectRelatedRegex)
+      : new RegExp("^\\b$");
+
+    const matches = await pairsAnalyse(
+      () => createReadStream("somalier.pairs.tsv"),
       ev.BatchInput.fingerprintFolder,
       indexSampleIdToFingerprintKeyMap,
       sampleIdToFingerprintKeyMap,
       ev.BatchInput.relatednessThreshold,
       ev.BatchInput.minimumNCount,
-      ev.BatchInput.expectRelatedRegex
+      expectRelatedRegex
     );
 
     await cleanSomalierFiles();
@@ -187,7 +193,7 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
 
     await cleanSomalierFiles();
 
-    const matches: { [url: string]: EitherMatchOrNoMatchType[] } = {};
+    const matches: { [url: string]: HolmesReturnType[] } = {};
 
     for (const indexUrl of ev.BatchInput.indexes) {
       matches[indexUrl] = [];
