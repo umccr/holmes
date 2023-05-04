@@ -48,4 +48,29 @@ export interface HolmesSettings {
    * account.
    */
   readonly createTesterRoleAllowingAccount?: string;
+
+  /**
+   * If present, installs a tool to send regular reports to Slack about new fingerprints
+   */
+  readonly slackNotifier?: {
+    /**
+     * The name of channel in Slack that should be sent daily notifications.
+     */
+    readonly channel: string;
+
+    /**
+     * The Cron expression for when to run the slack notification
+     */
+    readonly cron: string;
+
+    /**
+     * The number of days to go back looking for new fingerprints, or undefined to mean go back until encountered
+     */
+    readonly days?: number;
+
+    /**
+     * The specific folder to look into for new fingerprints to report
+     */
+    readonly fingerprintFolder?: string;
+  };
 }

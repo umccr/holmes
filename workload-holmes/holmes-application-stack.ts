@@ -10,14 +10,24 @@ import { Construct } from "constructs";
 import { DockerImageAsset } from "aws-cdk-lib/aws-ecr-assets";
 import { Secret } from "aws-cdk-lib/aws-secretsmanager";
 import { HttpNamespace, Service } from "aws-cdk-lib/aws-servicediscovery";
-import { HolmesSettings, STACK_DESCRIPTION } from "../holmes-settings";
+import { HolmesSettings, STACK_DESCRIPTION } from "../deploy/holmes-settings";
 import { SomalierCheckStateMachineConstruct } from "./somalier-check-state-machine-construct";
 import { Bucket, ObjectOwnership } from "aws-cdk-lib/aws-s3";
 import { Vpc } from "aws-cdk-lib/aws-ec2";
 import { Cluster } from "aws-cdk-lib/aws-ecs";
 import { SomalierExtractStateMachineConstruct } from "./somalier-extract-state-machine-construct";
-import { AccountPrincipal, ManagedPolicy, Role } from "aws-cdk-lib/aws-iam";
+import {
+  AccountPrincipal,
+  ManagedPolicy,
+  Role,
+  ServicePrincipal,
+} from "aws-cdk-lib/aws-iam";
 import { SomalierPairsStateMachineConstruct } from "./somalier-pairs-state-machine-construct";
+import {
+  Architecture,
+  DockerImageCode,
+  DockerImageFunction,
+} from "aws-cdk-lib/aws-lambda";
 
 /**
  * The Holmes application is a stack that implements a BAM fingerprinting
@@ -32,7 +42,7 @@ export class HolmesApplicationStack extends Stack {
   public readonly pairsStepsArnOutput: CfnOutput;
 
   // an optional output CFN for any stack that has decided it wants a role to be created for testing
-  public readonly testerRoleArnOutput: CfnOutput;
+  public readonly testerRoleArnOutput?: CfnOutput;
 
   constructor(
     scope: Construct,
@@ -105,7 +115,12 @@ export class HolmesApplicationStack extends Stack {
     }
 
     // the Docker asset shared by all steps
-    const dockerImageFolder = path.join(__dirname, "fingerprint-docker-image");
+    const dockerImageFolder = path.join(
+      __dirname,
+      "..",
+      "artifacts",
+      "fingerprint-docker-image"
+    );
 
     const asset = new DockerImageAsset(this, "FingerprintDockerImage", {
       directory: dockerImageFolder,
@@ -214,5 +229,87 @@ export class HolmesApplicationStack extends Stack {
     this.pairsStepsArnOutput = new CfnOutput(this, "PairsStepsArn", {
       value: pairsStateMachine.stepsArn,
     });
+
+    if (props.slackNotifierChannel && props.slackNotifierCron) {
+      const slackSecret = Secret.fromSecretNameV2(
+        this,
+        "SlackSecret",
+        "SlackApps"
+      );
+
+      const permissions = [
+        "service-role/AWSLambdaBasicExecutionRole",
+        "AmazonS3ReadOnlyAccess",
+        "AWSCloudMapReadOnlyAccess",
+        "AWSStepFunctionsFullAccess",
+      ];
+
+      const lambdaRole = new Role(this, "Role", {
+        assumedBy: new ServicePrincipal("lambda.amazonaws.com"),
+      });
+
+      slackSecret.grantRead(lambdaRole);
+
+      permissions.map((permission) => {
+        lambdaRole.addManagedPolicy(
+          ManagedPolicy.fromAwsManagedPolicyName(permission)
+        );
+      });
+
+      const cronReportDockerImageFolder = path.join(
+        __dirname,
+        "..",
+        "artifacts",
+        "cron-report-docker-image"
+      );
+
+      const cronReportDockerImageAsset = new DockerImageAsset(
+        this,
+        "DockerImage",
+        {
+          directory: cronReportDockerImageFolder,
+          buildArgs: {},
+        }
+      );
+
+      const env: any = {
+        BUCKET: fingerprintBucket.bucketName,
+        CHANNEL: props.slackNotifierChannel,
+        FINGERPRINT_FOLDER: props.fingerprintFolder,
+        EXPECT_RELATED_REGEX: props.expectRelatedRegex,
+      };
+
+      if (props.days) {
+        env["DAYS"] = props.days.toString();
+      }
+
+      // we install one function that is only for invocation from AWS event bridge
+      {
+        const eventFunc = new DockerImageFunction(
+          this,
+          `ScheduledGroupFunction`,
+          {
+            memorySize: 2048,
+            timeout: Duration.minutes(14),
+            architecture: Architecture.X86_64,
+            code: DockerImageCode.fromEcr(
+              cronReportDockerImageAsset.repository,
+              {
+                cmd: ["entrypoint-event-lambda.handler"],
+                tagOrDigest: cronReportDockerImageAsset.assetHash,
+              }
+            ),
+            role: lambdaRole,
+            environment: env,
+          }
+        );
+
+        const eventRule = new Rule(this, "ScheduleRule", {
+          schedule: Schedule.expression(props.cron),
+        });
+
+        eventRule.addTarget(new LambdaFunction(eventFunc));
+      }
+    }
   }
 }

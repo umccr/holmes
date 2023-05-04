@@ -12,6 +12,8 @@ This stack can be brought up and down at will. Feel free to leave it installed d
 the full development cycle (days/weeks) and then tear it down at the end. It is completely
 separated from the CI deployment to staging and production.
 
+In `deploy/manual`
+
 - `cdk deploy HolmesLocalDevTestStack` in AWS dev
 - `cdk destroy HolmesLocalDevTestStack` in AWS dev
 

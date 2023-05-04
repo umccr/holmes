@@ -3,6 +3,7 @@
 # this is a helper script for launching the e2e test script in either dev, stg or prod
 
 # holmes-e2e-test.ts is a standalone typescript script that will execute a e2e test suite
+
 # it is AUTOMATICALLY EXECUTED AS PART OF THE CI process and is passed in settings appropriate to
 # the env it is in
 

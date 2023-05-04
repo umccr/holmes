@@ -2,7 +2,7 @@ import { pipelines, Stack, StackProps } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import { StringParameter } from "aws-cdk-lib/aws-ssm";
 import { Effect, PolicyStatement } from "aws-cdk-lib/aws-iam";
-import { STACK_DESCRIPTION } from "./holmes-settings";
+import { STACK_DESCRIPTION } from "../holmes-settings";
 import {
   AWS_BUILD_ACCOUNT,
   AWS_PROD_ACCOUNT,
@@ -12,7 +12,7 @@ import {
   NAMESPACE_NAME,
   NAMESPACE_PROD_ID,
   NAMESPACE_STG_ID,
-} from "./umccr-constants";
+} from "../umccr-constants";
 import { HolmesBuildStage } from "./holmes-build-stage";
 import { LinuxBuildImage } from "aws-cdk-lib/aws-codebuild";
 
@@ -46,20 +46,17 @@ export class HolmesPipelineStack extends Stack {
         }),
         env: {},
         commands: [
+          "cd deploy/pipeline",
           "npm ci",
           // our cdk is configured to use ts-node - so we don't need any build step - just synth
           "npx cdk synth",
         ],
+        primaryOutputDirectory: "deploy/pipeline/cdk.out",
         rolePolicyStatements: [
           new PolicyStatement({
             effect: Effect.ALLOW,
             actions: ["sts:AssumeRole"],
             resources: ["*"],
-            //conditions: {
-            //  StringEquals: {
-            //    "iam:ResourceTag/aws-cdk:bootstrap-role": "lookup",
-            //  },
-            //},
           }),
         ],
       }),
@@ -67,7 +64,7 @@ export class HolmesPipelineStack extends Stack {
         buildEnvironment: {
           buildImage: LinuxBuildImage.STANDARD_6_0,
         },
-        // we need to give the codebuild engines permissions to assume a role in DEV - in order that they
+        // we need to give the codebuild engines permissions to assume a role in STG - in order that they
         // can invoke the tests - we don't know the name of the role yet (as it is built by CDK) - so we
         // are quite permissive (it is limited to one non-prod account though)
         rolePolicy: [
@@ -155,3 +152,38 @@ export class HolmesPipelineStack extends Stack {
     }
   }
 }
+
+/*const stgStage = new HolmesSlackCronBuildStage(this, "Stg", {
+      env: {
+        account: AWS_STG_ACCOUNT,
+        region: AWS_STG_REGION,
+      },
+      bucket: "umccr-fingerprint-stg",
+      // NOTE: THIS IS A UTC HOUR - SO LOOKING AT RUNNING ABOUT MIDDAY 2+10
+      // NOTE: this runs only on the first day of the month in deployed stg
+      cron: "cron(0 2 1 * ? *)",
+      channel: "#arteria-dev",
+      // we have a special folder in staging that reports on a static test set
+      fingerprintFolder: "fingerprints-group-detection/",
+      expectRelatedRegex: "^.*SBJ(\\d\\d\\d\\d\\d).*$",
+      // we look back until we find fingerprints (useful for stg static test)
+      days: undefined,
+    });
+
+    pipeline.addStage(stgStage, {});
+
+    const prodStage = new HolmesSlackCronBuildStage(this, "Prod", {
+      env: {
+        account: AWS_PROD_ACCOUNT,
+        region: AWS_PROD_REGION,
+      },
+      bucket: "umccr-fingerprint-prod",
+      // NOTE: THIS IS A UTC HOUR - SO LOOKING AT RUNNING ABOUT MIDDAY 2+10
+      // NOTE: it runs every day though we don't expect most days for it to discover fingerprints
+      cron: "cron(0 2 * * ? *)",
+      channel: "#biobots",
+      fingerprintFolder: "fingerprints/",
+      expectRelatedRegex: "^.*SBJ(\\d\\d\\d\\d\\d).*$",
+      // we look back one day for fingerprints to report on
+      days: 1,
+    });*/

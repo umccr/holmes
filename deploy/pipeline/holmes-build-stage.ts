@@ -1,7 +1,7 @@
 import { CfnOutput, Stage, StageProps, Tags } from "aws-cdk-lib";
 import { Construct } from "constructs";
-import { HolmesSettings, TAG_STACK_VALUE } from "./holmes-settings";
-import { HolmesApplicationStack } from "./application/holmes-application-stack";
+import { HolmesSettings, TAG_STACK_VALUE } from "../holmes-settings";
+import { HolmesApplicationStack } from "../../workload-holmes/holmes-application-stack";
 
 export class HolmesBuildStage extends Stage {
   // the output Steps function that is created - useful here for pipeline testing

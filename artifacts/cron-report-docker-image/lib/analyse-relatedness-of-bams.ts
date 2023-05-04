@@ -1,0 +1,576 @@
+import {
+  doStepsExecution,
+  extractLibraryId,
+  extractSubjectId,
+  s3GetObjectAsJson,
+} from "./common";
+import { basename } from "path";
+import { SFNClient } from "@aws-sdk/client-sfn";
+import { alg, Graph, json } from "@dagrejs/graphlib";
+
+/**
+ * A quick interface showing the structure of the results we
+ * get back from a somalier check - and with some extra fields
+ * we add in for display to Slack purposes.
+ */
+export interface SomalierRelatedMatch {
+  file: string;
+  n: number;
+  relatedness: number;
+  shared_hets: number;
+  shared_hom_alts: number;
+
+  unrelatedness?: string;
+
+  base?: string;
+  subject?: string;
+  library?: string;
+}
+
+export interface ExpectedRelatedMatch {
+  subjectId: string;
+  count: number;
+}
+
+/**
+ * For the given set of index URLs - return graph structures of
+ * the relationships between these samples and the rest of
+ * our fingerprint database.
+ *
+ * @param checkLargeStepsArn the ARN for the check function
+ * @param fingerprintFolder the folder the fingerprints live in
+ * @param indexUrls the array of index URLs (bams)
+ * @param relatednessThreshold a threshold
+ * @param expectRelatedRegex a regex that implies an expected relationship by filename
+ */
+export async function getBamRelatedGraphs(
+  checkLargeStepsArn: string,
+  fingerprintFolder: string,
+  indexUrls: string[],
+  relatednessThreshold: number,
+  expectRelatedRegex: RegExp
+) {
+  // first lets call the steps function to do the analysis of the given indexes
+  const stepsArgs = {
+    fingerprintFolder: fingerprintFolder,
+    indexes: indexUrls,
+    relatednessThreshold: relatednessThreshold,
+    expectRelatedRegex: expectRelatedRegex.toString(),
+  };
+
+  const fingerprintCheckResult = await doStepsExecution(
+    new SFNClient({}),
+    checkLargeStepsArn,
+    stepsArgs
+  );
+
+  // an example check large result (note we have suppressed some values out i.e. <runuuid>)
+  // {
+  //   "expectRelatedRegex": "^\\b$",
+  //   "excludeRegex": "^\\b$",
+  //   "minimumNCount": 50,
+  //   "indexes": [
+  //     "gds://1kg-genomes/extra/HG00100.bam",
+  //     "gds://1kg-genomes/extra/HG00101.bam",
+  //     "gds://1kg-genomes/extra/HG00103.bam"
+  //   ],
+  //   "relatednessThreshold": -0.5,
+  //   "fingerprintFolder": "fingerprints-1kg/",
+  //   "matches": {
+  //     "MapRunArn": "arn:aws:states:<region>:<account>:mapRun:SomalierCheckLargeStateMachine03C80DDB-ABCD/<stepsuuid>:<runuuid>",
+  //     "ResultWriterDetails": {
+  //       "Bucket": "umccr-fingerprint-local-dev-test",
+  //       "Key": "temp/<runuuid>/manifest.json"
+  //     }
+  //   }
+  // }
+
+  // all the details of the result are saved into the files - AS LISTED IN THE GIVEN MANIFEST
+  // so firstly we turn all that data into a JSON array
+  const lambdaResults = await distributedMapManifestToLambdaResults(
+    fingerprintCheckResult.matches.ResultWriterDetails.Bucket,
+    fingerprintCheckResult.matches.ResultWriterDetails.Key
+  );
+
+  return await lambdaResultsToGraph(lambdaResults);
+}
+
+/**
+ * For an already run check - perform the actual reporting step on existing
+ * data (useful for debug as we can skip the Steps call and just feed off
+ * the S3 result files).
+ *
+ * @param mapRunBucket
+ * @param mapRunKey
+ */
+export async function getBamRelatedGraphsFromExistingMapRun(
+  mapRunBucket: string,
+  mapRunKey: string
+) {
+  const lambdaResults = await distributedMapManifestToLambdaResults(
+    mapRunBucket,
+    mapRunKey
+  );
+
+  return await lambdaResultsToGraph(lambdaResults);
+}
+
+export async function distributedMapManifestToLambdaResults(
+  bucket: string,
+  key: string
+): Promise<Record<string, SomalierRelatedMatch[]>[]> {
+  const manifestJson = await s3GetObjectAsJson(bucket, key);
+
+  const manifestBucket: string = manifestJson.DestinationBucket;
+
+  const failedObjects = manifestJson.ResultFiles.FAILED;
+  const pendingObjects = manifestJson.ResultFiles.PENDING;
+  const succeededObjects = manifestJson.ResultFiles.SUCCEEDED;
+
+  if (
+    failedObjects.length > 0 ||
+    pendingObjects.length > 0 ||
+    succeededObjects.length !== 1
+  ) {
+    // note: we could probably write our code to handle this but for the moment we are _well_ under this limit
+    throw new Error(
+      "We need our Holmes result to come back as a single success file that is under 5GiB"
+    );
+  }
+
+  const successJson = await s3GetObjectAsJson(
+    manifestBucket,
+    succeededObjects[0].Key
+  );
+
+  const lambdaOutputsJson: Record<string, SomalierRelatedMatch[]>[] = [];
+
+  for (const lambdaResult of successJson) {
+    const lambdaJson: Record<string, SomalierRelatedMatch[]> = JSON.parse(
+      lambdaResult.Output
+    );
+    lambdaOutputsJson.push(lambdaJson);
+  }
+
+  return lambdaOutputsJson;
+}
+
+export async function lambdaResultsToGraph(
+  lambdaResults: Record<string, SomalierRelatedMatch[]>[]
+) {
+  // a graph of all the BAMs - and their relationships
+  let somalierRelationshipGraph = new Graph({
+    directed: false,
+    multigraph: false,
+    compound: false,
+  });
+
+  let missingSomalierRelationshipGraph = new Graph({
+    directed: false,
+    multigraph: false,
+    compound: false,
+  });
+
+  let combinedRelationshipGraph = new Graph({
+    directed: false,
+    multigraph: false,
+    compound: false,
+  });
+
+  let indexOnlyRelationshipGraph = new Graph({
+    directed: false,
+    multigraph: false,
+    compound: false,
+  });
+
+  // first step is to construct all the index nodes - we want to make sure these all
+  // exist as "index" nodes before we start trying to join things up
+  for (const lambdaJson of lambdaResults) {
+    for (const [indexBamUrl, relatedArray] of Object.entries(lambdaJson)) {
+      if (!somalierRelationshipGraph.hasNode(indexBamUrl)) {
+        somalierRelationshipGraph.setNode(indexBamUrl, "index");
+      }
+      if (!missingSomalierRelationshipGraph.hasNode(indexBamUrl)) {
+        missingSomalierRelationshipGraph.setNode(indexBamUrl, "index");
+      }
+      if (!combinedRelationshipGraph.hasNode(indexBamUrl)) {
+        combinedRelationshipGraph.setNode(indexBamUrl, "index");
+      }
+      if (!indexOnlyRelationshipGraph.hasNode(indexBamUrl)) {
+        indexOnlyRelationshipGraph.setNode(indexBamUrl, "index");
+      }
+    }
+  }
+
+  // now we join up all the nodes
+  for (const lambdaJson of lambdaResults) {
+    for (const [indexBamUrl, relatedArray] of Object.entries(lambdaJson)) {
+      for (const relatedBam of relatedArray || []) {
+        // we now have an assertion of a relation between the index BAM and the related BAM
+        const relatedBamUrl = relatedBam.file;
+
+        // there is no need for us to add in our assertions of relation to self
+        // (these were just generated in the lambda so we know the base somalier is working)
+        if (indexBamUrl == relatedBamUrl) continue;
+
+        // make sure the related BAM exists as a node - as we are making these on demand
+        if (!somalierRelationshipGraph.hasNode(relatedBamUrl)) {
+          somalierRelationshipGraph.setNode(relatedBamUrl, "not-index");
+        }
+        if (!somalierRelationshipGraph.hasNode(relatedBamUrl)) {
+          missingSomalierRelationshipGraph.setNode(relatedBamUrl, "not-index");
+        }
+        if (!combinedRelationshipGraph.hasNode(relatedBamUrl)) {
+          combinedRelationshipGraph.setNode(relatedBamUrl, "not-index");
+        }
+
+        const relatedData: any = { ...relatedBam };
+        delete relatedData.file;
+
+        if (relatedData.relatedness) {
+          somalierRelationshipGraph.setEdge(
+            indexBamUrl,
+            relatedBamUrl,
+            relatedData
+          );
+          combinedRelationshipGraph.setEdge(
+            indexBamUrl,
+            relatedBamUrl,
+            relatedData
+          );
+        } else if (relatedData.unrelatedness) {
+          missingSomalierRelationshipGraph.setEdge(
+            indexBamUrl,
+            relatedBamUrl,
+            relatedData
+          );
+          combinedRelationshipGraph.setEdge(
+            indexBamUrl,
+            relatedBamUrl,
+            relatedData
+          );
+        } else {
+          throw new Error(
+            "Received a Holmes result that was neither related not unrelated"
+          );
+        }
+
+        // if the destination node doesn't exist - that means it is not an index node
+        // so we continue
+        if (!indexOnlyRelationshipGraph.hasNode(relatedBamUrl)) continue;
+
+        // this graph only has index nodes - but it should contain all types of relationships
+        indexOnlyRelationshipGraph.setEdge(
+          indexBamUrl,
+          relatedBamUrl,
+          relatedData
+        );
+      }
+    }
+  }
+
+  return {
+    relatedGraph: somalierRelationshipGraph,
+    missingRelatedGraph: missingSomalierRelationshipGraph,
+    combinedRelatedGraph: combinedRelationshipGraph,
+    indexOnlyRelatedGraph: indexOnlyRelationshipGraph,
+  };
+
+  const outputGroupAsMarkdown = (nodes: string[]) => {
+    const vals: string[][] = [];
+
+    for (let i = 0; i < nodes.length; i++) {
+      vals[i] = Array.from("".repeat(nodes.length));
+
+      for (let j = 0; j < nodes.length; j++) {
+        if (i == j) {
+          vals[i][j] = "-";
+          continue;
+        }
+
+        const relatedEdge = somalierRelationshipGraph.edge(nodes[i], nodes[j]);
+        const unrelatedEdge = missingSomalierRelationshipGraph.edge(
+          nodes[i],
+          nodes[j]
+        );
+
+        if (relatedEdge && unrelatedEdge) vals[i][j] = "!!!";
+        else if (relatedEdge)
+          vals[i][j] = `n=${relatedEdge.n}/r=${relatedEdge.relatedness}`;
+        else if (unrelatedEdge)
+          vals[i][
+            j
+          ] = `n=${unrelatedEdge.n}/r=${unrelatedEdge.unrelatedness}❗`;
+        else vals[i][j] = " ";
+      }
+    }
+
+    let md = "";
+
+    for (let i = 0; i < nodes.length; i++) {
+      md += `${i} = ${nodes[i]}\n\n`;
+    }
+
+    // column headers
+    md += "|  | ";
+    for (let col = 0; col < nodes.length; col++) {
+      md += ` ${col} |`;
+    }
+    md += "\n";
+
+    // markdown header/body separator
+    md += "| ---  | ";
+    for (let col = 0; col < nodes.length; col++) {
+      md += ` --- |`;
+    }
+    md += "\n";
+
+    for (let row = 0; row < nodes.length; row++) {
+      md += `| ${row} | `;
+      for (let col = 0; col < nodes.length; col++) {
+        md += ` ${vals[row][col]} |`;
+      }
+      md += "\n";
+    }
+
+    console.debug(md);
+  };
+  // console.debug(JSON.stringify(json.write(somalierRelationshipGraph))); // .filter((a) => a.length > 1));
+  // console.debug(JSON.stringify(json.write(missingSomalierRelationshipGraph))); // .filter((a) => a.length > 1));
+  const expectedUnrelatedSubjectIds: string[] = [];
+
+  const missingSomalierConnected = alg
+    .components(missingSomalierRelationshipGraph)
+    .filter((a) => a.length > 1);
+
+  for (const ur of alg.components(somalierRelationshipGraph)) {
+    if (ur.length === 0) {
+      throw new Error("Wierd..");
+    }
+    if (ur.length === 1) {
+      expectedUnrelatedSubjectIds.push(ur[0]);
+    }
+    if (ur.length > 1) {
+      let allRegex = true;
+      for (const r of ur.slice(1)) {
+        const edge = somalierRelationshipGraph.edge(ur[0], r);
+        if (!edge.regexRelated) allRegex = false;
+      }
+
+      if (allRegex)
+        console.log(`Group ${ur[0]} was all good with size ${ur.length}`);
+      else {
+        outputGroupAsMarkdown(ur);
+      }
+    }
+  }
+
+  for (const ur of missingSomalierConnected) {
+    outputGroupAsMarkdown(ur);
+    if (ur.length > 1) {
+      for (const r of ur.slice(1)) {
+        console.log({
+          from: ur[0],
+          to: r,
+        });
+      }
+    }
+  }
+
+  console.log(JSON.stringify(missingSomalierConnected, null, 2));
+}
+
+/**
+ * Given a list of BAM Urls (generally from a single sequencing run batch) - this will check
+ * them each against the existing pool of BAMs and group them semantically.
+ *
+ * @param urls the list of URLs to analyse as indexes - against all the *rest* of the fingerprint database
+ * @param relatednessThreshold the relatedness threshold to use for relations
+ * @param fingerprintFolder the folder for fingerprints
+ * @param checkStepsArn the check step function to use for relation checking
+ * @param expectRelatedRegex a regex of our expected filename relations
+ */
+export async function analyseRelatednessOfBams(
+  urls: string[],
+  relatednessThreshold: number,
+  fingerprintFolder: string,
+  checkStepsArn: string,
+  expectRelatedRegex: string
+) {
+  // these are the GOOD results
+
+  // any subject id from a group of only 1 (i.e. itself)
+  const expectedUnrelatedSubjectIds: string[] = [];
+  // any subject ids that found themselves in a group but where all the subject ids matched
+  const expectedRelatedGroups: { [s: string]: ExpectedRelatedMatch } = {};
+
+  // these are the BAD results
+
+  // any subject id that should be related but we find is not - where the values are all the
+  // file urls as a Set
+  const unexpectedUnrelatedGroups: { [s: string]: Set<string> } = {};
+  // lists of results where we found unexpected Somalier results
+  const unexpectedRelatedGroups: Map<string, SomalierRelatedMatch>[] = [];
+
+  const stepsArgs = {
+    indexes: urls,
+    relatednessThreshold: relatednessThreshold,
+    expectRelatedRegex: expectRelatedRegex,
+    fingerprintFolder: fingerprintFolder,
+  };
+
+  const fingerprintCheckResult = await doStepsExecution(
+    new SFNClient({}),
+    checkStepsArn,
+    stepsArgs
+  );
+
+  const unexpectedRelatedInterimResults: any[][] = [];
+
+  // because of the way distributed maps work in Steps - our results comes back as an array
+  // of JSON dicts
+  for (const block of fingerprintCheckResult) {
+    // each JSON dict has results keyed by the url of the focus
+    for (const url of urls) {
+      // the url results will be distributed across the blocks
+      // so some urls we continue and will find later in another block
+      if (!(url in block)) continue;
+
+      // so for the index URL 'url' - this is an array of all the matching other fingerprints
+      const thisUrlResult = block[url];
+
+      console.log(url);
+      console.log(JSON.stringify(thisUrlResult));
+
+      const foundUnrelated = new Set<string>();
+
+      // first check for all unrelatedness results
+      for (const f of thisUrlResult || []) {
+        if (f.unrelatedness) {
+          foundUnrelated.add(f.file);
+        }
+      }
+
+      // if we found unrelated then we don't do any further processing
+      // and we report them back
+      if (foundUnrelated.size > 0) {
+        for (const file of foundUnrelated) {
+          // extract a subject id
+          let subjectId = extractSubjectId(file);
+          if (!subjectId) subjectId = file;
+
+          if (!(subjectId in unexpectedUnrelatedGroups)) {
+            unexpectedUnrelatedGroups[subjectId] = new Set<string>();
+          }
+
+          unexpectedUnrelatedGroups[subjectId].add(file);
+        }
+
+        continue;
+      }
+
+      const subjects = new Set<string>();
+      let count = 0;
+
+      // note the "|| []" clause should never happen - but if it does we shouldn't fail
+      // it occurring would be a fundamental failure in the fingerprint engine itself - we should always *at least*
+      // match against ourselves (but malformed fingerprint files possibly won't even match themselves)
+      for (const f of thisUrlResult || []) {
+        // the subject set lets us easily determine mismatches because it should never be > 1
+        {
+          const subjectId = extractSubjectId(f.file);
+
+          // if we DON'T find any subject id - then we really kind of want to abort
+          // and make sure the group is reported.. so we add the unique filename as
+          // a subject id - which will cause the later logic to force the group report
+          if (!subjectId) subjects.add(f.file);
+          else subjects.add(subjectId);
+        }
+
+        count++;
+      }
+
+      // we matched only to ourselves - which is what we expect
+      if (count <= 1) {
+        const subjectId = extractSubjectId(url);
+
+        if (subjectId) expectedUnrelatedSubjectIds.push(subjectId);
+        else expectedUnrelatedSubjectIds.push(url);
+      } else {
+        if (subjects.size === 1) {
+          // there were related files but all with the same subject id - this is good
+          const subjectId: string = subjects.values().next().value;
+
+          if (!(subjectId in expectedRelatedGroups))
+            expectedRelatedGroups[subjectId] = {
+              subjectId: subjectId,
+              count: count,
+            };
+        } else {
+          // there were related files - but with different subject ids - we need to report this
+          unexpectedRelatedInterimResults.push(thisUrlResult);
+        }
+      }
+    }
+  }
+
+  // match results is now an array or arrays - where the inner arrays are somalier fingerprint groups
+  // HOWEVER - those groups are in some ways symmetric i.e. A->B comes back also as B->A
+  // so we want to tidy up to get a useful slack message
+  while (unexpectedRelatedInterimResults.length > 0) {
+    // we sort by those that match the most
+    // and try to subset the others into that bigger group
+    const sortedMatchResults = unexpectedRelatedInterimResults.sort(
+      (a, b) => b.length - a.length
+    );
+
+    // make a Set of the files involved in this 'biggest' group
+    const nextGroupFileSet = new Set(sortedMatchResults[0].map((a) => a.file));
+
+    // for every other group - see if we are a true subset - and if so delete
+    for (let i = sortedMatchResults.length - 1; i >= 1; i--) {
+      const potentialMerge = sortedMatchResults[i];
+      const potentialMergeFileSet = new Set(potentialMerge.map((a) => a.file));
+
+      if (isSuperset(nextGroupFileSet, potentialMergeFileSet)) {
+        sortedMatchResults.splice(i, 1);
+      }
+    }
+
+    // turn the big group into a result we can show
+    unexpectedRelatedGroups.push(
+      // funky! take the 'file' field OUT of the structure and make it a key of a Map
+      // then add in some extra fields
+      new Map(
+        sortedMatchResults[0].map((i) => [
+          i.file,
+          (({ file, ...o }) => ({
+            ...o,
+            subject: extractSubjectId(i.file),
+            library: extractLibraryId(i.file),
+            base: basename(i.file),
+          }))(i),
+        ])
+      )
+    );
+
+    // delete the biggest group from the array and go around again
+    sortedMatchResults.splice(0, 1);
+  }
+
+  return {
+    expectedUnrelatedSubjectIds: expectedUnrelatedSubjectIds,
+    expectedRelatedGroups: expectedRelatedGroups,
+    unexpectedUnrelatedGroups: unexpectedUnrelatedGroups,
+    unexpectedRelatedGroups: unexpectedRelatedGroups,
+  };
+}
+
+function isSuperset(set: Set<string>, subset: Set<string>) {
+  for (const elem of subset.values()) {
+    if (!set.has(elem)) {
+      return false;
+    }
+  }
+  return true;
+}

@@ -12,7 +12,7 @@ import {
   EitherMatchOrNoMatchType,
   MatchType,
   NoMatchType,
-  SomalierType,
+  SomalierCommonType,
 } from "./somalier-types";
 
 // get this functionality as promise compatible function
@@ -73,7 +73,7 @@ export async function downloadAndCorrectFingerprint(
   return newSampleId;
 }
 
-function tsvRecordToSomalierType(record: any): SomalierType {
+function tsvRecordToSomalierType(record: any): SomalierCommonType {
   return {
     ibs0: parseInt(record[3]),
     ibs2: parseInt(record[4]),
@@ -213,6 +213,7 @@ export async function extractMatchesAgainstIndexes(
         ) {
           // all the match groups of the regex need to match for us to declare this to be a "regex match"
           let allMatch = true;
+          // match group 0 we skip as it is the whole regex match
           for (let i = 1; i < indexRegexMatch.length; i = i + 1) {
             if (indexRegexMatch[i] !== sampleRegexMatch[i]) {
               allMatch = false;
