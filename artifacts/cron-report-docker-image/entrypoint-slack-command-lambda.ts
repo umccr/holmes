@@ -89,7 +89,8 @@ export const handler = async (event: any) => {
             type: "mrkdwn",
             text: `
 /fingerprint
- report bamurl [...bamurl] "report all relatedness of the given URLs against each other"
+ exists bamurl [...bamurl] "report the existence of fingerprints for the given URLs"
+ relate bamurl [...bamurl] "report all relatedness of the given URLs against each other"
  check bamurl [...bamurl] "report threshold relatedness of the given URLs against the fingerprint database"
  help "this help"
             `,
@@ -97,17 +98,44 @@ export const handler = async (event: any) => {
         },
       ],
     };
+
   const client = new LambdaClient({});
 
-  const command = new InvokeCommand({
-    FunctionName: process.env["LAMBDA_RESPONSE_GROUPING_ARN"],
-    InvocationType: "Event",
-    Payload: Buffer.from(
-      JSON.stringify({
-        slackResponseUrl: o.response_url,
-      })
-    ),
-  });
+  let command: InvokeCommand;
+
+  switch (commands[0]) {
+    case "exists":
+      command = new InvokeCommand({
+        FunctionName: process.env["LAMBDA_EXISTS_ARN"],
+        InvocationType: "Event",
+        Payload: Buffer.from(
+          JSON.stringify({
+            slackResponseUrl: o.response_url,
+            fingerprintFolder: process.env["FINGERPRINT_FOLDER"],
+            indexUrls: commands.slice(1),
+          })
+        ),
+      });
+      break;
+
+    case "relate":
+      command = new InvokeCommand({
+        FunctionName: process.env["LAMBDA_RELATE_ARN"],
+        InvocationType: "Event",
+        Payload: Buffer.from(
+          JSON.stringify({
+            slackResponseUrl: o.response_url,
+            fingerprintFolder: process.env["FINGERPRINT_FOLDER"],
+            indexUrls: commands.slice(1),
+          })
+        ),
+      });
+      break;
+
+    default:
+      throw new Error(`Unknown command ${commands[0]}`);
+  }
+
   const response = await client.send(command);
 
   console.log(response);

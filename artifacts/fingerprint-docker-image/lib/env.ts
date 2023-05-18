@@ -1,9 +1,6 @@
 import { env as envDict } from "process";
 import { s3Download, s3ListAllFiles } from "./aws";
 
-export const ENV_NAME_FINGERPRINT_BUCKET_NAME = "FINGERPRINT_BUCKET_NAME";
-export const ENV_NAME_FINGERPRINT_CONFIG_FOLDER = "FINGERPRINT_CONFIG_FOLDER";
-
 // NOTE: this is used *only* as an env variable for passing to Fargate because Fargate has crappy input
 export const ENV_NAME_FINGERPRINT_REFERENCE = "FINGERPRINT_REFERENCE";
 
@@ -25,11 +22,18 @@ export const somalierFastaIndex =
   envDict["SOMALIERFASTA"] || "/tmp/reference.fa.fai";
 
 // the following variables are set by the external configuration to point to known
-// S3 bucket locations
+// S3 bucket locations (these are CDK level settings for the installation of Holmes)
 
 export const fingerprintBucketName = envDict["FINGERPRINT_BUCKET_NAME"];
 export const fingerprintConfigFolder = envDict["FINGERPRINT_CONFIG_FOLDER"];
 
+/**
+ * For a given reference string (i.e. hg38) retrieve the relevant
+ * data files. Will re-use files that are already present and has some ways
+ * to allow this to happen in test using magic env variables.
+ *
+ * @param reference
+ */
 export async function safeGetFingerprintSites(
   reference: string
 ): Promise<[string, string]> {

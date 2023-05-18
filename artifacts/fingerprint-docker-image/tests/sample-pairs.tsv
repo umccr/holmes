@@ -1,4 +1,4 @@
-sample_a	sample_b	relatedness	ibs0	ibs2	hom_concordance	hets_a	hets_b	hets_ab	shared_hets	hom_alts_a	hom_alts_b	shared_hom_alts	n	x_ibs0	x_ibs2	expected_relatedness
+#sample_a	sample_b	relatedness	ibs0	ibs2	hom_concordance	hets_a	hets_b	hets_ab	shared_hets	hom_alts_a	hom_alts_b	shared_hom_alts	n	x_ibs0	x_ibs2	expected_relatedness
 0000000	0000001	-0.008	1364	7328	-0.000	6583	6433	12893	2678	5376	5507	2727	16229	59	144	-1.0
 0000000	0000002	-0.115	1699	7068	-0.162	6583	6290	12707	2666	5376	5455	2526	16142	78	124	-1.0
 0000000	0000003	-0.111	1598	6942	-0.120	6583	6184	12597	2497	5376	5548	2550	16143	59	145	-1.0

@@ -15,7 +15,8 @@ We could split them into separate Docker assets if need be though.
 ## Entry Points
 
 - Check - (Lambda - <15s) return a structured JSON comparing the inputs to _all_ the fingerprints
-- Pairs - (Lambda - <30s) extract a pairs HTML report from comparison of _just_ the inputs
+- Exists - (Lambda - <15s) test whether the inputs exist as fingerprints
+- Related - (Lambda - <30s) extract a somalier relate pairs/samples TSV from _just_ the inputs
 - Extract (Fargate invoked - create fingerprint from BAM - 15 mins+)
 
 This was implemented but we never got around the fact it can return a result

@@ -6,7 +6,7 @@ import {
 } from "./common";
 import { basename } from "path";
 import { SFNClient } from "@aws-sdk/client-sfn";
-import { alg, Graph, json } from "@dagrejs/graphlib";
+import { alg, Graph } from "@dagrejs/graphlib";
 
 /**
  * A quick interface showing the structure of the results we
@@ -96,6 +96,26 @@ export async function getBamRelatedGraphs(
 }
 
 /**
+ * For an already run check - and just literally the success JSON - perform
+ * the reporting steps (useful for debug as we can skip all AWS and just
+ * feed off a local file)
+ *
+ * @param successJson
+ */
+export async function getBamRelatedGraphsFromSuccessFile(successJson: any) {
+  const lambdaOutputsJson: Record<string, SomalierRelatedMatch[]>[] = [];
+
+  for (const lambdaResult of successJson) {
+    const lambdaJson: Record<string, SomalierRelatedMatch[]> = JSON.parse(
+      lambdaResult.Output
+    );
+    lambdaOutputsJson.push(lambdaJson);
+  }
+
+  return await lambdaResultsToGraph(lambdaOutputsJson);
+}
+
+/**
  * For an already run check - perform the actual reporting step on existing
  * data (useful for debug as we can skip the Steps call and just feed off
  * the S3 result files).
@@ -158,6 +178,17 @@ export async function distributedMapManifestToLambdaResults(
 export async function lambdaResultsToGraph(
   lambdaResults: Record<string, SomalierRelatedMatch[]>[]
 ) {
+  if (false) {
+    for (const o of lambdaResults) {
+      for (const [p, a] of Object.entries(o)) {
+        if (a.length > 0)
+          for (const m of a) {
+            if (p !== m.file) console.debug(JSON.stringify(a));
+          }
+      }
+    }
+  }
+
   // a graph of all the BAMs - and their relationships
   let somalierRelationshipGraph = new Graph({
     directed: false,
@@ -250,9 +281,10 @@ export async function lambdaResultsToGraph(
             relatedData
           );
         } else {
-          throw new Error(
+          console.error(
             "Received a Holmes result that was neither related not unrelated"
           );
+          console.error(JSON.stringify(relatedData, null, 2));
         }
 
         // if the destination node doesn't exist - that means it is not an index node

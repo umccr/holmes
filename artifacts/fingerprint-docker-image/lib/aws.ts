@@ -2,6 +2,7 @@ import { createWriteStream, existsSync } from "fs";
 import {
   _Object,
   GetObjectCommand,
+  HeadObjectCommand,
   ListObjectsV2Command,
   ListObjectsV2Output,
   S3Client,
@@ -43,7 +44,9 @@ export function keyToUrl(fingerprintFolder: string, key: string): URL {
  * Turns a URL (of a BAM) into the key that its fingerprint would have
  * in the fingerprint bucket.
  *
- * @param url
+ * @param fingerprintFolder the folder in S3 which contains fingerprints
+ * @param url the URL of a bam
+ * @returns a new key that is the key for this bam in our fingerprint db
  */
 export function urlToKey(fingerprintFolder: string, url: URL) {
   if (!fingerprintFolder.endsWith("/"))
@@ -52,6 +55,32 @@ export function urlToKey(fingerprintFolder: string, url: URL) {
   const buf = Buffer.from(url.toString(), "ascii");
 
   return `${fingerprintFolder}${buf.toString("hex")}`;
+}
+
+/**
+ * Return true if a given file exists in S3 and is accessible to us.
+ *
+ * @param bucket
+ * @param key
+ */
+export async function s3Exists(
+  bucket: string | undefined,
+  key: string | undefined
+): Promise<boolean> {
+  const bucketParams = {
+    Bucket: bucket,
+    Key: key,
+  };
+
+  const command = new HeadObjectCommand(bucketParams);
+
+  try {
+    const response = await s3Client.send(command);
+
+    return true;
+  } catch (e) {}
+
+  return false;
 }
 
 /**

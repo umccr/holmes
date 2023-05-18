@@ -61,31 +61,36 @@ async function fingerprint(file: string, fingerprintFolder: string) {
 
   const url = new URL(file);
 
-  if (url.protocol === "s3:") {
-    // rather than rely on the S3 support of the somalier binary (we don't have enough control of what libraries
-    // are included for its build) - we construct presigned HTTPS links and get it to source the BAMs that way
-    const presignedUrl = await s3Presign(file);
-    const presignedUrlBai = await s3Presign(file + ".bai");
+  switch (url.protocol) {
+    case "s3:":
+      // rather than rely on the S3 support of the somalier binary (we don't have enough control of what libraries
+      // are included for its build) - we construct presigned HTTPS links and get it to source the BAMs that way
+      const s3PresignedUrl = await s3Presign(file);
+      const s3PresignedUrlBai = await s3Presign(file + ".bai");
 
-    await dumpFileHead(presignedUrl, presignedUrlBai);
+      await dumpFileHead(s3PresignedUrl, s3PresignedUrlBai);
 
-    indexString = `${presignedUrl}##idx##${presignedUrlBai}`;
-  } else if (url.protocol === "gds:") {
-    const presignedUrl = await getGdsFileAsPresigned(
-      url.hostname,
-      url.pathname
-    );
-    const presignedUrlBai = await getGdsFileAsPresigned(
-      url.hostname,
-      url.pathname + ".bai"
-    );
+      indexString = `${s3PresignedUrl}##idx##${s3PresignedUrlBai}`;
+      break;
 
-    await dumpFileHead(presignedUrl, presignedUrlBai);
+    case "gds:":
+      const gdsPresignedUrl = await getGdsFileAsPresigned(
+        url.hostname,
+        url.pathname
+      );
+      const gdsPresignedUrlBai = await getGdsFileAsPresigned(
+        url.hostname,
+        url.pathname + ".bai"
+      );
 
-    // this is the undocumented mechanism of nim-htslib to have a path that also specifies the actual index file
-    indexString = `${presignedUrl}##idx##${presignedUrlBai}`;
-  } else {
-    throw new Error(`Unknown file download technique for ${url}`);
+      await dumpFileHead(gdsPresignedUrl, gdsPresignedUrlBai);
+
+      // this is the undocumented mechanism of nim-htslib to have a path that also specifies the actual index file
+      indexString = `${gdsPresignedUrl}##idx##${gdsPresignedUrlBai}`;
+      break;
+
+    default:
+      throw new Error(`Unknown file download technique for ${url}`);
   }
 
   const randomString = nanoid();

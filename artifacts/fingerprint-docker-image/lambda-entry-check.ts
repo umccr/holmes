@@ -6,10 +6,9 @@ import {
   cleanSomalierFiles,
   downloadAndCorrectFingerprint,
   runSomalierRelate,
-} from "./lib/somalier";
+} from "./lib/somalier-download-run-clean";
 import { HolmesReturnType } from "./lib/somalier-types";
 import { pairsAnalyse } from "./lib/somalier-pairs-analyse";
-import { createReadStream } from "fs";
 
 /* Example input as processed through the Step Functions Distributed Map batcher
 
@@ -167,14 +166,14 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
   console.log(JSON.stringify(sampleIdToFingerprintKeyMap, null, 2));
 
   if (sampleCount > 1) {
-    await runSomalierRelate();
+    const { pairsTsv } = await runSomalierRelate();
 
     const expectRelatedRegex = ev.BatchInput.expectRelatedRegex
       ? new RegExp(ev.BatchInput.expectRelatedRegex)
       : new RegExp("^\\b$");
 
     const matches = await pairsAnalyse(
-      () => createReadStream("somalier.pairs.tsv"),
+      pairsTsv,
       ev.BatchInput.fingerprintFolder,
       indexSampleIdToFingerprintKeyMap,
       sampleIdToFingerprintKeyMap,

@@ -1,14 +1,11 @@
 import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { fingerprintBucketName, somalierBinary, somalierWork } from "./env";
 import { streamToBuffer } from "./misc";
-import { createReadStream, createWriteStream, ReadStream } from "fs";
+import { createWriteStream } from "fs";
 import { pipeline as pipelineCallback, Readable } from "stream";
 import { promisify } from "util";
-import { parse } from "csv-parse";
-import { keyToUrl } from "./aws";
 import { readdir, readFile, unlink } from "fs/promises";
 import { exec as execCallback } from "child_process";
-import { HolmesReturnType, SomalierCommonType } from "./somalier-types";
 
 // get this functionality as promise compatible function
 const pipeline = promisify(pipelineCallback);
@@ -22,6 +19,15 @@ const exec = promisify(execCallback);
  * @param fingerprintKey the key in our fingerprint bucket of the fingerprint file to download
  * @param count the count used to generate a new id
  * @return the sample id we generated matching the count
+ *
+ * NOTE so somalier itself relies too heavily on the sample ids *inside* the fingerprint
+ * files. This has two problems
+ * (1) they might be wrong/set incorrectly on creation and we can't fix
+ * (2) where they are identical - the output of somalier won't let us distinguish between two samples
+ *     with the same id (i.e. we can't tell which BAM was which)
+ * Which when the job of this is to detect incorrectly labelled samples - is a problem. So we
+ * do some magic here to replace the inbuilt fingerprint sample ids with our own 'per run'
+ * sample ids - and then match back to the original BAM.
  */
 export async function downloadAndCorrectFingerprint(
   fingerprintKey: string,
@@ -64,20 +70,15 @@ export async function downloadAndCorrectFingerprint(
   );
   await pipeline(Readable.from(fileBuffer), writeStream);
 
-  // let the caller know what sample id we ended up generating for later matching
+  // let the caller know what sample id we ended up generating for matching back to the original BAM
   return newSampleId;
-}
-
-export async function extractAllPairs(
-  fingerprintFolder: string,
-  indexSampleIdToKeyMap: { [sid: string]: string }
-): Promise<string> {
-  return await readFile("somalier.html", "utf-8");
 }
 
 /**
  * Runs somalier relate on all .somalier files in the current directory
- * and outputs the stdout and stderr output for debug purposes.
+ * and return all the somalier artifacts as text
+ * (either TSV or HTML).
+ * Also outputs them to stdout and stderr output for debug purposes.
  */
 export async function runSomalierRelate() {
   // do a somalier relate run on everything we have downloaded
@@ -96,33 +97,35 @@ export async function runSomalierRelate() {
     stderr.split("\n").forEach((l) => console.log(`stderr ${l}`));
   }
 
-  // this is some pure debug that ends up in cloudwatch - for if we do want to actually investigate more
-  //const groups = await readFile("somalier.groups.tsv");
-  const samples = await readFile("somalier.samples.tsv");
-  const pairs = await readFile("somalier.pairs.tsv");
+  const samples = await readFile("somalier.samples.tsv", "utf8");
+  const pairs = await readFile("somalier.pairs.tsv", "utf8");
 
+  // not useful
+  //const groups = await readFile("somalier.groups.tsv");
   //if (groups) {
   //  groups
   //      .toString()
   //      .split("\n")
   //      .forEach((l) => console.log(`groups ${l}`));
   //}
+
+  // this is some pure debug that ends up in cloudwatch - for if we do want to actually investigate more
   if (samples) {
-    samples
-      .toString()
-      .split("\n")
-      .forEach((l) => console.log(`samples ${l}`));
+    samples.split("\n").forEach((l) => console.log(`samples ${l}`));
   }
   if (pairs) {
-    pairs
-      .toString()
-      .split("\n")
-      .forEach((l) => console.log(`pairs ${l}`));
+    pairs.split("\n").forEach((l) => console.log(`pairs ${l}`));
   }
+
+  return {
+    samplesTsv: samples,
+    pairsTsv: pairs,
+    html: await readFile("somalier.html", "utf-8"),
+  };
 }
 
 /**
- * Remove our broad guess at any files that were used for input/output of the
+ * Remove (our broad guess) at any files that were used for input/output of the
  * somalier process. This is a ultra cautious step in case our Lambda is re-used
  * many many times and /tmp fills (possibly overly cautious!). Also we like to
  * use *.somalier for our actual exec of somalier - and we don't want it picking

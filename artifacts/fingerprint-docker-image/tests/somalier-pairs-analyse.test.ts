@@ -1,7 +1,7 @@
 import { pairsAnalyse } from "../lib/somalier-pairs-analyse";
-import { createReadStream } from "fs";
 import { urlToKey } from "../lib/aws";
 import { join } from "path";
+import { readFile } from "fs/promises";
 
 const FING_FOLDER = "fing/";
 
@@ -23,8 +23,9 @@ const index5 = "s3://subject_FFFF.bam";
 
 describe("Run pairing analysis", () => {
   it("Test direct somalier relationships are reported as Unexpected Related when no regexp", async () => {
+    const pairsTsv = await readFile(SAMPLE_PAIRS_PATH, "utf8");
     const matches = await pairsAnalyse(
-      () => createReadStream(SAMPLE_PAIRS_PATH),
+      pairsTsv,
       FING_FOLDER,
       {
         "0000000": urlToKey(FING_FOLDER, new URL(index0)),
@@ -81,8 +82,9 @@ describe("Run pairing analysis", () => {
   });
 
   it("Test relationships are found with regexp", async () => {
+    const pairsTsv = await readFile(SAMPLE_PAIRS_PATH, "utf8");
     const matches = await pairsAnalyse(
-      () => createReadStream(SAMPLE_PAIRS_PATH),
+      pairsTsv,
       FING_FOLDER,
       {
         "0000000": urlToKey(FING_FOLDER, new URL(index0)),

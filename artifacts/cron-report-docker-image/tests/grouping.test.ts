@@ -2,6 +2,7 @@ import {
   distributedMapManifestToLambdaResults,
   getBamRelatedGraphs,
   getBamRelatedGraphsFromExistingMapRun,
+  getBamRelatedGraphsFromSuccessFile,
   lambdaResultsToGraph,
 } from "../lib/analyse-relatedness-of-bams";
 import { findCheckLarge, getSlackWebClient } from "../lib/common";
@@ -10,6 +11,9 @@ import {
   reportCommand,
   reportRelated,
 } from "../lib/report-command";
+import { join } from "node:path";
+import { readFile } from "fs/promises";
+import { sl } from "date-fns/locale";
 
 describe("Run grouping algorithm", () => {
   beforeAll(async () => {});
@@ -66,7 +70,51 @@ describe("Run grouping algorithm", () => {
     );
   });
 
-  it("complete report from prod", async () => {
+  it("do something", async () => {
+    const web = await getSlackWebClient();
+
+    // we are setting up to allow Slack commands - so we want the ability to alter this
+    // channel per request
+    // for the EventBridge cron lambda however we just do a regular Post
+    const slackSend = async (slackMessage: any) => {
+      slackMessage["channel"] = "U029NVAK56W";
+      //await web.chat.postMessage(slackMessage);
+      await web.files.upload({});
+    };
+
+    const csvUpload = async (csvContent: string) => {
+      await web.files.upload({
+        channels: "U029NVAK56W",
+        content: csvContent,
+        filetype: "text",
+        title: "Fingerprint Report",
+      });
+    };
+
+    const succeededContent = await readFile(
+      join(__dirname, "SUCCEEDED_0.json"),
+      "utf8"
+    );
+
+    const { relatedGraph, missingRelatedGraph, indexOnlyRelatedGraph } =
+      await getBamRelatedGraphsFromSuccessFile(JSON.parse(succeededContent));
+
+    const reports = reportRelated(
+      relatedGraph,
+      indexOnlyRelatedGraph.nodes().sort()
+    );
+
+    await csvUpload(reports.join("\n\n"));
+
+    /*    for (const r of reports) {
+      await csvUpload(r);
+      break;
+
+
+    } */
+  });
+
+  xit("complete report from prod", async () => {
     const web = await getSlackWebClient();
 
     // we are setting up to allow Slack commands - so we want the ability to alter this
@@ -85,7 +133,7 @@ describe("Run grouping algorithm", () => {
         "temp/c71a16a3-2f31-30b2-99dc-a45303b6a671/manifest.json"
       );
 
-    reportRelated(relatedGraph, missingRelatedGraph, indexOnlyRelatedGraph);
+    reportRelated(relatedGraph, indexOnlyRelatedGraph.nodes().sort());
 
     return;
 

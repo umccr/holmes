@@ -30,6 +30,8 @@ export const handler = async (event: any) => {
         "not executed due to env variables DAYS and DATE both being specified",
     };
 
+  // const slackSend = getSlackChanneller(channel);
+
   const web = await getSlackWebClient();
 
   // we are setting up to allow Slack commands - so we want the ability to alter this

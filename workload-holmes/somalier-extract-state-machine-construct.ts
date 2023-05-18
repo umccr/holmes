@@ -28,8 +28,10 @@ import { RetentionDays } from "aws-cdk-lib/aws-logs";
 import {
   EcsFargateLaunchTarget,
   EcsRunTask,
+  TaskEnvironmentVariable,
 } from "aws-cdk-lib/aws-stepfunctions-tasks";
 import { Duration } from "aws-cdk-lib";
+import { standardEnv } from "./fingerprint-lambda-env";
 
 export class SomalierExtractStateMachineConstruct extends SomalierBaseStateMachineConstruct {
   readonly stateMachine: StateMachine;
@@ -123,6 +125,17 @@ export class SomalierExtractStateMachineConstruct extends SomalierBaseStateMachi
     });
 
     return [td, cd];
+  }
+
+  protected createFargateLambdaEnv(): TaskEnvironmentVariable[] {
+    return Array.from(
+      Object.entries(standardEnv(this.props)).map(([k, v]) => {
+        return {
+          name: k,
+          value: v,
+        };
+      })
+    );
   }
 
   /**

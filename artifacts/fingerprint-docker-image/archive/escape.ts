@@ -1,18 +1,3 @@
-import { createWriteStream, existsSync } from "fs";
-import {
-  _Object,
-  GetObjectCommand,
-  ListObjectsV2Command,
-  ListObjectsV2Output,
-  S3Client,
-} from "@aws-sdk/client-s3";
-import { readFile } from "fs/promises";
-import { createHash } from "crypto";
-import { promisify } from "util";
-import { pipeline as pipelineCallback } from "stream";
-import { URL } from "url";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-
 /**
  * WIP code - considering using a different escape technique rather than hexencoding the names
  */

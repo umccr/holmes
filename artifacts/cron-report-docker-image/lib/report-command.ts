@@ -1,7 +1,7 @@
 import { findCheckLarge } from "./common";
 import { getBamRelatedGraphs } from "./analyse-relatedness-of-bams";
 import { alg, Edge, Graph } from "@dagrejs/graphlib";
-import { AsciiTable3, AlignmentEnum } from "ascii-table3";
+import { table } from "table";
 
 /**
  * A command to print to slack *all* relationship information about a set of BAMs.
@@ -31,6 +31,7 @@ export async function reportCommand(
     await slackSend({
       text: renderGroupAsFixedFontString(
         relatedGraph,
+        "ABC",
         relatedGraph.nodes().sort()
       ),
     });
@@ -53,7 +54,13 @@ function createGroupNames(
 
   for (const group of components) {
     for (const groupNode of group) {
-      if (groupIndex > 25)
+      if (groupIndex >= 52)
+        groupNames[groupNode] = String.fromCharCode(
+          groupIndex - 52 + startCharacter.charCodeAt(0),
+          groupIndex - 52 + startCharacter.charCodeAt(0),
+          groupIndex - 52 + startCharacter.charCodeAt(0)
+        );
+      if (groupIndex >= 26)
         groupNames[groupNode] = String.fromCharCode(
           groupIndex - 26 + startCharacter.charCodeAt(0),
           groupIndex - 26 + startCharacter.charCodeAt(0)
@@ -70,82 +77,225 @@ function createGroupNames(
   return groupNames;
 }
 
+/**
+ * Confirms that all the nodes included here in a group of high
+ * relatedness are indeed expected to be related.
+ *
+ * @param graph the underlying graph of related nodes
+ * @param runGroupString run group id assigned in the table for this grouping
+ * @param nodeName the starting node name
+ * @param edges the rest of the edges in the group
+ */
+const confirmExpectedRelatedGroup = (
+  graph: Graph,
+  runGroupString: string,
+  nodeName: string,
+  edges: Edge[]
+) => {
+  let allRegex = true;
+
+  // we start at 1 as we match ourselves are we are in the index
+  let indexCount = 1;
+  // count those that match from the db
+  let nonIndexCount = 0;
+
+  for (const e of edges || []) {
+    let otherNode;
+    // find the node at the other end of the edge
+    if (e.v === nodeName) otherNode = graph.node(e.w);
+    else if (e.w === nodeName) otherNode = graph.node(e.v);
+    else
+      throw new Error(
+        "Ended in state where one of the edge nodes was not in the graph"
+      );
+
+    if (otherNode === "index") indexCount++;
+    else nonIndexCount++;
+
+    const edgeData = graph.edge(e);
+    if (!(edgeData as any).regexRelated) allRegex = false;
+  }
+
+  // we expect everything in the group to report matching regex, otherwise we are a fail (report elsewhere)
+  if (allRegex && edges.length < 3)
+    return {
+      confirmed: true,
+      expectedRelatedFromIndex: indexCount,
+      expectedRelatedFromDb: nonIndexCount,
+    };
+  else {
+    return {
+      confirmed: false,
+    };
+  }
+};
+
+/**
+ * Create a text report of the related graph from a somalier run.
+ *
+ * @param relatedGraph a graph of relations between named BAM files
+ * @param indexNodeNames a list of BAM files that are index cases we are to report on
+ * @returns an array of fixed font text to be printed/sent to slack
+ */
 export function reportRelated(
   relatedGraph: Graph,
-  unrelatedGraph: Graph,
-  indexGraph: Graph
-) {
-  const rowNames = indexGraph.nodes().sort();
+  indexNodeNames: string[]
+): string[] {
+  const indexNodeSet = new Set<string>(indexNodeNames);
 
+  // group everything that is connected (by genomic relatedness)
   const relatedComponents = alg.components(relatedGraph);
 
-  const rowRelatedGroups = createGroupNames(relatedComponents, "A");
+  // assign each group a string id (A,B,C... AA, BB, CC... AAA, BBB..)
+  const relatedComponentsGroupNames = createGroupNames(relatedComponents, "A");
 
-  const unrelatedComponents = alg.components(unrelatedGraph);
+  // once we've done a group we mark it done
+  const relatedComponentGroupChecked = new Array<boolean>(
+    relatedComponents.length
+  ).fill(false);
 
-  const rowUnrelatedGroups = createGroupNames(unrelatedComponents, "a");
+  const problemReports: string[] = [];
 
-  const confirmSubjectGroup = (
-    graph: Graph,
-    nodeName: string,
-    edges: Edge[]
-  ) => {
-    let allRegex = true;
+  let tableData: string[][] = [];
 
-    let indexCount = 0;
-    let nonIndexCount = 0;
+  tableData.push(["Group", "BAM", "ER\n(from run)", "ER\n(from db)"]);
 
-    for (const e of edges || []) {
-      let otherNode;
-      // find the node at the other end of the edge
-      if (e.v === nodeName) otherNode = graph.node(e.w);
-      else if (e.w === nodeName) otherNode = graph.node(e.v);
-      else
-        throw new Error(
-          "Ended in state where one of the edge nodes was not in the graph"
-        );
+  const spanningCells: {
+    col: number;
+    row: number;
+    colSpan?: number;
+    rowSpan?: number;
+  }[] = [];
 
-      if (otherNode === "index") indexCount++;
-      else nonIndexCount++;
+  // display the rows in the table ordered by group
+  for (
+    let relatedGroupCount = 0;
+    relatedGroupCount < relatedComponents.length;
+    relatedGroupCount++
+  ) {
+    // these have the rowspan calculated during the loop (if the group ends up > 1)
 
-      const edgeData = graph.edge(e);
-      if (!(edgeData as any).regexRelated) allRegex = false;
-    }
-    if (allRegex) return `✅ ${indexCount}/${nonIndexCount}`;
-    else return `❌`;
-  };
+    // a spanning cell to make our group names a spanning cell group
+    const relatedGroupNameSpanningCell = {
+      col: 0,
+      row: tableData.length,
+      rowSpan: 0,
+      colSpan: 1,
+    };
+    // a spanning cell to make our "expected in index" column a spanning cell group
+    const relatedGroupInIndexSpanningCell = {
+      col: 2,
+      row: tableData.length,
+      rowSpan: 0,
+      colSpan: 1,
+    };
+    // a spanning cell to make our "expected in db" column a spanning cell group
+    const relatedGroupInDbSpanningCell = {
+      col: 3,
+      row: tableData.length,
+      rowSpan: 0,
+      colSpan: 1,
+    };
 
-  {
-    let table = new AsciiTable3()
-      .setTitle("Fingerprint Base Report")
-      .setStyle("unicode-single")
-      .setHeading("RG", "UG", "URL", "Related", "Unrelated");
+    // loop through everything in the related group, though not all are made into rows in the table
+    for (const nodeInRelatedGroup of relatedComponents[relatedGroupCount]) {
+      // skip reporting in this table anything not from the index set
+      // (they will be reported on in separately if they cause an issue)
+      if (!indexNodeSet.has(nodeInRelatedGroup)) continue;
 
-    for (const r of rowNames) {
-      const relatedEdgeCount = relatedGraph.nodeEdges(r);
-      const unrelatedEdgeCount = unrelatedGraph.nodeEdges(r);
+      const relatedGroupName = relatedComponentsGroupNames[nodeInRelatedGroup];
 
-      let betterUrl = r.startsWith("gds://production/analysis_data/")
-        ? ".. " + r.substring(31)
-        : r;
-      if (betterUrl.endsWith(".bam")) betterUrl = betterUrl.slice(0, -4);
+      const relatedEdges = relatedGraph.nodeEdges(nodeInRelatedGroup);
 
-      if (!relatedEdgeCount || !unrelatedEdgeCount) {
-        table.addRow(betterUrl, "Error", "Error");
-        continue;
+      // our related graph always returns an edge array - albeit possibly an empty one!
+      if (!relatedEdges) {
+        throw new Error("Invalid related graph");
       }
 
-      table.addRow(
-        rowRelatedGroups[r],
-        rowUnrelatedGroups[r],
-        betterUrl,
-        confirmSubjectGroup(relatedGraph, r, relatedEdgeCount),
-        (unrelatedEdgeCount || []).length === 0 ? "✅" : "❌"
-      );
+      let betterUrl = nodeInRelatedGroup;
+
+      /*nodeInRelatedGroup.startsWith(
+        "gds://production/analysis_data/"
+      )
+        ? ".. " + nodeInRelatedGroup.substring(31)
+        : nodeInRelatedGroup;
+      if (betterUrl.endsWith(".bam")) betterUrl = betterUrl.slice(0, -4); */
+
+      relatedGroupNameSpanningCell.rowSpan++;
+      relatedGroupInIndexSpanningCell.rowSpan++;
+      relatedGroupInDbSpanningCell.rowSpan++;
+
+      if (!relatedComponentGroupChecked[relatedGroupCount]) {
+        // check the status of the group
+        const confirmation = confirmExpectedRelatedGroup(
+          relatedGraph,
+          relatedGroupName,
+          nodeInRelatedGroup,
+          relatedEdges
+        );
+
+        relatedComponentGroupChecked[relatedGroupCount] = true;
+
+        if (confirmation.confirmed) {
+          tableData.push([
+            relatedGroupName,
+            betterUrl,
+            `${confirmation.expectedRelatedFromIndex}`,
+            `${confirmation.expectedRelatedFromDb}`,
+          ]);
+        } else {
+          tableData.push([
+            relatedGroupName,
+            betterUrl,
+            `x (see group\nreport ${relatedGroupName}`,
+            "",
+          ]);
+          relatedGroupInIndexSpanningCell.colSpan = 2;
+
+          problemReports.push(
+            renderGroupAsFixedFontString(
+              relatedGraph,
+              relatedGroupName,
+              relatedComponents[relatedGroupCount]
+            )
+          );
+        }
+      } else {
+        tableData.push([relatedGroupName, betterUrl, "", ""]);
+      }
     }
 
-    console.log(table.toString());
+    if (relatedGroupNameSpanningCell.rowSpan > 1)
+      spanningCells.push(relatedGroupNameSpanningCell);
+
+    if (relatedGroupInIndexSpanningCell.rowSpan > 1)
+      spanningCells.push(relatedGroupInIndexSpanningCell);
+
+    // we only need to put the "in db" spanning cell in *if the row is not reporting an error*
+    // (otherwise we will have made a two column spanning "in index" cell)
+    if (
+      relatedGroupInDbSpanningCell.rowSpan > 1 &&
+      relatedGroupInIndexSpanningCell.colSpan === 1
+    )
+      spanningCells.push(relatedGroupInDbSpanningCell);
   }
+
+  return [
+    table(tableData, {
+      header: {
+        alignment: "center",
+        content: "Fingerprint Expected Related Report",
+      },
+      columns: [
+        { alignment: "left" },
+        { alignment: "left", width: 120 },
+        { alignment: "center" },
+        { alignment: "center" },
+      ],
+      spanningCells: spanningCells,
+    }),
+    ...problemReports,
+  ];
 
   /* for (const ur of missingSomalierConnected) {
     if (ur.length > 1) {
@@ -160,7 +310,7 @@ export function reportRelated(
     }
   } */
 
-  const expectedUnrelatedSubjectIds: string[] = [];
+  /*const expectedUnrelatedSubjectIds: string[] = [];
 
   for (const ur of alg.components(relatedGraph)) {
     if (ur.length === 0) {
@@ -184,28 +334,24 @@ export function reportRelated(
     }
   }
 
-  console.log(JSON.stringify(expectedUnrelatedSubjectIds));
+  console.log(JSON.stringify(expectedUnrelatedSubjectIds)); */
 }
 
-export function renderGroupAsFixedFontString(g: Graph, nodes: string[]) {
-  let text = "```\n";
+export function renderGroupAsFixedFontString(
+  g: Graph,
+  groupNamePrefix: string,
+  nodes: string[]
+) {
+  let text = "";
 
-  for (let row = 0; row < nodes.length; row++)
-    text += `${row} = ${nodes[row]}\n`;
+  const nodesAsHeaders = nodes.map((n, i) => `${groupNamePrefix}${i}`);
 
-  text += "\n";
-
-  const nodesAsHeaders = nodes.map((n, i) => i.toString());
-
-  let table = new AsciiTable3()
-    .setTitle("Fingerprint Report")
-    .setStyle("unicode-single")
-    .setHeading("", ...nodesAsHeaders);
+  const tableData: string[][] = [];
 
   for (let row = 0; row < nodes.length; row++) {
     const rowVals: string[] = [];
 
-    rowVals.push(row.toString());
+    rowVals.push(`${groupNamePrefix}${row}`);
 
     for (let col = 0; col < nodes.length; col++) {
       if (row === col) {
@@ -225,12 +371,15 @@ export function renderGroupAsFixedFontString(g: Graph, nodes: string[]) {
       else rowVals.push("");
     }
 
-    table = table.addRow(...rowVals);
+    tableData.push(rowVals);
   }
 
-  text += table.toString();
+  text += table(tableData);
 
-  text += "```\n";
+  for (let row = 0; row < nodes.length; row++)
+    text += `  ${groupNamePrefix}${row} = ${nodes[row]}\n`;
+
+  text += "\n";
 
   return text;
 }
