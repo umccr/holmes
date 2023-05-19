@@ -1,25 +1,18 @@
 import { chdir } from "process";
-import { URL } from "url";
 import { somalierWork } from "./lib/env";
-import { urlToKey } from "./lib/aws";
 import {
   cleanSomalierFiles,
-  downloadAndCorrectFingerprint,
   runSomalierRelate,
 } from "./lib/somalier-download-run-clean";
 import { somalierTsvCorrectIds } from "./lib/somalier-tsv-correct-ids";
-import { reportExists } from "./lib/report-exists";
-import {
-  getSlackChanneller,
-  getSlackResponder,
-  getSlackTextAttacher,
-} from "./lib/slack";
+import { getSlackTextAttacher } from "./lib/slack";
 import { reportRelate } from "./lib/report-relate";
 import { downloadIndexSamples } from "./lib/ids";
+import { urlListByRegex } from "./lib/url-list-by-regex";
 
 type EventInput = {
-  // the URL of the BAMs we are asking for an all pairs report
-  indexes: string[];
+  // a list of regexs (ANY match) on URLs that will go to build the indexes for the all pairs report
+  regexes: string[];
 
   // the slash terminated folder where the fingerprints have been sourced in S3 (i.e. the folder key + /)
   fingerprintFolder: string;
@@ -29,8 +22,8 @@ type EventInput = {
 };
 
 /**
- * A lambda which does an all pairs somalier report (i.e somalier relate) on all BAM urls passed in
- * and returns the somalier result files as TSV.
+ * A lambda which does an all pairs somalier report (i.e somalier relate)
+ * on a regex of BAMs.
  *
  * @param ev
  * @param _context
@@ -44,8 +37,29 @@ export const lambdaHandler = async (ev: EventInput, _context: any) => {
   // only small areas of the lambda runtime are read/write so we need to make sure we are in a writeable working dir
   chdir(somalierWork);
 
+  const indexes = await urlListByRegex(ev.regexes, ev.fingerprintFolder);
+
+  const MAX_ALL_PAIRS = 25;
+
+  if (indexes.length > MAX_ALL_PAIRS) {
+    if (ev.channelId) {
+      const responder = await getSlackTextAttacher(ev.channelId);
+      await responder(
+        `The maximum number of samples that can
+be processed for this report is ${MAX_ALL_PAIRS}
+but your regex has matched ${indexes.length}`
+      );
+    }
+
+    return {
+      errorMessage: `Your regex matched ${indexes.length} samples which is above the maximum of ${MAX_ALL_PAIRS} allowed`,
+      samplesTsv: "",
+      pairsTsv: "",
+    };
+  }
+
   const indexSampleIdToBamUrlMap = await downloadIndexSamples(
-    ev.indexes,
+    indexes,
     ev.fingerprintFolder
   );
 
@@ -69,8 +83,7 @@ export const lambdaHandler = async (ev: EventInput, _context: any) => {
 
   if (ev.channelId) {
     const responder = await getSlackTextAttacher(ev.channelId);
-    const report = reportRelate(fixedSamplesTsv, fixedPairsTsv);
-
+    const report = await reportRelate(fixedSamplesTsv, fixedPairsTsv);
     await responder(report);
   }
 

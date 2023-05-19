@@ -21,6 +21,10 @@ type Props = {
   fingerprintConfigFolder: string;
 
   cmd: string[];
+
+  extraEnv: {
+    [k: string]: string;
+  };
 };
 
 /**
@@ -31,17 +35,14 @@ type Props = {
  */
 export class FingerprintLambda extends Construct {
   public readonly dockerImageFunction: DockerImageFunction;
+  public readonly role: IRole;
 
   constructor(scope: Construct, id: string, private props: Props) {
     super(scope, id);
 
-    const role = this.createLambdaRole();
+    this.role = this.createLambdaRole();
 
-    this.dockerImageFunction = this.createLambda(
-      role,
-      props.dockerImageAsset,
-      props.cmd
-    );
+    this.dockerImageFunction = this.createLambda(this.role);
   }
 
   /**
@@ -70,18 +71,19 @@ export class FingerprintLambda extends Construct {
 
     return lambdaRole;
   }
-  createLambda(role: IRole, imageAsset: DockerImageAsset, cmd: string[]) {
+
+  private createLambda(role: IRole) {
     return new DockerImageFunction(this, `Function`, {
       // as an example - processing a batch size of about 10 takes < 10 seconds
       // and requires in practice about 128k of memory
       memorySize: 4096,
       timeout: Duration.minutes(1),
       role: role,
-      code: DockerImageCode.fromEcr(imageAsset.repository, {
-        tagOrDigest: imageAsset.assetHash,
-        cmd: cmd,
+      code: DockerImageCode.fromEcr(this.props.dockerImageAsset.repository, {
+        tagOrDigest: this.props.dockerImageAsset.assetHash,
+        cmd: this.props.cmd,
       }),
-      environment: standardEnv(this.props),
+      environment: { ...standardEnv(this.props), ...this.props.extraEnv },
     });
   }
 }

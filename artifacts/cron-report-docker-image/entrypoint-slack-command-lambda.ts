@@ -1,6 +1,5 @@
 import * as crypto from "crypto";
 import { getSlackSigningSecret } from "./lib/common";
-import yargsParser from "yargs-parser";
 import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
 
 /**
@@ -61,6 +60,22 @@ export const handler = async (event: any) => {
 
   const params = new URLSearchParams(bodyString);
 
+  // example from docs
+  // token=gIkuvaNzQIHg97ATvDxqgjtO
+  // &team_id=T0001
+  // &team_domain=example
+  // &enterprise_id=E0001
+  // &enterprise_name=Globular%20Construct%20Inc
+  // &channel_id=C2147483705
+  // &channel_name=test
+  // &user_id=U2147483697
+  // &user_name=Steve
+  // &command=/weather
+  // &text=94070
+  // &response_url=https://hooks.slack.com/commands/1234/5678
+  // &trigger_id=13345224609.738474920.8088930838d88f008e0
+  // &api_app_id=A123456
+
   const o = Object.fromEntries(
     Array.from(params.keys()).map((k) => [
       k,
@@ -69,17 +84,16 @@ export const handler = async (event: any) => {
     ])
   );
 
-  if (!o.text) throw new Error("No text for the command in the Slack message");
-
   if (!o.command) throw new Error("No command in the Slack message");
-
+  if (!o.text) throw new Error("No text for the command in the Slack message");
+  if (!o.channel_id)
+    throw new Error("No channel_id for the command in the Slack message");
   if (!o.response_url) throw new Error("No response_url in the Slack message");
 
-  const argv = yargsParser(o.text);
+  // log all the inputs
+  console.log(JSON.stringify(o));
 
-  const commands: (string | number)[] = argv["_"] || [];
-
-  if (commands.length < 1 || commands[0] === "help")
+  if (o.text.includes("help"))
     return {
       response_type: "in_channel",
       blocks: [
@@ -89,9 +103,10 @@ export const handler = async (event: any) => {
             type: "mrkdwn",
             text: `
 /fingerprint
- exists bamurl [...bamurl] "report the existence of fingerprints for the given URLs"
- relate bamurl [...bamurl] "report all relatedness of the given URLs against each other"
  check bamurl [...bamurl] "report threshold relatedness of the given URLs against the fingerprint database"
+ exists bamurl [...bamurl] "report the existence of fingerprints for the given URLs"
+ relate bamurl [...bamurl] "report all relatedness of the given URLs against each other (max ${25})"
+ relatex re [...re] "report all relatedness of the URLs matching any RE against each other (max ${25})"
  help "this help"
             `,
           },
@@ -103,7 +118,16 @@ export const handler = async (event: any) => {
 
   let command: InvokeCommand;
 
-  switch (commands[0]) {
+  const splitText = o.text.split(/\s+/);
+  const urls: string[] = [];
+
+  for (const item of splitText.slice(1)) {
+    if (item.startsWith("gds://") || item.startsWith("s3://")) urls.push(item);
+  }
+
+  console.log(urls);
+
+  switch (splitText[0]) {
     case "exists":
       command = new InvokeCommand({
         FunctionName: process.env["LAMBDA_EXISTS_ARN"],
@@ -111,8 +135,24 @@ export const handler = async (event: any) => {
         Payload: Buffer.from(
           JSON.stringify({
             slackResponseUrl: o.response_url,
+            channelId: o.channel_id,
             fingerprintFolder: process.env["FINGERPRINT_FOLDER"],
-            indexUrls: commands.slice(1),
+            indexes: urls,
+          })
+        ),
+      });
+      break;
+
+    case "list":
+      command = new InvokeCommand({
+        FunctionName: process.env["LAMBDA_LIST_ARN"],
+        InvocationType: "Event",
+        Payload: Buffer.from(
+          JSON.stringify({
+            slackResponseUrl: o.response_url,
+            channelId: o.channel_id,
+            fingerprintFolder: process.env["FINGERPRINT_FOLDER"],
+            regexes: splitText.slice(1),
           })
         ),
       });
@@ -125,15 +165,31 @@ export const handler = async (event: any) => {
         Payload: Buffer.from(
           JSON.stringify({
             slackResponseUrl: o.response_url,
+            channelId: o.channel_id,
             fingerprintFolder: process.env["FINGERPRINT_FOLDER"],
-            indexUrls: commands.slice(1),
+            indexes: urls,
+          })
+        ),
+      });
+      break;
+
+    case "relatex":
+      command = new InvokeCommand({
+        FunctionName: process.env["LAMBDA_RELATEX_ARN"],
+        InvocationType: "Event",
+        Payload: Buffer.from(
+          JSON.stringify({
+            slackResponseUrl: o.response_url,
+            channelId: o.channel_id,
+            fingerprintFolder: process.env["FINGERPRINT_FOLDER"],
+            regexes: splitText.slice(1),
           })
         ),
       });
       break;
 
     default:
-      throw new Error(`Unknown command ${commands[0]}`);
+      throw new Error(`Unknown command ${splitText[0]}`);
   }
 
   const response = await client.send(command);

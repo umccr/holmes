@@ -12,14 +12,15 @@ import {
   SomalierBaseStateMachineProps,
 } from "./somalier-base-state-machine-construct";
 import { Arn, ArnFormat, Stack } from "aws-cdk-lib";
+import { FingerprintLambda } from "./fingerprint-lambda";
 
 /**
  * A statemachine thats checks for somalier similarity between a large set of BAM files
  * and some passed in 'index' BAM files.
  */
 export class SomalierCheckStateMachineConstruct extends SomalierBaseStateMachineConstruct {
-  private readonly lambdaRole: IRole;
-  private readonly stateMachine: StateMachine;
+  private readonly _stateMachine: StateMachine;
+  private readonly _fingerprintLambda: FingerprintLambda;
 
   constructor(
     scope: Construct,
@@ -28,14 +29,15 @@ export class SomalierCheckStateMachineConstruct extends SomalierBaseStateMachine
   ) {
     super(scope, id, props);
 
-    this.lambdaRole = this.createLambdaRole();
+    this._fingerprintLambda = this.createFingerprintLambda("Check", [
+      "step-check.lambdaHandler",
+    ]);
 
     const checkLambdaStep = this.createLambdaStep(
       "Check",
-      ["check.lambdaHandler"],
+      this._fingerprintLambda,
       undefined,
-      "$.Payload",
-      this.lambdaRole
+      "$.Payload"
     );
 
     // This is a workaround from the following issue
@@ -133,11 +135,11 @@ export class SomalierCheckStateMachineConstruct extends SomalierBaseStateMachine
 
     // NOTE: we use a technique here to allow optional input parameters to the state machine
     // by defining defaults and then JsonMerging them with the actual input params
-    this.stateMachine = new StateMachine(this, "StateMachine", {
+    this._stateMachine = new StateMachine(this, "StateMachine", {
       definition: def,
     });
 
-    this.stateMachine.addToRolePolicy(
+    this._stateMachine.addToRolePolicy(
       new PolicyStatement({
         effect: Effect.ALLOW,
         actions: ["states:StartExecution"],
@@ -155,7 +157,7 @@ export class SomalierCheckStateMachineConstruct extends SomalierBaseStateMachine
       })
     );
 
-    this.stateMachine.addToRolePolicy(
+    this._stateMachine.addToRolePolicy(
       new PolicyStatement({
         effect: Effect.ALLOW,
         actions: ["states:DescribeExecution", "states:StopExecution"],
@@ -175,7 +177,7 @@ export class SomalierCheckStateMachineConstruct extends SomalierBaseStateMachine
 
     // this is too broad - but once the CFN native Distributed Map is created - it will handle this for us
     // (I think it isn't doing it because of our DummyMap)
-    this.stateMachine.addToRolePolicy(
+    this._stateMachine.addToRolePolicy(
       new PolicyStatement({
         effect: Effect.ALLOW,
         actions: ["lambda:InvokeFunction"],
@@ -183,16 +185,20 @@ export class SomalierCheckStateMachineConstruct extends SomalierBaseStateMachine
       })
     );
 
-    props.fingerprintBucket.grantReadWrite(this.stateMachine);
+    props.fingerprintBucket.grantReadWrite(this._stateMachine);
 
     if (props.allowExecutionByTesterRole) {
-      this.stateMachine.grantRead(props.allowExecutionByTesterRole);
-      this.stateMachine.grantStartExecution(props.allowExecutionByTesterRole);
+      this._stateMachine.grantRead(props.allowExecutionByTesterRole);
+      this._stateMachine.grantStartExecution(props.allowExecutionByTesterRole);
     }
   }
 
   public get stepsArn(): string {
-    return this.stateMachine.stateMachineArn;
+    return this._stateMachine.stateMachineArn;
+  }
+
+  public get stateMachine(): StateMachine {
+    return this._stateMachine;
   }
 
   /**
@@ -200,6 +206,6 @@ export class SomalierCheckStateMachineConstruct extends SomalierBaseStateMachine
    * the actual task activity (not the outer activity towards executing the task itself)
    */
   public get taskRole(): IRole {
-    return this.lambdaRole;
+    return this._fingerprintLambda.role;
   }
 }

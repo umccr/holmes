@@ -72,5 +72,10 @@ export interface HolmesSettings {
      * The specific folder to look into for new fingerprints to report
      */
     readonly fingerprintFolder?: string;
+
+    /**
+     * The regex rule to apply
+     */
+    readonly expectRelatedRegex?: string;
   };
 }

@@ -10,7 +10,7 @@ import { getSlackWebClient } from "./lib/common";
  * @param event
  */
 export const handler = async (event: any) => {
-  const bucket = process.env["BUCKET"];
+  const bucket = process.env["FINGERPRINT_BUCKET_NAME"];
   const fingerprintFolder = process.env["FINGERPRINT_FOLDER"];
   const channel = process.env["CHANNEL"];
   const expectRelatedRegex = process.env["EXPECT_RELATED_REGEX"];
@@ -18,7 +18,7 @@ export const handler = async (event: any) => {
   if (!fingerprintFolder || !bucket || !channel || !expectRelatedRegex)
     return {
       status:
-        "not executed due to missing env variables BUCKET, FINGERPRINT_FOLDER, EXPECT_RELATED_REGEX or CHANNEL",
+        "not executed due to missing env variables FINGERPRINT_BUCKET_NAME, FINGERPRINT_FOLDER, EXPECT_RELATED_REGEX or CHANNEL",
     };
 
   const days = process.env["DAYS"];

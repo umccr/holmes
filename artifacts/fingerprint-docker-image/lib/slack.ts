@@ -9,7 +9,7 @@ export async function getSlackResponder(slackResponseUrl: string) {
   const webhook = new IncomingWebhook(slackResponseUrl);
 
   return async (slackMessage: any) => {
-    return webhook.send(slackMessage);
+    return await webhook.send(slackMessage);
   };
 }
 
@@ -19,10 +19,21 @@ export async function getSlackChanneller(slackChannel: string) {
   return async (slackMessage: any) => {
     slackMessage["channel"] = slackChannel;
 
-    return web.chat.postMessage(slackMessage);
+    return await web.chat.postMessage(slackMessage);
   };
 }
 
+export async function getSlackTextAttacher(slackChannel: string) {
+  const web = await getSlackWebClient();
+
+  return async (slackTextMessage: any) => {
+    return await web.files.upload({
+      channels: slackChannel,
+      content: slackTextMessage,
+      filetype: "text",
+    });
+  };
+}
 async function getSlackSecret(fieldName: string, fieldDescription: string) {
   const secretsClient = new SecretsManagerClient({});
 

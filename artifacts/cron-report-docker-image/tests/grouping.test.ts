@@ -19,6 +19,23 @@ describe("Run grouping algorithm", () => {
   beforeAll(async () => {});
   afterAll(async () => {});
 
+  it("aaa", async () => {
+    const commands = [
+      "exists",
+      "<gds://production/analysis_data/SBJ03240/wgs_alignment_qc/202305134facea68/L2300647__4_dragen/PRJ230299.bam>\n```<gds://production/analysis_data/SBJ03240/wts_tumor_only/202305133ed10d34/L2300641_dragen/PRJ230301.bam>```",
+    ];
+    const urls = [];
+
+    for (const item of commands.slice(1)) {
+      const itemString = item.toString();
+
+      for (const u of itemString.matchAll(/<(gds:.+)>/g)) {
+        urls.push(u.slice(1));
+      }
+    }
+    console.debug(urls);
+  });
+
   xit("should create and return an object of ingredient details", async () => {
     await getBamRelatedGraphs(
       await findCheckLarge(),
@@ -70,7 +87,7 @@ describe("Run grouping algorithm", () => {
     );
   });
 
-  it("do something", async () => {
+  xit("do something", async () => {
     const web = await getSlackWebClient();
 
     // we are setting up to allow Slack commands - so we want the ability to alter this

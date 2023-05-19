@@ -22,12 +22,12 @@ new HolmesApplicationStack(app, "HolmesLocalDevTestStack", {
   fingerprintBucketName: "umccr-fingerprint-local-dev-test",
   shouldCreateFingerprintBucket: false,
   fingerprintConfigFolder: "config/",
-  expectRelatedRegex: "^\\b$",
   slackNotifier: {
-    // change this to the personal id of whichever dev is doing dev work
     cron: "cron(0 2 1 * ? *)",
-    days: 1,
+    days: undefined,
+    // change this to the personal id of whichever dev is doing dev work
     channel: "U029NVAK56W",
     fingerprintFolder: "fingerprints/",
+    expectRelatedRegex: "^\\b$",
   },
 });

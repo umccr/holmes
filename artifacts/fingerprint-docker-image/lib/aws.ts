@@ -148,8 +148,6 @@ export async function* s3ListAllFiles(
 ): AsyncGenerator<_Object> {
   let contToken = undefined;
 
-  console.log("Starting - S3 file list");
-
   let count = 0;
 
   do {
@@ -173,8 +171,6 @@ export async function* s3ListAllFiles(
       yield file;
     }
   } while (contToken);
-
-  console.log(`Ending - S3 file list generated ${count} files`);
 }
 
 /**

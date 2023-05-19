@@ -1,5 +1,5 @@
 import { fingerprintBucketName } from "./lib/env";
-import { getSlackTextAttacher } from "./lib/slack";
+import { getSlackResponder, getSlackTextAttacher } from "./lib/slack";
 import { reportList } from "./lib/report-list";
 import { urlListByRegex } from "./lib/url-list-by-regex";
 
@@ -15,7 +15,8 @@ type EventInput = {
 };
 
 /**
- * A lambda which checks a set of index URLs against the fingerprint database.
+ * A lambda which checks for the existence of fingerprints corresponding to the input
+ * BAM urls.
  *
  * @param ev
  * @param _context

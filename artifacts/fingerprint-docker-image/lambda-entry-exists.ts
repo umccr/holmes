@@ -36,11 +36,10 @@ export const lambdaHandler = async (ev: EventInput, _context: any) => {
     resultExists[indexAsBamUrl] = await s3Exists(fingerprintBucketName, key);
   }
 
-  if (ev.slackResponseUrl)
-    await reportExists(
-      await getSlackResponder(ev.slackResponseUrl),
-      resultExists
-    );
+  if (ev.slackResponseUrl) {
+    const responder = await getSlackResponder(ev.slackResponseUrl);
+    await reportExists(responder, resultExists);
+  }
 
   return resultExists;
 };
