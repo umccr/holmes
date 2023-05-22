@@ -136,15 +136,17 @@ export async function cleanSomalierFiles() {
 
   let somalierFingerprintRegex = /[.]somalier$/;
   let somalierOutputRegex = /somalier.*tsv$/;
-  allTmpFiles.forEach((d) => {
+
+  for (const d of allTmpFiles) {
     if (
       somalierFingerprintRegex.test(d.name) ||
       somalierOutputRegex.test(d.name)
     ) {
       console.log(`Removing ${d.name} from working directory`);
-      unlink(d.name);
+
+      await unlink(d.name);
     }
-  });
+  }
 }
 
 // 2022-12-20T05:34:07.103Z	30199470-9648-49fd-a66a-3e04c7c8ed69	INFO	stderr OpenBLAS WARNING - could not determine the L2 cache size on this system, assuming 256k

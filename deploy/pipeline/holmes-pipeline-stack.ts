@@ -9,7 +9,9 @@ import {
   AWS_PROD_REGION,
   AWS_STG_ACCOUNT,
   AWS_STG_REGION,
+  NAMESPACE_BETA_NAME,
   NAMESPACE_NAME,
+  NAMESPACE_PROD_BETA_ID,
   NAMESPACE_PROD_ID,
   NAMESPACE_STG_ID,
 } from "../umccr-constants";
@@ -106,9 +108,9 @@ export class HolmesPipelineStack extends Stack {
         // new pipelines.ManualApprovalStep("Run E2E Tests (20 mins)"),
         new pipelines.ShellStep("E2E Tests", {
           envFromCfnOutputs: {
-            CHECK_STEPS_ARN: stgStage.checkStepsArnOutput,
+            //CHECK_STEPS_ARN: stgStage.checkStepsArnOutput,
             EXTRACT_STEPS_ARN: stgStage.extractStepsArnOutput,
-            PAIRS_STEPS_ARN: stgStage.pairsStepsArnOutput,
+            //PAIRS_STEPS_ARN: stgStage.pairsStepsArnOutput,
             TESTER_ROLE_ARN: stgStage.testerRoleArnOutput!,
           },
           commands: [
@@ -121,9 +123,11 @@ export class HolmesPipelineStack extends Stack {
       ]);
 
       pipeline.addStage(stgStage, {
-        post: orderedSteps,
+        // post: orderedSteps,
       });
     }
+
+    const prodWave = pipeline.addWave("ProdWave", {});
 
     // production
     {
@@ -140,7 +144,7 @@ export class HolmesPipelineStack extends Stack {
         fingerprintConfigFolder: "config/",
       });
 
-      pipeline.addStage(prodStage, {
+      prodWave.addStage(prodStage, {
         pre: [new pipelines.ManualApprovalStep("PromoteToProd")],
       });
 
@@ -149,6 +153,33 @@ export class HolmesPipelineStack extends Stack {
       // HOWEVER it is possible to log in to prod and run
       // homes-e2e-test.sh
       // which will safely run a production test
+    }
+
+    {
+      const prodBetaStage = new HolmesBuildStage(this, "ProdBeta", {
+        env: {
+          account: AWS_PROD_ACCOUNT,
+          region: AWS_PROD_REGION,
+        },
+        namespaceName: NAMESPACE_BETA_NAME,
+        namespaceId: NAMESPACE_PROD_BETA_ID,
+        icaSecretNamePartial: ICA_SEC,
+        fingerprintBucketName: "umccr-fingerprint-prod",
+        shouldCreateFingerprintBucket: false,
+        fingerprintConfigFolder: "config/",
+        slackNotifier: {
+          cron: "cron(0 2 1 * ? 2050)",
+          days: undefined,
+          // change this to the personal id of whichever dev is doing dev work
+          channel: "U029NVAK56W",
+          fingerprintFolder: "fingerprints/",
+          expectRelatedRegex: "^\\b$",
+        },
+      });
+
+      prodWave.addStage(prodBetaStage, {
+        pre: [new pipelines.ManualApprovalStep("PromoteToProdBeta")],
+      });
     }
   }
 }

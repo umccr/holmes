@@ -189,7 +189,6 @@ export class HolmesApplicationStack extends Stack {
       fingerprintBucket: fingerprintBucket,
       cmd: ["exists.lambdaHandler"],
       fingerprintConfigFolder: props.fingerprintConfigFolder,
-      extraEnv: {},
     });
 
     const listLambda = new FingerprintLambda(this, "List", {
@@ -198,7 +197,6 @@ export class HolmesApplicationStack extends Stack {
       fingerprintBucket: fingerprintBucket,
       cmd: ["list.lambdaHandler"],
       fingerprintConfigFolder: props.fingerprintConfigFolder,
-      extraEnv: {},
     });
 
     const relateLambda = new FingerprintLambda(this, "Relate", {
@@ -207,7 +205,6 @@ export class HolmesApplicationStack extends Stack {
       fingerprintBucket: fingerprintBucket,
       cmd: ["relate.lambdaHandler"],
       fingerprintConfigFolder: props.fingerprintConfigFolder,
-      extraEnv: {},
     });
 
     const relatexLambda = new FingerprintLambda(this, "Relatex", {
@@ -216,7 +213,6 @@ export class HolmesApplicationStack extends Stack {
       fingerprintBucket: fingerprintBucket,
       cmd: ["relatex.lambdaHandler"],
       fingerprintConfigFolder: props.fingerprintConfigFolder,
-      extraEnv: {},
     });
 
     // the extractor is the only service that needs access to ICA (to download
@@ -237,6 +233,7 @@ export class HolmesApplicationStack extends Stack {
     fingerprintBucket.grantRead(relatexLambda.role);
 
     checkLargeStateMachine.stateMachine.grantStartExecution(checkLambda.role);
+    checkLargeStateMachine.stateMachine.grantRead(checkLambda.role);
 
     /* I don't understand CloudMap - there seems no way for me to import in a namespace that
         already exists... other than providing *all* the details... and a blank arn?? */

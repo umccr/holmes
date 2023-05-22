@@ -14,3 +14,7 @@ export const NAMESPACE_NAME = "umccr";
 
 export const NAMESPACE_STG_ID = "ns-ay2qsv5bi2djv64m";
 export const NAMESPACE_PROD_ID = "ns-z7kktgazzvwokcvz";
+
+export const NAMESPACE_BETA_NAME = "umccr-beta";
+
+export const NAMESPACE_PROD_BETA_ID = "ns-hlituwodcawmhogy";

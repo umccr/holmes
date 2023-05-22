@@ -36,7 +36,10 @@ export async function urlListByRegex(
       }
     }
 
-    if (anyMatched) result.push(url.toString());
+    if (anyMatched) {
+      console.log(s3Object);
+      result.push(url.toString());
+    }
   }
 
   return result;

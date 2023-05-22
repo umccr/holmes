@@ -13,6 +13,11 @@ import { promisify } from "util";
 import { pipeline as pipelineCallback } from "stream";
 import { URL } from "url";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import {
+  DescribeExecutionCommand,
+  SFNClient,
+  StartExecutionCommand,
+} from "@aws-sdk/client-sfn";
 
 const s3Client = new S3Client({});
 
@@ -189,4 +194,108 @@ export async function s3Presign(s3url: string) {
   });
 
   return await getSignedUrl(s3Client, command, { expiresIn: 2 * 60 * 60 });
+}
+
+/**
+ * Execute a steps function and wait for the result (via polling)
+ *
+ * @param stepsClient a AWS SDK client for steps
+ * @param stepsArn the ARN of the steps function to call
+ * @param inp an input JSON object to pass to the steps
+ */
+export async function stepsDoExecution(
+  stepsClient: SFNClient,
+  stepsArn: string,
+  inp: any
+): Promise<any> {
+  try {
+    const stepExecuteResult = await stepsClient.send(
+      new StartExecutionCommand({
+        stateMachineArn: stepsArn,
+        input: JSON.stringify(inp),
+      })
+    );
+
+    if (!stepExecuteResult.executionArn) {
+      console.log(stepExecuteResult);
+      throw new Error("Step failed to execute");
+    }
+
+    let stepResult: any = {};
+
+    while (true) {
+      const execResult = await stepsClient.send(
+        new DescribeExecutionCommand({
+          executionArn: stepExecuteResult.executionArn,
+        })
+      );
+
+      if (execResult.output) {
+        stepResult = JSON.parse(execResult.output);
+      }
+
+      if (execResult.status == "ABORTED" || execResult.status == "FAILED") {
+        console.log(execResult);
+        throw new Error("Unexpected failure status");
+      }
+
+      if (execResult.status != "RUNNING") break;
+
+      // wait a bit then repeat the polling
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+    }
+
+    return stepResult;
+  } catch (e) {
+    console.error(e);
+    throw new Error("Step failed to execute");
+  }
+}
+
+/**
+ * List all the fingerprint files in a bucket and folder.
+ *
+ * @param bucketName
+ * @param fingerprintFolder
+ */
+export async function* s3ListAllFingerprintFiles(
+  bucketName: string,
+  fingerprintFolder: string
+): AsyncGenerator<_Object> {
+  const s3Client = new S3Client({});
+
+  let contToken = undefined;
+
+  do {
+    const data: ListObjectsV2Output = await s3Client.send(
+      new ListObjectsV2Command({
+        Bucket: bucketName,
+        Prefix: fingerprintFolder,
+        ContinuationToken: contToken,
+      })
+    );
+
+    contToken = data.NextContinuationToken;
+
+    for (const file of data.Contents || [])
+      if (file.Key !== fingerprintFolder) yield file;
+  } while (contToken);
+}
+
+export async function s3GetObjectAsJson(
+  bucket: string,
+  key: string
+): Promise<any> {
+  const s3Client = new S3Client({});
+
+  const command = new GetObjectCommand({
+    Bucket: bucket,
+    Key: key,
+  });
+
+  const response = await s3Client.send(command);
+
+  if (response.Body) return JSON.parse(await response.Body.transformToString());
+
+  throw Error("Empty body response from s3GetObjectAsJson");
 }

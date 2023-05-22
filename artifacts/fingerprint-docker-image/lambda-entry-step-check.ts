@@ -117,6 +117,12 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
   // only small areas of the lambda runtime are read/write so we need to make sure we are in a writeable working dir
   chdir(somalierWork);
 
+  // we can theoretically fail a somalier run - and therefore never clean up... and therefore fail
+  // in the future with some extra files left over from a previous run...
+  // I think I saw this in the wild once - well it was the only explanation... so adding
+  // this here for safety
+  await cleanSomalierFiles();
+
   // as we download all the samples into this lambda context we assign them pseudo identifiers (of this count)
   let sampleCount = 0;
 
@@ -181,7 +187,7 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
       ? new RegExp(ev.BatchInput.expectRelatedRegex)
       : new RegExp("^\\b$");
 
-    const matches = await pairsAnalyse(
+    return await pairsAnalyse(
       pairsTsv,
       ev.BatchInput.fingerprintFolder,
       indexSampleIdToFingerprintKeyMap,
@@ -190,16 +196,10 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
       ev.BatchInput.minimumNCount,
       expectRelatedRegex
     );
-
-    await cleanSomalierFiles();
-
-    return matches;
   } else {
     // if due to our exclude regex or bad luck - we ended up with a batch that has no useable
     // fingerprints - then we just return all the index names but without actually running somalier
     // (we don't want to tempt fate with somalier runs of size 0 or 1)
-
-    await cleanSomalierFiles();
 
     const matches: { [url: string]: HolmesReturnType[] } = {};
 

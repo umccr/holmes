@@ -4,13 +4,13 @@ import {
   getBamRelatedGraphsFromExistingMapRun,
   getBamRelatedGraphsFromSuccessFile,
   lambdaResultsToGraph,
-} from "../lib/analyse-relatedness-of-bams";
+} from "../lib/analyse-relatedness-of-bams.xts";
 import { findCheckLarge, getSlackWebClient } from "../lib/common";
 import {
   renderGroupAsFixedFontString,
   reportCommand,
   reportRelated,
-} from "../lib/report-command";
+} from "../lib/report-command.xts";
 import { join } from "node:path";
 import { readFile } from "fs/promises";
 import { sl } from "date-fns/locale";

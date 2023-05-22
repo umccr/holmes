@@ -1,17 +1,5 @@
 import { WebClient } from "@slack/web-api";
 import {
-  _Object,
-  GetObjectCommand,
-  ListObjectsV2Command,
-  ListObjectsV2Output,
-  S3Client,
-} from "@aws-sdk/client-s3";
-import {
-  DescribeExecutionCommand,
-  SFNClient,
-  StartExecutionCommand,
-} from "@aws-sdk/client-sfn";
-import {
   DiscoverInstancesCommand,
   ServiceDiscoveryClient,
 } from "@aws-sdk/client-servicediscovery";
@@ -19,7 +7,6 @@ import {
   GetSecretValueCommand,
   SecretsManagerClient,
 } from "@aws-sdk/client-secrets-manager";
-import { ReadableStream } from "node:stream/web";
 
 export function bucketKeyToUrl(fingerprintFolder: string, key: string) {
   if (!fingerprintFolder.endsWith("/"))
@@ -147,110 +134,6 @@ export function extractLibraryId(url: string): string | undefined {
   // if we DON'T match a single library then we return null and let the caller deal
   if (!libraryMatches || libraryMatches.length < 2) return undefined;
   else return libraryMatches[1];
-}
-
-/**
- * Execute a steps function and wait for the result (via polling)
- *
- * @param stepsClient a AWS SDK client for steps
- * @param stepsArn the ARN of the steps function to call
- * @param inp an input JSON object to pass to the steps
- */
-export async function doStepsExecution(
-  stepsClient: SFNClient,
-  stepsArn: string,
-  inp: any
-): Promise<any> {
-  try {
-    const stepExecuteResult = await stepsClient.send(
-      new StartExecutionCommand({
-        stateMachineArn: stepsArn,
-        input: JSON.stringify(inp),
-      })
-    );
-
-    if (!stepExecuteResult.executionArn) {
-      console.log(stepExecuteResult);
-      throw new Error("Step failed to execute");
-    }
-
-    let stepResult: any = {};
-
-    while (true) {
-      const execResult = await stepsClient.send(
-        new DescribeExecutionCommand({
-          executionArn: stepExecuteResult.executionArn,
-        })
-      );
-
-      if (execResult.output) {
-        stepResult = JSON.parse(execResult.output);
-      }
-
-      if (execResult.status == "ABORTED" || execResult.status == "FAILED") {
-        console.log(execResult);
-        throw new Error("Unexpected failure status");
-      }
-
-      if (execResult.status != "RUNNING") break;
-
-      // wait a bit then repeat the polling
-      await new Promise((resolve) => setTimeout(resolve, 5000));
-    }
-
-    return stepResult;
-  } catch (e) {
-    console.error(e);
-    throw new Error("Step failed to execute");
-  }
-}
-
-/**
- * List all the fingerprint files in a bucket for a given sites file (identified by
- * its checksum).
- *
- * @param bucketName
- * @param fingerprintFolder
- */
-export async function* s3ListAllFingerprintFiles(
-  bucketName: string,
-  fingerprintFolder: string
-): AsyncGenerator<_Object> {
-  const s3Client = new S3Client({});
-
-  let contToken = undefined;
-
-  do {
-    const data: ListObjectsV2Output = await s3Client.send(
-      new ListObjectsV2Command({
-        Bucket: bucketName,
-        Prefix: fingerprintFolder,
-        ContinuationToken: contToken,
-      })
-    );
-
-    contToken = data.NextContinuationToken;
-
-    for (const file of data.Contents || []) yield file;
-  } while (contToken);
-}
-
-export async function s3GetObjectAsJson(
-  bucket: string,
-  key: string
-): Promise<any> {
-  const s3Client = new S3Client({});
-
-  const command = new GetObjectCommand({
-    Bucket: bucket,
-    Key: key,
-  });
-
-  const response = await s3Client.send(command);
-
-  if (response.Body) return JSON.parse(await response.Body.transformToString());
-
-  throw Error("Empty body response from s3GetObjectAsJson");
 }
 
 // another piece of functionality - read a set of URIs from a file and print every one that doesn't exist

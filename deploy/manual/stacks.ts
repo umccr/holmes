@@ -19,7 +19,8 @@ new HolmesApplicationStack(app, "HolmesLocalDevTestStack", {
     account: AWS_DEV_ACCOUNT,
     region: AWS_DEV_REGION,
   },
-  fingerprintBucketName: "umccr-fingerprint-local-dev-test",
+  fingerprintBucketName: "umccr-fingerprint-prod",
+  // fingerprintBucketName: "umccr-fingerprint-local-dev-test",
   shouldCreateFingerprintBucket: false,
   fingerprintConfigFolder: "config/",
   slackNotifier: {
@@ -27,6 +28,7 @@ new HolmesApplicationStack(app, "HolmesLocalDevTestStack", {
     days: undefined,
     // change this to the personal id of whichever dev is doing dev work
     channel: "U029NVAK56W",
+    // fingerprintFolder: "fingerprints-test-bc13669e6503cdd3ab0ec7cef47a5b950968a02d/",
     fingerprintFolder: "fingerprints/",
     expectRelatedRegex: "^\\b$",
   },

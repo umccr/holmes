@@ -1,4 +1,3 @@
-import { groupingCommand } from "./lib/grouping-command";
 import { getSlackWebClient } from "./lib/common";
 
 /**

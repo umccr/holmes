@@ -6,9 +6,9 @@ import { HolmesApplicationStack } from "../../workload-holmes/holmes-application
 export class HolmesBuildStage extends Stage {
   // the output Steps function that is created - useful here for pipeline testing
   // (this is also registered into CloudMap for more general use)
-  public readonly checkStepsArnOutput: CfnOutput;
+  //public readonly checkStepsArnOutput: CfnOutput;
   public readonly extractStepsArnOutput: CfnOutput;
-  public readonly pairsStepsArnOutput: CfnOutput;
+  //public readonly pairsStepsArnOutput: CfnOutput;
   public readonly testerRoleArnOutput?: CfnOutput;
 
   constructor(
@@ -22,9 +22,9 @@ export class HolmesBuildStage extends Stage {
 
     Tags.of(stack).add("Stack", TAG_STACK_VALUE);
 
-    this.checkStepsArnOutput = stack.checkStepsArnOutput;
+    //this.checkStepsArnOutput = stack.checkStepsArnOutput;
     this.extractStepsArnOutput = stack.extractStepsArnOutput;
-    this.pairsStepsArnOutput = stack.pairsStepsArnOutput;
+    //this.pairsStepsArnOutput = stack.pairsStepsArnOutput;
     this.testerRoleArnOutput = stack.testerRoleArnOutput;
   }
 }

@@ -95,19 +95,19 @@ export const handler = async (event: any) => {
 
   if (o.text.includes("help"))
     return {
-      response_type: "in_channel",
+      response_type: "ephemeral",
       blocks: [
         {
           type: "section",
           text: {
             type: "mrkdwn",
             text: `
-/fingerprint
- check bamurl [...bamurl] "report threshold relatedness of the given URLs against the fingerprint database"
- exists bamurl [...bamurl] "report the existence of fingerprints for the given URLs"
- relate bamurl [...bamurl] "report all relatedness of the given URLs against each other (max ${25})"
- relatex re [...re] "report all relatedness of the URLs matching any RE against each other (max ${25})"
- help "this help"
+\`/fingerprint\`
+   \`check url [...url]\` report threshold relatedness of the given BAM URLs against the fingerprint database
+   \`listx re [..re]\` return a list of fingerprints with BAM URLS matching any RE
+   \`relate url [...url]\` report all relatedness of the given BAM URLs against each other (max ${25})
+   \`relatex re [...re]\` report all relatedness of the BAM URLs matching any RE against each other (max ${25})
+   \`help\` this help
             `,
           },
         },
@@ -125,12 +125,13 @@ export const handler = async (event: any) => {
     if (item.startsWith("gds://") || item.startsWith("s3://")) urls.push(item);
   }
 
+  console.log(splitText);
   console.log(urls);
 
   switch (splitText[0]) {
-    case "exists":
+    case "check":
       command = new InvokeCommand({
-        FunctionName: process.env["LAMBDA_EXISTS_ARN"],
+        FunctionName: process.env["LAMBDA_CHECK_ARN"],
         InvocationType: "Event",
         Payload: Buffer.from(
           JSON.stringify({
@@ -143,7 +144,20 @@ export const handler = async (event: any) => {
       });
       break;
 
-    case "list":
+    case "listx":
+      // before even invoking our list lambda - we try to catch any input that won't be a regexp
+      // and instead immediately return an error response
+      let currentListxR = "";
+      try {
+        for (currentListxR of splitText.slice(1)) {
+          new RegExp(currentListxR);
+        }
+      } catch (e) {
+        return {
+          response_type: "ephemeral",
+          text: `Sorry, Slack command 'listx' failed because input ${currentListxR} could not be interpreted as a regular expression`,
+        };
+      }
       command = new InvokeCommand({
         FunctionName: process.env["LAMBDA_LIST_ARN"],
         InvocationType: "Event",
@@ -174,6 +188,19 @@ export const handler = async (event: any) => {
       break;
 
     case "relatex":
+      // before even invoking our list lambda - we try to catch any input that won't be a regexp
+      // and instead immediately return an error response
+      let currentRelatexR = "";
+      try {
+        for (currentRelatexR of splitText.slice(1)) {
+          new RegExp(currentRelatexR);
+        }
+      } catch (e) {
+        return {
+          response_type: "ephemeral",
+          text: `Sorry, Slack command 'relatex' failed because input ${currentRelatexR} could not be interpreted as a regular expression`,
+        };
+      }
       command = new InvokeCommand({
         FunctionName: process.env["LAMBDA_RELATEX_ARN"],
         InvocationType: "Event",

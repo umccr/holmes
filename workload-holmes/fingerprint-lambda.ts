@@ -22,7 +22,7 @@ type Props = {
 
   cmd: string[];
 
-  extraEnv: {
+  extraEnv?: {
     [k: string]: string;
   };
 };
@@ -83,7 +83,9 @@ export class FingerprintLambda extends Construct {
         tagOrDigest: this.props.dockerImageAsset.assetHash,
         cmd: this.props.cmd,
       }),
-      environment: { ...standardEnv(this.props), ...this.props.extraEnv },
+      environment: this.props.extraEnv
+        ? { ...standardEnv(this.props), ...this.props.extraEnv }
+        : standardEnv(this.props),
     });
   }
 }
