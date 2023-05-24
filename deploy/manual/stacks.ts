@@ -19,17 +19,19 @@ new HolmesApplicationStack(app, "HolmesLocalDevTestStack", {
     account: AWS_DEV_ACCOUNT,
     region: AWS_DEV_REGION,
   },
-  fingerprintBucketName: "umccr-fingerprint-prod",
-  // fingerprintBucketName: "umccr-fingerprint-local-dev-test",
+  fingerprintBucketName: "umccr-fingerprint-local-dev-test",
   shouldCreateFingerprintBucket: false,
   fingerprintConfigFolder: "config/",
   slackNotifier: {
-    cron: "cron(0 2 1 * ? *)",
+    cron: "cron(0 17 ? * * *)",
     days: undefined,
     // change this to the personal id of whichever dev is doing dev work
-    channel: "U029NVAK56W",
+    channel: "C058W0G54H2",
     // fingerprintFolder: "fingerprints-test-bc13669e6503cdd3ab0ec7cef47a5b950968a02d/",
-    fingerprintFolder: "fingerprints/",
-    expectRelatedRegex: "^\\b$",
+    fingerprintFolder: "fingerprints-prod/",
+    // the default settings to use for all our Slack interactions with the API/lambdas
+    relatednessThreshold: 0.8,
+    minimumNCount: 50,
+    expectRelatedRegex: "^.*SBJ(\\d\\d\\d\\d\\d).*$",
   },
 });

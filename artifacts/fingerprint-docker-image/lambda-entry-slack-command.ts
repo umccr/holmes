@@ -1,6 +1,8 @@
 import * as crypto from "crypto";
-import { getSlackSigningSecret } from "./lib/common";
-import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
+import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
+import { MAX_RELATE } from "./limits";
+import { getFromEnv } from "./env";
+import { getSlackSigningSecret } from "./lib/slack";
 
 /**
  * A handler that gets called as a result of a Slack hook
@@ -11,7 +13,7 @@ import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
  *
  * @param event
  */
-export const handler = async (event: any) => {
+export const lambdaHandler = async (event: any) => {
   // we could probably use a proper serverless lambda <-> HTTP handler here - but
   // then we'd need to use Fastify/express etc
   // our needs are so simple we've just done it manually for the moment
@@ -53,11 +55,15 @@ export const handler = async (event: any) => {
   console.log(`calculated signature = ${expectedSignature}`);
   console.log(`header signature from Slack = ${requestSignature}`);
 
-  if (expectedSignature !== requestSignature)
+  if (expectedSignature !== requestSignature) {
+    // NOTE we don't return a Slack message because this state means we did not get a valid
+    // signed Slack request - so we can't trust anything
     throw new Error(
       "Slack signature mismatch - see CloudWatch logs for details"
     );
+  }
 
+  // convert the incoming URL params into an object
   const params = new URLSearchParams(bodyString);
 
   // example from docs
@@ -93,7 +99,11 @@ export const handler = async (event: any) => {
   // log all the inputs
   console.log(JSON.stringify(o));
 
-  if (o.text.includes("help"))
+  // break up the input text by whitespace... though we note that various Slack formatting (```, ** etc)
+  // can come through unintentionally if the person uses styles - and possibly we want to strip that off too?
+  const textSplit = o.text.split(/\s+/);
+
+  if (o.text.includes("help") || textSplit.length < 1)
     return {
       response_type: "ephemeral",
       blocks: [
@@ -103,53 +113,47 @@ export const handler = async (event: any) => {
             type: "mrkdwn",
             text: `
 \`/fingerprint\`
-   \`check url [...url]\` report threshold relatedness of the given BAM URLs against the fingerprint database
-   \`listx re [..re]\` return a list of fingerprints with BAM URLS matching any RE
-   \`relate url [...url]\` report all relatedness of the given BAM URLs against each other (max ${25})
-   \`relatex re [...re]\` report all relatedness of the BAM URLs matching any RE against each other (max ${25})
-   \`help\` this help
+     \`listx <re> [<re>...]\` return a list of fingerprints with BAM URLs matching any RE
+     \`checkx <re> [<re>...]\` report threshold relatedness of the BAM URLs matching any RE against the fingerprint database
+     \`relatex <re> [<re>...]\` report all relatedness of the BAM URLs matching any RE against each other (max ${MAX_RELATE})
+     \`check <url> [<url>...]\` report threshold relatedness of the given BAM URLs against the fingerprint database
+     \`relate <url> [<url>...]\` report all relatedness of the given BAM URLs against each other (max ${MAX_RELATE})
+     \`help\` this help
             `,
           },
         },
       ],
     };
 
-  const client = new LambdaClient({});
+  // the sub command is the actual thing they want to do with the fingerprint service
+  const subCommand = textSplit[0].toLowerCase().trim();
 
-  let command: InvokeCommand;
+  // the sub command args are all the trailing text after the sub command
+  const subCommandArgs = textSplit.slice(1);
 
-  const splitText = o.text.split(/\s+/);
-  const urls: string[] = [];
+  // because we can identify URLs we can be slightly more permissive on the URLs and only select know URI formats
+  const subCommandArgsIfUrls: string[] = [];
 
-  for (const item of splitText.slice(1)) {
-    if (item.startsWith("gds://") || item.startsWith("s3://")) urls.push(item);
+  for (const item of subCommandArgs) {
+    if (item.startsWith("gds://") || item.startsWith("s3://"))
+      subCommandArgsIfUrls.push(item);
   }
 
-  console.log(splitText);
-  console.log(urls);
+  console.log(subCommand);
+  console.log(subCommandArgs);
+  console.log(subCommandArgsIfUrls);
 
-  switch (splitText[0]) {
-    case "check":
-      command = new InvokeCommand({
-        FunctionName: process.env["LAMBDA_CHECK_ARN"],
-        InvocationType: "Event",
-        Payload: Buffer.from(
-          JSON.stringify({
-            slackResponseUrl: o.response_url,
-            channelId: o.channel_id,
-            fingerprintFolder: process.env["FINGERPRINT_FOLDER"],
-            indexes: urls,
-          })
-        ),
-      });
-      break;
+  const client = new LambdaClient({});
 
+  let lambdaCommand: InvokeCommand;
+
+  switch (subCommand) {
     case "listx":
       // before even invoking our list lambda - we try to catch any input that won't be a regexp
       // and instead immediately return an error response
       let currentListxR = "";
       try {
-        for (currentListxR of splitText.slice(1)) {
+        for (currentListxR of subCommandArgs) {
           new RegExp(currentListxR);
         }
       } catch (e) {
@@ -158,41 +162,52 @@ export const handler = async (event: any) => {
           text: `Sorry, Slack command 'listx' failed because input ${currentListxR} could not be interpreted as a regular expression`,
         };
       }
-      command = new InvokeCommand({
+      lambdaCommand = new InvokeCommand({
         FunctionName: process.env["LAMBDA_LIST_ARN"],
         InvocationType: "Event",
         Payload: Buffer.from(
           JSON.stringify({
-            slackResponseUrl: o.response_url,
+            ...getFromEnv(),
             channelId: o.channel_id,
-            fingerprintFolder: process.env["FINGERPRINT_FOLDER"],
-            regexes: splitText.slice(1),
+            regexes: subCommandArgs,
           })
         ),
       });
       break;
 
-    case "relate":
-      command = new InvokeCommand({
-        FunctionName: process.env["LAMBDA_RELATE_ARN"],
+    case "checkx":
+      // before even invoking our relatex lambda - we try to catch any input that won't be a regexp
+      // and instead immediately return an error response
+      let currentCheckxR = "";
+      try {
+        for (currentCheckxR of subCommandArgs) {
+          new RegExp(currentCheckxR);
+        }
+      } catch (e) {
+        return {
+          response_type: "ephemeral",
+          text: `Sorry, Slack command 'checkx' failed because input ${currentCheckxR} could not be interpreted as a regular expression`,
+        };
+      }
+      lambdaCommand = new InvokeCommand({
+        FunctionName: process.env["LAMBDA_CHECKX_ARN"],
         InvocationType: "Event",
         Payload: Buffer.from(
           JSON.stringify({
-            slackResponseUrl: o.response_url,
+            ...getFromEnv(),
             channelId: o.channel_id,
-            fingerprintFolder: process.env["FINGERPRINT_FOLDER"],
-            indexes: urls,
+            regexes: subCommandArgs,
           })
         ),
       });
       break;
 
     case "relatex":
-      // before even invoking our list lambda - we try to catch any input that won't be a regexp
+      // before even invoking our relatex lambda - we try to catch any input that won't be a regexp
       // and instead immediately return an error response
       let currentRelatexR = "";
       try {
-        for (currentRelatexR of splitText.slice(1)) {
+        for (currentRelatexR of subCommandArgs) {
           new RegExp(currentRelatexR);
         }
       } catch (e) {
@@ -201,34 +216,73 @@ export const handler = async (event: any) => {
           text: `Sorry, Slack command 'relatex' failed because input ${currentRelatexR} could not be interpreted as a regular expression`,
         };
       }
-      command = new InvokeCommand({
+      lambdaCommand = new InvokeCommand({
         FunctionName: process.env["LAMBDA_RELATEX_ARN"],
         InvocationType: "Event",
         Payload: Buffer.from(
           JSON.stringify({
-            slackResponseUrl: o.response_url,
+            ...getFromEnv(),
             channelId: o.channel_id,
-            fingerprintFolder: process.env["FINGERPRINT_FOLDER"],
-            regexes: splitText.slice(1),
+            regexes: subCommandArgs,
+          })
+        ),
+      });
+      break;
+
+    case "check":
+      lambdaCommand = new InvokeCommand({
+        FunctionName: process.env["LAMBDA_CHECK_ARN"],
+        InvocationType: "Event",
+        Payload: Buffer.from(
+          JSON.stringify({
+            ...getFromEnv(),
+            channelId: o.channel_id,
+            indexes: subCommandArgsIfUrls,
+          })
+        ),
+      });
+      break;
+
+    case "relate":
+      lambdaCommand = new InvokeCommand({
+        FunctionName: process.env["LAMBDA_RELATE_ARN"],
+        InvocationType: "Event",
+        Payload: Buffer.from(
+          JSON.stringify({
+            ...getFromEnv(),
+            channelId: o.channel_id,
+            indexes: subCommandArgsIfUrls,
           })
         ),
       });
       break;
 
     default:
-      throw new Error(`Unknown command ${splitText[0]}`);
+      return {
+        response_type: "ephemeral",
+        text: `Sorry, Slack sub-command \`${subCommand}\` was not understood by the Holmes \`${o.command}\` bot`,
+      };
   }
 
-  const response = await client.send(command);
+  // because we have only 3 seconds to response to a Slack message - we need to asynchronously invoke
+  // the subsequent lambda and just let it post back the response
+  const response = await client.send(lambdaCommand);
 
   console.log(response);
 
+  // so we return nothing (of note) back in the 3 seconds - other than a plain result which lets it know it worked
   return {
     response_type: "in_channel",
+    // our check commands are a bit slower than the others so we send back more info..
+    text: subCommand.startsWith("check")
+      ? "May take up to 30 seconds..."
+      : undefined,
   };
 };
 
 /*
+THE DUMP OF AN INCOMING RAW SLACK SLACK MESSAGE VIA LAMBDA FUNCTIONS
+
 2023-01-30T06:34:53.733Z	b7634aa7-a9ec-4496-a918-2322d5c71198	INFO	{
   version: '2.0',
   routeKey: '$default',

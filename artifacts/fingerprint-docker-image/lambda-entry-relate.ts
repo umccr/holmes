@@ -1,19 +1,11 @@
 import { chdir } from "process";
-import { URL } from "url";
 import { somalierWork } from "./lib/env";
-import { urlToKey } from "./lib/aws";
 import {
   cleanSomalierFiles,
-  downloadAndCorrectFingerprint,
   runSomalierRelate,
 } from "./lib/somalier-download-run-clean";
 import { somalierTsvCorrectIds } from "./lib/somalier-tsv-correct-ids";
-import { reportExists } from "./lib/report-exists";
-import {
-  getSlackChanneller,
-  getSlackResponder,
-  getSlackTextAttacher,
-} from "./lib/slack";
+import { getSlackTextAttacher } from "./lib/slack";
 import { reportRelate } from "./lib/report-relate";
 import { downloadIndexSamples } from "./lib/ids";
 
@@ -69,7 +61,7 @@ export const lambdaHandler = async (ev: EventInput, _context: any) => {
 
   if (ev.channelId) {
     const responder = await getSlackTextAttacher(ev.channelId);
-    const report = reportRelate(fixedSamplesTsv, fixedPairsTsv);
+    const report = await reportRelate(fixedSamplesTsv, fixedPairsTsv);
 
     await responder(report);
   }

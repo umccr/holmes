@@ -68,14 +68,34 @@ export interface HolmesSettings {
      */
     readonly days?: number;
 
-    /**
-     * The specific folder to look into for new fingerprints to report
-     */
-    readonly fingerprintFolder?: string;
+    // The following are settings that are normally API parameters to the lambdads - but we do not
+    // give our Slack users a chance to set these (should we?)
+    // So anyhow they have to be baked in at this config level
 
     /**
-     * The regex rule to apply
+     * The specific folder to look into for new fingerprints to report for Slack
      */
+    readonly fingerprintFolder: string;
+
+    /**
+     * The relatedness threshold to report against for Slack
+     */
+    readonly relatednessThreshold: number;
+
+    /**
+     * A minimum N count that we need to meet to report against for Slack
+     */
+    readonly minimumNCount: number;
+
+    /**
+     * if present a regex that is matched to BAM filenames (i.e. not against the hex encoded keys)
+     * and tells us to exclude them from sending to "somalier relate"
+     */
+    readonly excludeRegex?: string;
+
+    // if present a regex that generates match groups - and expects all fingerprints with group matches
+    // to the index - to also be 'related' genomically.. this is used to detect fingerprints that *should*
+    // be related but come back not related
     readonly expectRelatedRegex?: string;
   };
 }

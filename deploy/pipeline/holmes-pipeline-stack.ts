@@ -127,8 +127,6 @@ export class HolmesPipelineStack extends Stack {
       });
     }
 
-    const prodWave = pipeline.addWave("ProdWave", {});
-
     // production
     {
       const prodStage = new HolmesBuildStage(this, "Prod", {
@@ -144,7 +142,7 @@ export class HolmesPipelineStack extends Stack {
         fingerprintConfigFolder: "config/",
       });
 
-      prodWave.addStage(prodStage, {
+      pipeline.addStage(prodStage, {
         pre: [new pipelines.ManualApprovalStep("PromoteToProd")],
       });
 
@@ -153,33 +151,6 @@ export class HolmesPipelineStack extends Stack {
       // HOWEVER it is possible to log in to prod and run
       // homes-e2e-test.sh
       // which will safely run a production test
-    }
-
-    {
-      const prodBetaStage = new HolmesBuildStage(this, "ProdBeta", {
-        env: {
-          account: AWS_PROD_ACCOUNT,
-          region: AWS_PROD_REGION,
-        },
-        namespaceName: NAMESPACE_BETA_NAME,
-        namespaceId: NAMESPACE_PROD_BETA_ID,
-        icaSecretNamePartial: ICA_SEC,
-        fingerprintBucketName: "umccr-fingerprint-prod",
-        shouldCreateFingerprintBucket: false,
-        fingerprintConfigFolder: "config/",
-        slackNotifier: {
-          cron: "cron(0 2 1 * ? 2050)",
-          days: undefined,
-          // change this to the personal id of whichever dev is doing dev work
-          channel: "U029NVAK56W",
-          fingerprintFolder: "fingerprints/",
-          expectRelatedRegex: "^\\b$",
-        },
-      });
-
-      prodWave.addStage(prodBetaStage, {
-        pre: [new pipelines.ManualApprovalStep("PromoteToProdBeta")],
-      });
     }
   }
 }

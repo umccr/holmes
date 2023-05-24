@@ -15,8 +15,7 @@ type EventInput = {
 };
 
 /**
- * A lambda which checks for the existence of fingerprints corresponding to the input
- * BAM urls.
+ * A lambda which lists URLS and dates of fingerprints that match the regexes passed in.
  *
  * @param ev
  * @param _context
@@ -41,7 +40,10 @@ export const lambdaHandler = async (ev: EventInput, _context: any) => {
   if (ev.channelId) {
     const responder = await getSlackTextAttacher(ev.channelId);
     const report = await reportList(urls);
-    await responder(report);
+    await responder(
+      report,
+      `Fingerprint listx report for ${ev.regexes.join(" | ")}`
+    );
   }
 
   return urls;

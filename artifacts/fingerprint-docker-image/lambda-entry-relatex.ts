@@ -59,7 +59,7 @@ but your regex has matched ${indexes.length}`
   }
 
   const indexSampleIdToBamUrlMap = await downloadIndexSamples(
-    indexes,
+    indexes.map((i) => i.url),
     ev.fingerprintFolder
   );
 
@@ -84,7 +84,10 @@ but your regex has matched ${indexes.length}`
   if (ev.channelId) {
     const responder = await getSlackTextAttacher(ev.channelId);
     const report = await reportRelate(fixedSamplesTsv, fixedPairsTsv);
-    await responder(report);
+    await responder(
+      report,
+      `Fingerprint relatex report for ${ev.regexes.join(" | ")}`
+    );
   }
 
   return {

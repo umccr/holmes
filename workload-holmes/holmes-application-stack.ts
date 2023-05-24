@@ -1,6 +1,7 @@
 import * as path from "path";
 import {
   CfnOutput,
+  CfnResource,
   Duration,
   RemovalPolicy,
   Stack,
@@ -18,7 +19,10 @@ import { Cluster } from "aws-cdk-lib/aws-ecs";
 import { SomalierExtractStateMachineConstruct } from "./somalier-extract-state-machine-construct";
 import {
   AccountPrincipal,
+  Effect,
   ManagedPolicy,
+  PolicyDocument,
+  PolicyStatement,
   Role,
   ServicePrincipal,
 } from "aws-cdk-lib/aws-iam";
@@ -28,8 +32,6 @@ import {
   DockerImageFunction,
   FunctionUrlAuthType,
 } from "aws-cdk-lib/aws-lambda";
-import { Rule, Schedule } from "aws-cdk-lib/aws-events";
-import { LambdaFunction } from "aws-cdk-lib/aws-events-targets";
 import { FingerprintLambda } from "./fingerprint-lambda";
 
 /**
@@ -39,12 +41,11 @@ import { FingerprintLambda } from "./fingerprint-lambda";
 export class HolmesApplicationStack extends Stack {
   // the output Steps functions we create (are also registered into CloudMap)
   // we output this here so it can be used in the codepipeline build for testing
-  //public readonly checkStepsArnOutput: CfnOutput;
   public readonly checkLargeStepsArnOutput: CfnOutput;
   public readonly extractStepsArnOutput: CfnOutput;
 
   public readonly checkLambdaArnOutput: CfnOutput;
-  public readonly existsLambdaArnOutput: CfnOutput;
+  public readonly checkxLambdaArnOutput: CfnOutput;
   public readonly listLambdaArnOutput: CfnOutput;
   public readonly relateLambdaArnOutput: CfnOutput;
   public readonly relatexLambdaArnOutput: CfnOutput;
@@ -123,32 +124,30 @@ export class HolmesApplicationStack extends Stack {
     }
 
     // the Docker asset shared by all steps
-    const dockerImageFolder = path.join(
+    const fingerprintDockerImageFolder = path.join(
       __dirname,
       "..",
       "artifacts",
       "fingerprint-docker-image"
     );
 
-    const asset = new DockerImageAsset(this, "FingerprintDockerImage", {
-      directory: dockerImageFolder,
-      buildArgs: {},
-    });
+    const fingerprintDockerImageAsset = new DockerImageAsset(
+      this,
+      "FingerprintDockerImage",
+      {
+        directory: fingerprintDockerImageFolder,
+        buildArgs: {},
+      }
+    );
 
     const stateProps = {
-      dockerImageAsset: asset,
+      dockerImageAsset: fingerprintDockerImageAsset,
       icaSecret: icaSecret,
       fingerprintBucket: fingerprintBucket,
       fargateCluster: cluster,
       allowExecutionByTesterRole: testerRole,
       ...props,
     };
-
-    //const checkStateMachine = new SomalierCheckStateMachineConstruct(
-    //  this,
-    //  "SomalierCheck",
-    //  stateProps
-    //);
 
     const checkLargeStateMachine = new SomalierCheckStateMachineConstruct(
       this,
@@ -172,7 +171,7 @@ export class HolmesApplicationStack extends Stack {
     );
 
     const checkLambda = new FingerprintLambda(this, "Check", {
-      dockerImageAsset: asset,
+      dockerImageAsset: fingerprintDockerImageAsset,
       icaSecret: icaSecret,
       fingerprintBucket: fingerprintBucket,
       cmd: ["check.lambdaHandler"],
@@ -183,24 +182,29 @@ export class HolmesApplicationStack extends Stack {
       },
     });
 
-    const existsLambda = new FingerprintLambda(this, "Exists", {
-      dockerImageAsset: asset,
+    const checkxLambda = new FingerprintLambda(this, "Checkx", {
+      dockerImageAsset: fingerprintDockerImageAsset,
       icaSecret: icaSecret,
       fingerprintBucket: fingerprintBucket,
-      cmd: ["exists.lambdaHandler"],
+      cmd: ["checkx.lambdaHandler"],
       fingerprintConfigFolder: props.fingerprintConfigFolder,
+      extraEnv: {
+        // the check lambda needs to launch and process the Check Steps Machine (note we share the Steps between
+        // both check and checkx)
+        CHECK_STEPS_ARN: checkLargeStateMachine.stepsArn,
+      },
     });
 
     const listLambda = new FingerprintLambda(this, "List", {
-      dockerImageAsset: asset,
+      dockerImageAsset: fingerprintDockerImageAsset,
       icaSecret: icaSecret,
       fingerprintBucket: fingerprintBucket,
-      cmd: ["list.lambdaHandler"],
+      cmd: ["listx.lambdaHandler"],
       fingerprintConfigFolder: props.fingerprintConfigFolder,
     });
 
     const relateLambda = new FingerprintLambda(this, "Relate", {
-      dockerImageAsset: asset,
+      dockerImageAsset: fingerprintDockerImageAsset,
       icaSecret: icaSecret,
       fingerprintBucket: fingerprintBucket,
       cmd: ["relate.lambdaHandler"],
@@ -208,7 +212,7 @@ export class HolmesApplicationStack extends Stack {
     });
 
     const relatexLambda = new FingerprintLambda(this, "Relatex", {
-      dockerImageAsset: asset,
+      dockerImageAsset: fingerprintDockerImageAsset,
       icaSecret: icaSecret,
       fingerprintBucket: fingerprintBucket,
       cmd: ["relatex.lambdaHandler"],
@@ -227,13 +231,16 @@ export class HolmesApplicationStack extends Stack {
 
     // the lambdas just read
     fingerprintBucket.grantRead(checkLambda.role);
-    fingerprintBucket.grantRead(existsLambda.role);
+    fingerprintBucket.grantRead(checkxLambda.role);
     fingerprintBucket.grantRead(listLambda.role);
     fingerprintBucket.grantRead(relateLambda.role);
     fingerprintBucket.grantRead(relatexLambda.role);
 
     checkLargeStateMachine.stateMachine.grantStartExecution(checkLambda.role);
     checkLargeStateMachine.stateMachine.grantRead(checkLambda.role);
+
+    checkLargeStateMachine.stateMachine.grantStartExecution(checkxLambda.role);
+    checkLargeStateMachine.stateMachine.grantRead(checkxLambda.role);
 
     /* I don't understand CloudMap - there seems no way for me to import in a namespace that
         already exists... other than providing *all* the details... and a blank arn?? */
@@ -257,7 +264,7 @@ export class HolmesApplicationStack extends Stack {
       customAttributes: {
         extractStepsArn: extractStateMachine.stepsArn,
         checkLambdaArn: checkLambda.dockerImageFunction.functionArn,
-        existsLambdaArn: existsLambda.dockerImageFunction.functionArn,
+        checkxLambdaArn: checkxLambda.dockerImageFunction.functionArn,
         listLambdaArn: listLambda.dockerImageFunction.functionArn,
         relateLambdaArn: relateLambda.dockerImageFunction.functionArn,
         relatexLambdaArn: relatexLambda.dockerImageFunction.functionArn,
@@ -282,8 +289,8 @@ export class HolmesApplicationStack extends Stack {
       value: checkLambda.dockerImageFunction.functionArn,
     });
 
-    this.existsLambdaArnOutput = new CfnOutput(this, "ExistsLambdaArn", {
-      value: existsLambda.dockerImageFunction.functionArn,
+    this.checkxLambdaArnOutput = new CfnOutput(this, "CheckxLambdaArn", {
+      value: checkxLambda.dockerImageFunction.functionArn,
     });
 
     this.listLambdaArnOutput = new CfnOutput(this, "ListLambdaArn", {
@@ -313,7 +320,7 @@ export class HolmesApplicationStack extends Stack {
       ];
 
       slackSecret.grantRead(checkLambda.role);
-      slackSecret.grantRead(existsLambda.role);
+      slackSecret.grantRead(checkxLambda.role);
       slackSecret.grantRead(listLambda.role);
       slackSecret.grantRead(relateLambda.role);
       slackSecret.grantRead(relatexLambda.role);
@@ -330,28 +337,21 @@ export class HolmesApplicationStack extends Stack {
         );
       });
 
-      const cronReportDockerImageFolder = path.join(
-        __dirname,
-        "..",
-        "artifacts",
-        "cron-report-docker-image"
-      );
-
-      const cronReportDockerImageAsset = new DockerImageAsset(
-        this,
-        "DockerImage",
-        {
-          directory: cronReportDockerImageFolder,
-          buildArgs: {},
-        }
-      );
-
       const env: any = {
-        BUCKET: fingerprintBucket.bucketName,
         CHANNEL: props.slackNotifier.channel,
+        FINGERPRINT_BUCKET_NAME: fingerprintBucket.bucketName,
         FINGERPRINT_FOLDER: props.slackNotifier.fingerprintFolder,
-        EXPECT_RELATED_REGEX: props.slackNotifier.expectRelatedRegex,
+        RELATEDNESS_THRESHOLD:
+          props.slackNotifier.relatednessThreshold.toString(),
+        MINIMUM_N_COUNT: props.slackNotifier.minimumNCount.toString(),
+        LAMBDA_CHECKX_ARN: checkxLambda.dockerImageFunction.functionArn,
       };
+
+      if (props.slackNotifier.excludeRegex)
+        env["EXCLUDE_REGEX"] = props.slackNotifier?.excludeRegex;
+
+      if (props.slackNotifier.expectRelatedRegex)
+        env["EXPECT_RELATED_REGEX"] = props.slackNotifier?.expectRelatedRegex;
 
       if (props.slackNotifier.days) {
         env["DAYS"] = props.slackNotifier.days.toString();
@@ -363,14 +363,14 @@ export class HolmesApplicationStack extends Stack {
           this,
           `ScheduledGroupFunction`,
           {
-            memorySize: 2048,
-            timeout: Duration.minutes(14),
+            memorySize: 512,
+            timeout: Duration.seconds(30),
             architecture: Architecture.X86_64,
             code: DockerImageCode.fromEcr(
-              cronReportDockerImageAsset.repository,
+              fingerprintDockerImageAsset.repository,
               {
-                cmd: ["entrypoint-event-lambda.handler"],
-                tagOrDigest: cronReportDockerImageAsset.assetHash,
+                cmd: ["scheduler-event.lambdaHandler"],
+                tagOrDigest: fingerprintDockerImageAsset.assetHash,
               }
             ),
             role: lambdaRole,
@@ -378,82 +378,108 @@ export class HolmesApplicationStack extends Stack {
           }
         );
 
-        const eventRule = new Rule(this, "ScheduleRule", {
-          schedule: Schedule.expression(props.slackNotifier.cron),
+        const schedulerRole = new Role(this, "SchedulerRole", {
+          assumedBy: new ServicePrincipal("scheduler.amazonaws.com"),
+          inlinePolicies: {
+            allowInvokePolicy: new PolicyDocument({
+              statements: [
+                new PolicyStatement({
+                  actions: ["lambda:InvokeFunction"],
+                  resources: [eventFunc.functionArn],
+                  effect: Effect.ALLOW,
+                }),
+              ],
+            }),
+          },
         });
 
-        eventRule.addTarget(new LambdaFunction(eventFunc));
+        const syncScheduler = new CfnResource(this, "DailyScheduler", {
+          type: "AWS::Scheduler::Schedule",
+          properties: {
+            Description:
+              "Schedules a daily examination of the previous days sequencing fingerprints",
+            FlexibleTimeWindow: {
+              Mode: "FLEXIBLE",
+              MaximumWindowInMinutes: 60,
+            },
+            ScheduleExpression: props.slackNotifier.cron,
+            ScheduleExpressionTimezone: "Australia/Melbourne",
+            Target: {
+              Arn: eventFunc.functionArn,
+              RoleArn: schedulerRole.roleArn,
+              Input: JSON.stringify({}),
+            },
+          },
+        });
       }
 
-      if (true) {
-        // we install another function (same image, just different entrypoint) that is for
-        // invoking from Slack commands
-        {
-          const publicSlackRole = new Role(this, "PublicSlackRole", {
-            assumedBy: new ServicePrincipal("lambda.amazonaws.com"),
-          });
+      // we install another function (same image, just different entrypoint) that is for
+      // invoking from Slack commands
+      {
+        const publicSlackRole = new Role(this, "PublicSlackRole", {
+          assumedBy: new ServicePrincipal("lambda.amazonaws.com"),
+        });
 
-          publicSlackRole.addManagedPolicy(
-            ManagedPolicy.fromAwsManagedPolicyName(
-              "service-role/AWSLambdaBasicExecutionRole"
-            )
-          );
+        publicSlackRole.addManagedPolicy(
+          ManagedPolicy.fromAwsManagedPolicyName(
+            "service-role/AWSLambdaBasicExecutionRole"
+          )
+        );
 
-          // the slack command lambda needs access to the secret so that it can get
-          // signing secrets (that help it verify the incoming commands)
-          slackSecret.grantRead(publicSlackRole);
+        // the slack command lambda needs access to the secret so that it can get
+        // signing secrets (that help it verify the incoming commands)
+        slackSecret.grantRead(publicSlackRole);
 
-          const publicSlackFunc = new DockerImageFunction(
-            this,
-            `PublicSlackFunction`,
-            {
-              // the public slack function does almost no work itself...
-              memorySize: 512,
-              // note that this public slack function has only 3 seconds to respond to
-              // Slack command - so it is configured to async trigger the other lambdas
-              timeout: Duration.seconds(30),
-              architecture: Architecture.X86_64,
-              code: DockerImageCode.fromEcr(
-                cronReportDockerImageAsset.repository,
-                {
-                  cmd: ["entrypoint-slack-command-lambda.handler"],
-                  tagOrDigest: cronReportDockerImageAsset.assetHash,
-                }
-              ),
-              role: publicSlackRole,
-              environment: {
-                // the public slack function needs to know the locations of all
-                // the lambda - so that it can invoke them in response to Slash commands
-                LAMBDA_CHECK_ARN: checkLambda.dockerImageFunction.functionArn,
-                LAMBDA_EXISTS_ARN: existsLambda.dockerImageFunction.functionArn,
-                LAMBDA_LIST_ARN: listLambda.dockerImageFunction.functionArn,
-                LAMBDA_RELATE_ARN: relateLambda.dockerImageFunction.functionArn,
-                LAMBDA_RELATEX_ARN:
-                  relatexLambda.dockerImageFunction.functionArn,
-                FINGERPRINT_FOLDER: props.slackNotifier.fingerprintFolder!,
-                EXPECT_RELATED_REGEX: props.slackNotifier.expectRelatedRegex!,
-              },
-            }
-          );
+        const publicSlackFunc = new DockerImageFunction(
+          this,
+          `PublicSlackFunction`,
+          {
+            // the public slack function does almost no work itself...
+            memorySize: 512,
+            // note that this public slack function has only 3 seconds to respond to
+            // Slack command - so it is configured to async trigger the other lambdas
+            timeout: Duration.seconds(30),
+            architecture: Architecture.X86_64,
+            code: DockerImageCode.fromEcr(
+              fingerprintDockerImageAsset.repository,
+              {
+                cmd: ["slack-command.lambdaHandler"],
+                tagOrDigest: fingerprintDockerImageAsset.assetHash,
+              }
+            ),
+            role: publicSlackRole,
+            environment: {
+              // the public slack function needs to know the locations of all
+              // the lambda - so that it can invoke them in response to Slash commands
+              LAMBDA_CHECK_ARN: checkLambda.dockerImageFunction.functionArn,
+              LAMBDA_CHECKX_ARN: checkxLambda.dockerImageFunction.functionArn,
+              LAMBDA_LIST_ARN: listLambda.dockerImageFunction.functionArn,
+              LAMBDA_RELATE_ARN: relateLambda.dockerImageFunction.functionArn,
+              LAMBDA_RELATEX_ARN: relatexLambda.dockerImageFunction.functionArn,
+              ...env,
+            },
+          }
+        );
 
-          // the slack role executes the relevant lambdas on command
-          checkLambda.dockerImageFunction.grantInvoke(publicSlackRole);
-          existsLambda.dockerImageFunction.grantInvoke(publicSlackRole);
-          listLambda.dockerImageFunction.grantInvoke(publicSlackRole);
-          relateLambda.dockerImageFunction.grantInvoke(publicSlackRole);
-          relatexLambda.dockerImageFunction.grantInvoke(publicSlackRole);
+        // the slack role executes the relevant lambdas on command
+        checkLambda.dockerImageFunction.grantInvoke(publicSlackRole);
+        checkxLambda.dockerImageFunction.grantInvoke(publicSlackRole);
+        listLambda.dockerImageFunction.grantInvoke(publicSlackRole);
+        relateLambda.dockerImageFunction.grantInvoke(publicSlackRole);
+        relatexLambda.dockerImageFunction.grantInvoke(publicSlackRole);
 
-          const fnUrl = publicSlackFunc.addFunctionUrl({
-            // auth is done *in* the Slack function to make sure
-            // it is only sent messages from the right Slack channel - but we do not
-            // need any AWS level auth
-            authType: FunctionUrlAuthType.NONE,
-          });
+        checkxLambda.dockerImageFunction.grantInvoke(lambdaRole);
 
-          new CfnOutput(this, "SlackFunctionUrl", {
-            value: fnUrl.url,
-          });
-        }
+        const fnUrl = publicSlackFunc.addFunctionUrl({
+          // auth is done *in* the Slack function to make sure
+          // it is only sent messages from the right Slack channel - but we do not
+          // need any AWS level auth
+          authType: FunctionUrlAuthType.NONE,
+        });
+
+        new CfnOutput(this, "SlackFunctionUrl", {
+          value: fnUrl.url,
+        });
       }
     }
   }

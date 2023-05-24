@@ -4,15 +4,20 @@ import { stepsDoExecution } from "./lib/aws";
 import { SFNClient } from "@aws-sdk/client-sfn";
 import { distributedMapManifestToLambdaResults } from "./lib/distributed-map";
 import { reportCheck } from "./lib/report-check";
+import { urlListByRegex } from "./lib/url-list-by-regex";
 
 type EventInput = {
-  // the BAM urls to use as indexes in our check against the database
-  indexes: string[];
+  // the BAM urls regexes any of which can match
+  regexes: string[];
 
   // the slash terminated folder where the fingerprints have been sourced in S3 (i.e. the folder key + /)
   fingerprintFolder: string;
 
-  relatednessThreshold?: number;
+  relatednessThreshold: number;
+
+  minimumNCount: number;
+
+  excludeRegex?: string;
 
   expectRelatedRegex?: string;
 
@@ -44,12 +49,18 @@ export const lambdaHandler = async (ev: EventInput, _context: any) => {
 
   console.log(`Finger bucket = ${fingerprintBucketName}`);
   console.log(`Folder = ${ev.fingerprintFolder}`);
-  console.log(`Indexes = ${ev.indexes}`);
+  console.log(`Regexes = ${ev.regexes}`);
+
+  const urls = await urlListByRegex(ev.regexes, ev.fingerprintFolder);
+
+  if (urls.length > 25) throw new Error("Hit max");
 
   const stepsArgs = {
     fingerprintFolder: ev.fingerprintFolder,
-    indexes: ev.indexes,
+    indexes: urls.map((u) => u.url),
     relatednessThreshold: ev.relatednessThreshold,
+    minimumNCount: ev.minimumNCount,
+    excludeRegex: ev.excludeRegex,
     expectRelatedRegex: ev.expectRelatedRegex,
   };
 
@@ -92,7 +103,10 @@ export const lambdaHandler = async (ev: EventInput, _context: any) => {
 
     const report = await reportCheck(lambdaResults);
 
-    await responder(report);
+    await responder(
+      report,
+      `Fingerprint checkx report for ${ev.regexes.join(" | ")}`
+    );
   }
 
   return lambdaResults;

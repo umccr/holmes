@@ -23,14 +23,20 @@ export async function getSlackChanneller(slackChannel: string) {
   };
 }
 
+/**
+ * Return a function that can be used to upload text file content to a Slack channel.
+ *
+ * @param slackChannel
+ */
 export async function getSlackTextAttacher(slackChannel: string) {
   const web = await getSlackWebClient();
 
-  return async (slackTextMessage: any) => {
+  return async (slackTextMessage: string, title?: string) => {
     return await web.files.upload({
       channels: slackChannel,
       content: slackTextMessage,
       filetype: "text",
+      title: title,
     });
   };
 }

@@ -26,6 +26,11 @@ export type HolmesCommonType = {
   regexJson: string;
 };
 
+export type SelfType = HolmesCommonType &
+  SomalierCommonType & {
+    type: "Self";
+  };
+
 export type ExpectedRelatedType = HolmesCommonType &
   SomalierCommonType & {
     type: "ExpectedRelated";
@@ -47,6 +52,7 @@ export type UnexpectedRelatedType = HolmesCommonType &
   };
 
 export type HolmesReturnType =
+  | SelfType
   | ExpectedRelatedType
   | UnexpectedUnrelatedType
   | UnexpectedRelatedType;

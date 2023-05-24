@@ -71,11 +71,23 @@ export async function pairsAnalyse(
         continue;
       }
 
+      // all indexes should end up with a matches array - even if it ends up empty
+      if (!(indexUrlAsString in matches)) matches[indexUrlAsString] = [];
+
       // the printable URL name of the sample we are comparing the index to
       const sampleUrlAsString = keyToUrl(
         fingerprintFolder,
         sampleIdToKeyMap[record[1]]
       ).toString();
+
+      // we are an automatic match against ourselves irrespective of the settings - we just
+      // want to report back the somalier results
+      if (indexUrlAsString === sampleUrlAsString) {
+        matches[indexUrlAsString].push(
+          tsvRecordToReturnType("Self", record, sampleUrlAsString, "{}")
+        );
+        continue;
+      }
 
       // this is score of sites matching the sites file locations - where this gets very
       // low the results are less than useful
@@ -115,9 +127,6 @@ export async function pairsAnalyse(
         index: indexRegexMatch?.slice(1),
         sample: sampleRegexMatch?.slice(1),
       });
-
-      // all indexes should end up with a matches array - even if it ends up empty
-      if (!(indexUrlAsString in matches)) matches[indexUrlAsString] = [];
 
       // NOTE we DO NOT use the minimumNCount here - as ruling out relations with low N counts
       // is counterproductive for Unexpected Unrelated (a low N just means that we can't make strong assertions
@@ -213,7 +222,11 @@ function tsvRecordToSomalierType(record: any): SomalierCommonType {
 }
 
 function tsvRecordToReturnType(
-  type: "UnexpectedRelated" | "ExpectedRelated" | "UnexpectedUnrelated",
+  type:
+    | "Self"
+    | "UnexpectedRelated"
+    | "ExpectedRelated"
+    | "UnexpectedUnrelated",
   record: any,
   fileComparedTo: string,
   regexJson: string
