@@ -8,216 +8,19 @@ import * as assert from "assert";
 import { AssumeRoleCommand, STSClient } from "@aws-sdk/client-sts";
 import * as crypto from "crypto";
 import { writeFile } from "fs/promises";
-
-/**
- * Trigger the extract of a single BAM, with logic to skip the
- * extract if the fingerprint already exists.
- *
- * @param stepsClient
- * @param s3Client
- * @param extractStepsArn
- * @param fingerprintBucket the bucket for all fingerprint activity
- * @param fingerprintFolder the test specific folder for fingerprints
- * @param bamUrl
- * @param reference
- */
-async function doFingerprintExtract(
-  stepsClient: SFNClient,
-  s3Client: S3Client,
-  extractStepsArn: string,
-  fingerprintBucket: string,
-  fingerprintFolder: string,
-  bamUrl: string,
-  reference: string
-): Promise<any> {
-  try {
-    await s3Client.send(
-      new GetObjectCommand({
-        Bucket: fingerprintBucket,
-        Key: fingerprintFolder + Buffer.from(bamUrl, "ascii").toString("hex"),
-      })
-    );
-
-    console.log(
-      `Skipping extract for ${bamUrl} as it already exists in test fingerprint db`
-    );
-
-    return Promise.resolve({});
-  } catch (e: any) {
-    if (e?.Code !== "NoSuchKey") {
-      console.error(e);
-      throw Error(
-        "Unexpected S3 error trying to determine if fingerprint exists"
-      );
-    }
-
-    const timeLabel = `EXTRACT ${bamUrl}`;
-    console.time(timeLabel);
-
-    // we actually expect normally to get here... (the skip file thing is only of use when we are actually working on the tests themselves)
-    return doStepsExecution(stepsClient, extractStepsArn, {
-      indexes: [bamUrl],
-      fingerprintFolder: fingerprintFolder,
-      reference: reference,
-    }).then(() => {
-      console.timeEnd(timeLabel);
-    });
-  }
-}
-
-/**
- * Does a relatedness check for the given BAM, with some assertions around how
- * we expect the results to be formatted. Then bundles up the results in a nicer
- * dictionary. NOTE: the index BAM *is not* returned in the result.
- *
- * @param stepsClient a steps AWS client
- * @param checkStepsArn the ARN of the checking step function
- * @param fingerprintBucket the bucket for all fingerprint activity
- * @param fingerprintFolder the test specific folder for fingerprints
- * @param bamUrl the index BAM to check
- * @param excludeRegex if present sent as the exclude regex
- * @param expectRelatedRegex if present sent as the expected related regex
- */
-async function doFingerprintCheck(
-  stepsClient: SFNClient,
-  checkStepsArn: string,
-  fingerprintBucket: string,
-  fingerprintFolder: string,
-  bamUrl: string,
-  excludeRegex?: string,
-  expectRelatedRegex?: string
-): Promise<[{ [url: string]: number }, { [url: string]: number }]> {
-  const result = await doStepsExecution(stepsClient, checkStepsArn, {
-    indexes: [bamUrl],
-    // note because we are doing trio testing we want to explicitly to be a pretty broad search
-    relatednessThreshold: 0.4,
-    // a low n count for tests helps us - for real usage probably needs to be higher
-    minimumNCount: 10,
-    fingerprintFolder: fingerprintFolder,
-    excludeRegex: excludeRegex,
-    expectRelatedRegex: expectRelatedRegex,
-  });
-
-  let ourResults = [];
-
-  // due to the way our steps engine splits checking - our results come back as a set of blocks - each block *might* have some results for us
-  for (const resultBlock of result) {
-    if (bamUrl in resultBlock) ourResults.push(...resultBlock[bamUrl]);
-  }
-
-  if (!ourResults)
-    throw new Error(
-      "Fingerprint check should return an array of dictionaries where at least one is keyed by the submitted index bams"
-    );
-
-  // our results will be an array of MatchBlocks - where each match is a relation from index to something
-  // we tidy this up into a neat dictionary
-
-  const related: { [url: string]: number } = {};
-  const unrelated: { [url: string]: number } = {};
-
-  let foundIndex = false;
-
-  for (const m of ourResults || []) {
-    if (m.file == bamUrl) {
-      foundIndex = true;
-
-      assert.ok(
-        m.relatedness == 1,
-        `Index BAM ${bamUrl} should always be matched with relatedness of 1`
-      );
-    } else {
-      if (m.relatedness) related[m.file] = m.relatedness;
-      else if (m.unrelatedness) unrelated[m.file] = m.unrelatedness;
-      else
-        assert.fail(
-          "A check result returned a match that was neither related not unrelated"
-        );
-    }
-  }
-
-  assert.ok(foundIndex, `Index BAM ${bamUrl} should always match to itself`);
-
-  return [related, unrelated];
-}
-
-/**
- * Does the generation of a pairs report on the passed in bams.
- *
- * @param stepsClient a steps AWS client
- * @param pairsStepsArn the ARN of the pairs step function
- * @param fingerprintBucket the bucket for all fingerprint activity
- * @param fingerprintFolder the test specific folder for fingerprints
- * @param bamUrls the BAMs to examine
- */
-async function doFingerprintPairs(
-  stepsClient: SFNClient,
-  pairsStepsArn: string,
-  fingerprintBucket: string,
-  fingerprintFolder: string,
-  bamUrls: string[]
-): Promise<any> {
-  const result = await doStepsExecution(stepsClient, pairsStepsArn, {
-    indexes: bamUrls,
-    fingerprintFolder: fingerprintFolder,
-  });
-
-  return result;
-}
-
-/**
- * A simple Steps waiter function - using polling - due to the AWS client libraries having
- * no way of invoking a steps function and waiting for it to finish.
- *
- * @param stepsClient a Steps client
- * @param stepsArn the step function to execute
- * @param inp the input to the steps execution
- */
-async function doStepsExecution(
-  stepsClient: SFNClient,
-  stepsArn: string,
-  inp: any
-): Promise<any> {
-  const stepExecuteResult = await stepsClient.send(
-    new StartExecutionCommand({
-      stateMachineArn: stepsArn,
-      input: JSON.stringify(inp),
-    })
-  );
-
-  if (!stepExecuteResult.executionArn) {
-    throw new Error(
-      `Steps ${stepsArn} failed to execute with input ${JSON.stringify(inp)}`
-    );
-  }
-
-  let stepResult: any = {};
-
-  while (true) {
-    const execResult = await stepsClient.send(
-      new DescribeExecutionCommand({
-        executionArn: stepExecuteResult.executionArn,
-      })
-    );
-
-    if (execResult.output) {
-      stepResult = JSON.parse(execResult.output);
-    }
-
-    if (execResult.status == "ABORTED" || execResult.status == "FAILED")
-      throw new Error(
-        `Steps ${stepsArn} failed with status ${
-          execResult.status
-        } from input ${JSON.stringify(inp)}`
-      );
-
-    if (execResult.status != "RUNNING") break;
-
-    await new Promise((resolve) => setTimeout(resolve, 5000));
-  }
-
-  return stepResult;
-}
+import {
+  DiscoverInstancesCommand,
+  ServiceDiscoveryClient,
+} from "@aws-sdk/client-servicediscovery";
+import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
+import { toUtf8 } from "@aws-sdk/util-utf8";
+import { fail } from "assert";
+import {
+  doFingerprintCheck,
+  doFingerprintExtract,
+  doFingerprintList,
+  doFingerprintRelate,
+} from "./holmes-e2e-test-helper";
 
 const CONSOLE_BREAK_LINE = "-----------------------";
 
@@ -226,23 +29,49 @@ const CONSOLE_BREAK_LINE = "-----------------------";
  *
  * @param stepsClient
  * @param s3Client
+ * @param lambdaClient
+ * @param serviceDiscoveryClient
+ * @param namespaceName the namespace of the service
  * @param fingerprintBucket the bucket holding test fingerprints
  * @param fingerprintFolder the test folder in the bucket where fingerprinting will happen
  * @param gdsBase the GDS URL for the base folder holding our test data
- * @param checkStepsArn the steps function for fingerprint checks
- * @param extractStepsArn the steps function for fingerprint creation
- * @param pairsStepsArn the pairs function for fingerprint creation
  */
 export async function runTest(
   stepsClient: SFNClient,
   s3Client: S3Client,
+  lambdaClient: LambdaClient,
+  serviceDiscoveryClient: ServiceDiscoveryClient,
+  namespaceName: string,
   fingerprintBucket: string,
   fingerprintFolder: string,
-  gdsBase: string,
-  checkStepsArn: string,
-  extractStepsArn: string,
-  pairsStepsArn: string
+  gdsBase: string
 ) {
+  // first lets discover the services that we want to test
+  const instances = await serviceDiscoveryClient.send(
+    new DiscoverInstancesCommand({
+      NamespaceName: namespaceName,
+      ServiceName: "fingerprint",
+    })
+  );
+
+  if (!instances.Instances || instances.Instances.length != 1)
+    throw new Error(
+      `Expecting to find only one instance of the fingerprint service in CloudMap ${namespaceName}`
+    );
+
+  const extractStepsArn =
+    instances?.Instances[0]?.Attributes?.["extractStepsArn"];
+  const checkLambdaArn =
+    instances?.Instances[0]?.Attributes?.["checkLambdaArn"];
+  const listLambdaArn = instances?.Instances[0]?.Attributes?.["listLambdaArn"];
+  const relateLambdaArn =
+    instances?.Instances[0]?.Attributes?.["relateLambdaArn"];
+
+  if (!extractStepsArn) throw new Error("Missing extractStepsArn in CloudMap");
+  if (!checkLambdaArn) throw new Error("Missing checkLambdaArn in CloudMap");
+  if (!listLambdaArn) throw new Error("Missing listLambdaArn in CloudMap");
+  if (!relateLambdaArn) throw new Error("Missing relateLambdaArn in CloudMap");
+
   const INDIVIDUAL_96 = `${gdsBase}/individual/HG00096.bam`;
   const INDIVIDUAL_97 = `${gdsBase}/individual/HG00097.bam`;
   const INDIVIDUAL_99 = `${gdsBase}/individual/HG00099.bam`;
@@ -290,31 +119,64 @@ export async function runTest(
 
   await Promise.all(allExtractPromises);
 
+  const findUnexpectedRelatedRelatedness = (r: any, bam: string) => {
+    for (const a of r.unexpectedRelated) {
+      if (a.file === bam) return a.relatedness;
+    }
+    fail(
+      `Bam ${bam} was not found in the unexpected related array for the result`
+    );
+  };
+
+  const findExpectedRelatedRelatedness = (r: any, bam: string) => {
+    for (const a of r.expectedRelated) {
+      if (a.file === bam) return a.relatedness;
+    }
+    fail(
+      `Bam ${bam} was not found in the expected related array for the result`
+    );
+  };
+
+  const findUnexpectedUnrelatedRelatedness = (r: any, bam: string) => {
+    for (const a of r.unexpectedUnrelated) {
+      if (a.file === bam) return a.relatedness;
+    }
+    fail(
+      `Bam ${bam} was not found in the unexpected unrelated array for the result`
+    );
+  };
+
   {
     console.log(CONSOLE_BREAK_LINE);
     console.log("SON CHECK");
     console.log(CONSOLE_BREAK_LINE);
 
-    const [sonCheck, _] = await doFingerprintCheck(
-      stepsClient,
-      checkStepsArn,
+    const sonCheckResult = await doFingerprintCheck(
+      lambdaClient,
+      checkLambdaArn,
       fingerprintBucket,
       fingerprintFolder,
       TRIO_SON,
       "ctdna"
     );
 
-    console.log(sonCheck);
+    // console.log(JSON.stringify(sonCheckResult, null, 2));
 
-    assert.ok(Object.keys(sonCheck).length == 2, "Son should match 2 people");
     assert.ok(
-      sonCheck[TRIO_FATHER] > 0.4 && sonCheck[TRIO_FATHER] < 0.6,
+      sonCheckResult.unexpectedRelated.length == 2,
+      "Son should match 2 people"
+    );
+    assert.ok(
+      findUnexpectedRelatedRelatedness(sonCheckResult, TRIO_FATHER) > 0.4 &&
+        findUnexpectedRelatedRelatedness(sonCheckResult, TRIO_FATHER) < 0.6,
       "Son/father relation not found"
     );
     assert.ok(
-      sonCheck[TRIO_MOTHER] > 0.4 && sonCheck[TRIO_MOTHER] < 0.6,
+      findUnexpectedRelatedRelatedness(sonCheckResult, TRIO_MOTHER) > 0.4 &&
+        findUnexpectedRelatedRelatedness(sonCheckResult, TRIO_MOTHER) < 0.6,
       "Son/mother relation not found"
     );
+    console.log("Passed");
   }
 
   {
@@ -322,25 +184,28 @@ export async function runTest(
     console.log("FATHER CHECK");
     console.log(CONSOLE_BREAK_LINE);
 
-    const [fatherCheck, _] = await doFingerprintCheck(
-      stepsClient,
-      checkStepsArn,
+    const fatherCheckResult = await doFingerprintCheck(
+      lambdaClient,
+      checkLambdaArn,
       fingerprintBucket,
       fingerprintFolder,
       TRIO_FATHER,
+      // we exclude the Ctdna by name so we are just checking the family trio
       "ctdna"
     );
 
-    console.log(fatherCheck);
+    // console.log(JSON.stringify(fatherCheckResult, null, 2));
 
     assert.ok(
-      Object.keys(fatherCheck).length == 1,
+      fatherCheckResult.unexpectedRelated.length == 1,
       "Father should match 1 person"
     );
     assert.ok(
-      fatherCheck[TRIO_SON] > 0.4 && fatherCheck[TRIO_SON] < 0.6,
+      findUnexpectedRelatedRelatedness(fatherCheckResult, TRIO_SON) > 0.4 &&
+        findUnexpectedRelatedRelatedness(fatherCheckResult, TRIO_SON) < 0.6,
       "Father/son relation not found"
     );
+    console.log("Passed");
   }
 
   {
@@ -348,25 +213,27 @@ export async function runTest(
     console.log("MOTHER CHECK");
     console.log(CONSOLE_BREAK_LINE);
 
-    const [motherCheck, _] = await doFingerprintCheck(
-      stepsClient,
-      checkStepsArn,
+    const motherCheckResult = await doFingerprintCheck(
+      lambdaClient,
+      checkLambdaArn,
       fingerprintBucket,
       fingerprintFolder,
       TRIO_MOTHER,
       "ctdna"
     );
 
-    console.log(motherCheck);
+    // console.log(JSON.stringify(motherCheckResult, null, 2));
 
     assert.ok(
-      Object.keys(motherCheck).length == 1,
+      motherCheckResult.unexpectedRelated.length == 1,
       "Mother should match 1 person"
     );
     assert.ok(
-      motherCheck[TRIO_SON] > 0.4 && motherCheck[TRIO_SON] < 0.6,
+      findUnexpectedRelatedRelatedness(motherCheckResult, TRIO_SON) > 0.4 &&
+        findUnexpectedRelatedRelatedness(motherCheckResult, TRIO_SON) < 0.6,
       "Mother/son relation not found"
     );
+    console.log("Passed");
   }
 
   {
@@ -374,21 +241,22 @@ export async function runTest(
     console.log("MOTHER CHECK WITH REGEX EXCLUDE");
     console.log(CONSOLE_BREAK_LINE);
 
-    const [motherCheckRegex, _] = await doFingerprintCheck(
-      stepsClient,
-      checkStepsArn,
+    const motherCheckRegexResult = await doFingerprintCheck(
+      lambdaClient,
+      checkLambdaArn,
       fingerprintBucket,
       fingerprintFolder,
       TRIO_MOTHER,
       `HG002|ctdna`
     );
 
-    console.log(motherCheckRegex);
+    // console.log(JSON.stringify(motherCheckRegexResult, null, 2));
 
     assert.ok(
-      Object.keys(motherCheckRegex).length == 0,
+      motherCheckRegexResult.unexpectedRelated.length == 0,
       "Mother should match 0 person because the child was regex excluded"
     );
+    console.log("Passed");
   }
 
   {
@@ -396,15 +264,21 @@ export async function runTest(
     console.log("INDIVIDUAL 96 CHECK");
     console.log(CONSOLE_BREAK_LINE);
 
-    const [nine6Check, _] = await doFingerprintCheck(
-      stepsClient,
-      checkStepsArn,
+    const nine6CheckResult = await doFingerprintCheck(
+      lambdaClient,
+      checkLambdaArn,
       fingerprintBucket,
       fingerprintFolder,
       INDIVIDUAL_96
     );
-    console.log(nine6Check);
-    assert.ok(Object.keys(nine6Check).length == 0, "96 should match noone");
+
+    //console.log(JSON.stringify(nine6CheckResult, null, 2));
+
+    assert.ok(
+      nine6CheckResult.unexpectedRelated.length == 0,
+      "96 should match noone"
+    );
+    console.log("Passed");
   }
 
   {
@@ -412,15 +286,21 @@ export async function runTest(
     console.log("INDIVIDUAL 97 CHECK");
     console.log(CONSOLE_BREAK_LINE);
 
-    const [nine7Check, _] = await doFingerprintCheck(
-      stepsClient,
-      checkStepsArn,
+    const nine7CheckResult = await doFingerprintCheck(
+      lambdaClient,
+      checkLambdaArn,
       fingerprintBucket,
       fingerprintFolder,
       INDIVIDUAL_97
     );
-    console.log(nine7Check);
-    assert.ok(Object.keys(nine7Check).length == 0, "97 should match noone");
+
+    // console.log(JSON.stringify(nine7CheckResult, null, 2));
+
+    assert.ok(
+      nine7CheckResult.unexpectedRelated.length == 0,
+      "97 should match noone"
+    );
+    console.log("Passed");
   }
 
   {
@@ -428,15 +308,21 @@ export async function runTest(
     console.log("INDIVIDUAL 99 CHECK");
     console.log(CONSOLE_BREAK_LINE);
 
-    const [nine9Check, _] = await doFingerprintCheck(
-      stepsClient,
-      checkStepsArn,
+    const nine9CheckResult = await doFingerprintCheck(
+      lambdaClient,
+      checkLambdaArn,
       fingerprintBucket,
       fingerprintFolder,
       INDIVIDUAL_99
     );
-    console.log(nine9Check);
-    assert.ok(Object.keys(nine9Check).length == 0, "99 should match noone");
+
+    //console.log(JSON.stringify(nine9CheckResult, null, 2));
+
+    assert.ok(
+      nine9CheckResult.unexpectedRelated.length == 0,
+      "99 should match noone"
+    );
+    console.log("Passed");
   }
 
   {
@@ -444,29 +330,40 @@ export async function runTest(
     console.log("HG19 CTDNA CHECK");
     console.log(CONSOLE_BREAK_LINE);
 
-    const [ctdnaRelatedCheck, ctnaUnrelatedCheck] = await doFingerprintCheck(
-      stepsClient,
-      checkStepsArn,
+    const ctdnaRelatedCheckResukt = await doFingerprintCheck(
+      lambdaClient,
+      checkLambdaArn,
       fingerprintBucket,
       fingerprintFolder,
       CTDNA
     );
-    console.log(ctdnaRelatedCheck);
+
+    // console.log(JSON.stringify(ctdnaRelatedCheckResukt, null, 2));
+
     assert.ok(
-      Object.keys(ctdnaRelatedCheck).length == 3,
+      ctdnaRelatedCheckResukt.unexpectedRelated.length == 3,
       "cTDNA should match 3 people by virtue of it being derived from HG0002 cell line"
     );
-    assert.ok(ctdnaRelatedCheck[TRIO_SON] >= 1, "ctDNA/son relation not found");
     assert.ok(
-      ctdnaRelatedCheck[TRIO_FATHER] > 0.4 &&
-        ctdnaRelatedCheck[TRIO_FATHER] < 0.7,
+      findUnexpectedRelatedRelatedness(ctdnaRelatedCheckResukt, TRIO_SON) >= 1,
+      "ctDNA/son relation not found"
+    );
+    assert.ok(
+      findUnexpectedRelatedRelatedness(ctdnaRelatedCheckResukt, TRIO_FATHER) >
+        0.4 &&
+        findUnexpectedRelatedRelatedness(ctdnaRelatedCheckResukt, TRIO_FATHER) <
+          0.7,
       "ctDNA/father relation not found"
     );
     assert.ok(
-      ctdnaRelatedCheck[TRIO_MOTHER] > 0.4 &&
-        ctdnaRelatedCheck[TRIO_MOTHER] < 0.7,
+      findUnexpectedRelatedRelatedness(ctdnaRelatedCheckResukt, TRIO_MOTHER) >
+        0.4 &&
+        findUnexpectedRelatedRelatedness(ctdnaRelatedCheckResukt, TRIO_MOTHER) <
+          0.7,
       "ctDNA/mother relation not found"
     );
+
+    console.log("Passed");
   }
 
   {
@@ -474,56 +371,62 @@ export async function runTest(
     console.log("EXPECTED FAMILY REGEX CHECK");
     console.log(CONSOLE_BREAK_LINE);
 
-    const [familyCheckRelated, familyCheckUnrelated] = await doFingerprintCheck(
-      stepsClient,
-      checkStepsArn,
+    const familyCheckResult = await doFingerprintCheck(
+      lambdaClient,
+      checkLambdaArn,
       fingerprintBucket,
       fingerprintFolder,
       TRIO_FATHER,
       "ctdna",
       "(family)"
     );
-    console.log(familyCheckRelated);
-    console.log(familyCheckUnrelated);
+
+    //console.log(JSON.stringify(familyCheckResult, null, 2));
+
     assert.ok(
-      Object.keys(familyCheckRelated).length == 1 &&
-        familyCheckRelated[TRIO_SON] > 0.4,
+      familyCheckResult.expectedRelated.length == 1 &&
+        findExpectedRelatedRelatedness(familyCheckResult, TRIO_SON) > 0.4,
       "Family related should match 1 person - the son"
     );
     assert.ok(
-      Object.keys(familyCheckUnrelated).length == 1 &&
-        familyCheckUnrelated[TRIO_MOTHER] < 2,
+      familyCheckResult.unexpectedUnrelated.length == 1 &&
+        findUnexpectedUnrelatedRelatedness(familyCheckResult, TRIO_MOTHER) < 2,
       "Family unrelated should match 1 person - the mother"
     );
+    console.log("Passed");
   }
 
   {
     console.log(CONSOLE_BREAK_LINE);
-    console.log("ALL PAIRS REPORT");
+    console.log("RELATE REPORT (SHOULD PRINT TWO TSVS)");
     console.log(CONSOLE_BREAK_LINE);
 
-    const ctdnaPairs = await doFingerprintPairs(
-      stepsClient,
-      pairsStepsArn,
+    const ctdnaReport = await doFingerprintRelate(
+      lambdaClient,
+      relateLambdaArn,
       fingerprintBucket,
       fingerprintFolder,
       [INDIVIDUAL_96, TRIO_SON, TRIO_MOTHER, INDIVIDUAL_97, CTDNA]
     );
 
-    assert.ok(
-      ctdnaPairs.html.startsWith("<!DOCTYPE html>"),
-      "Html pairs report not present"
+    console.log(ctdnaReport["samplesTsv"]);
+    console.log(ctdnaReport["pairsTsv"]);
+  }
+
+  {
+    console.log(CONSOLE_BREAK_LINE);
+    console.log("LIST (SHOULD PRINT LIST OF HG SAMPLES)");
+    console.log(CONSOLE_BREAK_LINE);
+
+    const listReport = await doFingerprintList(
+      lambdaClient,
+      listLambdaArn,
+      fingerprintBucket,
+      fingerprintFolder,
+      "HG"
     );
 
-    // assert.ok(ctdnaPairs.key, 'Key to pairs report not present');
-    //console.log("Key for report are");
-    //console.log(ctdnaPairs.key);
-
-    await writeFile("./pairs.html", ctdnaPairs.html);
-
-    console.log(
-      "Report saved to ./pairs.html - must visually confirm (should be report of everyone *except* TRIO_FATHER AND HG00099)"
-    );
+    console.log(listReport);
   }
 }
 
@@ -534,15 +437,12 @@ export async function runTest(
 
   console.log(`
     Testing Holmes via role ${roleArn} in bucket ${process.argv[3]}
-     and BAMs from ${process.argv[4]} and
-      steps check ${process.argv[5]}
-            extract ${process.argv[6]}
-             pairs ${process.argv[7]}`);
+     and BAMs from ${process.argv[4]} and for namespace ${process.argv[5]}`);
 
   // we do the entire test suite in the context of a once-off fingerprint folder - though if specified on the command line we
   // can get it to re-use an existing folder (helps with test development to skip the extract phase)
-  const fingerprintFolder = process.argv[8]
-    ? process.argv[8]
+  const fingerprintFolder = process.argv[6]
+    ? process.argv[6]
     : `fingerprints-test-${crypto.randomBytes(20).toString("hex")}/`;
 
   console.log(`Fingerprints will be created in folder ${fingerprintFolder}`);
@@ -577,28 +477,43 @@ export async function runTest(
         expiration: assumeRoleResult.Credentials?.Expiration,
       },
     });
+    const lambdaClient = new LambdaClient({
+      credentials: {
+        accessKeyId: assumeRoleResult.Credentials?.AccessKeyId!,
+        secretAccessKey: assumeRoleResult.Credentials?.SecretAccessKey!,
+        sessionToken: assumeRoleResult.Credentials?.SessionToken,
+        expiration: assumeRoleResult.Credentials?.Expiration,
+      },
+    });
+    const serviceDiscoveryClient = new ServiceDiscoveryClient({
+      credentials: {
+        accessKeyId: assumeRoleResult.Credentials?.AccessKeyId!,
+        secretAccessKey: assumeRoleResult.Credentials?.SecretAccessKey!,
+        sessionToken: assumeRoleResult.Credentials?.SessionToken,
+        expiration: assumeRoleResult.Credentials?.Expiration,
+      },
+    });
 
     await runTest(
       stepsClient,
       s3Client,
+      lambdaClient,
+      serviceDiscoveryClient,
+      process.argv[5],
       process.argv[3],
       fingerprintFolder,
-      process.argv[4],
-      process.argv[5],
-      process.argv[6],
-
-      process.argv[7]
+      process.argv[4]
     );
   } else {
     await runTest(
       new SFNClient({}),
       new S3Client({}),
+      new LambdaClient({}),
+      new ServiceDiscoveryClient({}),
+      process.argv[5],
       process.argv[3],
       fingerprintFolder,
-      process.argv[4],
-      process.argv[5],
-      process.argv[6],
-      process.argv[7]
+      process.argv[4]
     );
   }
 })();

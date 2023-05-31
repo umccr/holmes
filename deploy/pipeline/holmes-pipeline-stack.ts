@@ -127,6 +127,8 @@ export class HolmesPipelineStack extends Stack {
       });
     }
 
+    const prodWave = pipeline.addWave("ProdWave");
+
     // production
     {
       const prodStage = new HolmesBuildStage(this, "Prod", {
@@ -142,7 +144,7 @@ export class HolmesPipelineStack extends Stack {
         fingerprintConfigFolder: "config/",
       });
 
-      pipeline.addStage(prodStage, {
+      prodWave.addStage(prodStage, {
         pre: [new pipelines.ManualApprovalStep("PromoteToProd")],
       });
 
@@ -152,40 +154,25 @@ export class HolmesPipelineStack extends Stack {
       // homes-e2e-test.sh
       // which will safely run a production test
     }
+
+    // temporary production-beta
+    {
+      const prodBetaStage = new HolmesBuildStage(this, "ProdBeta", {
+        env: {
+          account: AWS_PROD_ACCOUNT,
+          region: AWS_PROD_REGION,
+        },
+        namespaceName: NAMESPACE_BETA_NAME,
+        namespaceId: NAMESPACE_PROD_BETA_ID,
+        icaSecretNamePartial: ICA_SEC,
+        fingerprintBucketName: "umccr-fingerprint-prod",
+        shouldCreateFingerprintBucket: false,
+        fingerprintConfigFolder: "config/",
+      });
+
+      prodWave.addStage(prodBetaStage, {
+        pre: [new pipelines.ManualApprovalStep("PromoteToProd")],
+      });
+    }
   }
 }
-
-/*const stgStage = new HolmesSlackCronBuildStage(this, "Stg", {
-      env: {
-        account: AWS_STG_ACCOUNT,
-        region: AWS_STG_REGION,
-      },
-      bucket: "umccr-fingerprint-stg",
-      // NOTE: THIS IS A UTC HOUR - SO LOOKING AT RUNNING ABOUT MIDDAY 2+10
-      // NOTE: this runs only on the first day of the month in deployed stg
-      cron: "cron(0 2 1 * ? *)",
-      channel: "#arteria-dev",
-      // we have a special folder in staging that reports on a static test set
-      fingerprintFolder: "fingerprints-group-detection/",
-      expectRelatedRegex: "^.*SBJ(\\d\\d\\d\\d\\d).*$",
-      // we look back until we find fingerprints (useful for stg static test)
-      days: undefined,
-    });
-
-    pipeline.addStage(stgStage, {});
-
-    const prodStage = new HolmesSlackCronBuildStage(this, "Prod", {
-      env: {
-        account: AWS_PROD_ACCOUNT,
-        region: AWS_PROD_REGION,
-      },
-      bucket: "umccr-fingerprint-prod",
-      // NOTE: THIS IS A UTC HOUR - SO LOOKING AT RUNNING ABOUT MIDDAY 2+10
-      // NOTE: it runs every day though we don't expect most days for it to discover fingerprints
-      cron: "cron(0 2 * * ? *)",
-      channel: "#biobots",
-      fingerprintFolder: "fingerprints/",
-      expectRelatedRegex: "^.*SBJ(\\d\\d\\d\\d\\d).*$",
-      // we look back one day for fingerprints to report on
-      days: 1,
-    });*/

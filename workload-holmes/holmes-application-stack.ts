@@ -39,17 +39,6 @@ import { FingerprintLambda } from "./fingerprint-lambda";
  * service.
  */
 export class HolmesApplicationStack extends Stack {
-  // the output Steps functions we create (are also registered into CloudMap)
-  // we output this here so it can be used in the codepipeline build for testing
-  public readonly checkLargeStepsArnOutput: CfnOutput;
-  public readonly extractStepsArnOutput: CfnOutput;
-
-  public readonly checkLambdaArnOutput: CfnOutput;
-  public readonly checkxLambdaArnOutput: CfnOutput;
-  public readonly listLambdaArnOutput: CfnOutput;
-  public readonly relateLambdaArnOutput: CfnOutput;
-  public readonly relatexLambdaArnOutput: CfnOutput;
-
   // an optional output CFN for any stack that has decided it wants a role to be created for testing
   public readonly testerRoleArnOutput?: CfnOutput;
 
@@ -182,24 +171,11 @@ export class HolmesApplicationStack extends Stack {
       },
     });
 
-    const checkxLambda = new FingerprintLambda(this, "Checkx", {
-      dockerImageAsset: fingerprintDockerImageAsset,
-      icaSecret: icaSecret,
-      fingerprintBucket: fingerprintBucket,
-      cmd: ["checkx.lambdaHandler"],
-      fingerprintConfigFolder: props.fingerprintConfigFolder,
-      extraEnv: {
-        // the check lambda needs to launch and process the Check Steps Machine (note we share the Steps between
-        // both check and checkx)
-        CHECK_STEPS_ARN: checkLargeStateMachine.stepsArn,
-      },
-    });
-
     const listLambda = new FingerprintLambda(this, "List", {
       dockerImageAsset: fingerprintDockerImageAsset,
       icaSecret: icaSecret,
       fingerprintBucket: fingerprintBucket,
-      cmd: ["listx.lambdaHandler"],
+      cmd: ["list.lambdaHandler"],
       fingerprintConfigFolder: props.fingerprintConfigFolder,
     });
 
@@ -208,14 +184,6 @@ export class HolmesApplicationStack extends Stack {
       icaSecret: icaSecret,
       fingerprintBucket: fingerprintBucket,
       cmd: ["relate.lambdaHandler"],
-      fingerprintConfigFolder: props.fingerprintConfigFolder,
-    });
-
-    const relatexLambda = new FingerprintLambda(this, "Relatex", {
-      dockerImageAsset: fingerprintDockerImageAsset,
-      icaSecret: icaSecret,
-      fingerprintBucket: fingerprintBucket,
-      cmd: ["relatex.lambdaHandler"],
       fingerprintConfigFolder: props.fingerprintConfigFolder,
     });
 
@@ -231,16 +199,11 @@ export class HolmesApplicationStack extends Stack {
 
     // the lambdas just read
     fingerprintBucket.grantRead(checkLambda.role);
-    fingerprintBucket.grantRead(checkxLambda.role);
     fingerprintBucket.grantRead(listLambda.role);
     fingerprintBucket.grantRead(relateLambda.role);
-    fingerprintBucket.grantRead(relatexLambda.role);
 
     checkLargeStateMachine.stateMachine.grantStartExecution(checkLambda.role);
     checkLargeStateMachine.stateMachine.grantRead(checkLambda.role);
-
-    checkLargeStateMachine.stateMachine.grantStartExecution(checkxLambda.role);
-    checkLargeStateMachine.stateMachine.grantRead(checkxLambda.role);
 
     /* I don't understand CloudMap - there seems no way for me to import in a namespace that
         already exists... other than providing *all* the details... and a blank arn?? */
@@ -264,10 +227,8 @@ export class HolmesApplicationStack extends Stack {
       customAttributes: {
         extractStepsArn: extractStateMachine.stepsArn,
         checkLambdaArn: checkLambda.dockerImageFunction.functionArn,
-        checkxLambdaArn: checkxLambda.dockerImageFunction.functionArn,
         listLambdaArn: listLambda.dockerImageFunction.functionArn,
         relateLambdaArn: relateLambda.dockerImageFunction.functionArn,
-        relatexLambdaArn: relatexLambda.dockerImageFunction.functionArn,
       },
     });
 
@@ -276,34 +237,6 @@ export class HolmesApplicationStack extends Stack {
         value: testerRole.roleArn,
       });
     }
-
-    this.checkLargeStepsArnOutput = new CfnOutput(this, "CheckLargeStepsArn", {
-      value: checkLargeStateMachine.stepsArn,
-    });
-
-    this.extractStepsArnOutput = new CfnOutput(this, "ExtractStepsArn", {
-      value: extractStateMachine.stepsArn,
-    });
-
-    this.checkLambdaArnOutput = new CfnOutput(this, "CheckLambdaArn", {
-      value: checkLambda.dockerImageFunction.functionArn,
-    });
-
-    this.checkxLambdaArnOutput = new CfnOutput(this, "CheckxLambdaArn", {
-      value: checkxLambda.dockerImageFunction.functionArn,
-    });
-
-    this.listLambdaArnOutput = new CfnOutput(this, "ListLambdaArn", {
-      value: listLambda.dockerImageFunction.functionArn,
-    });
-
-    this.relateLambdaArnOutput = new CfnOutput(this, "RelateLambdaArn", {
-      value: relateLambda.dockerImageFunction.functionArn,
-    });
-
-    this.relatexLambdaArnOutput = new CfnOutput(this, "RelatexLambdaArn", {
-      value: relatexLambda.dockerImageFunction.functionArn,
-    });
 
     if (props.slackNotifier) {
       const slackSecret = Secret.fromSecretNameV2(
@@ -320,10 +253,8 @@ export class HolmesApplicationStack extends Stack {
       ];
 
       slackSecret.grantRead(checkLambda.role);
-      slackSecret.grantRead(checkxLambda.role);
       slackSecret.grantRead(listLambda.role);
       slackSecret.grantRead(relateLambda.role);
-      slackSecret.grantRead(relatexLambda.role);
 
       const lambdaRole = new Role(this, "Role", {
         assumedBy: new ServicePrincipal("lambda.amazonaws.com"),
@@ -344,7 +275,7 @@ export class HolmesApplicationStack extends Stack {
         RELATEDNESS_THRESHOLD:
           props.slackNotifier.relatednessThreshold.toString(),
         MINIMUM_N_COUNT: props.slackNotifier.minimumNCount.toString(),
-        LAMBDA_CHECKX_ARN: checkxLambda.dockerImageFunction.functionArn,
+        LAMBDA_CHECK_ARN: checkLambda.dockerImageFunction.functionArn,
       };
 
       if (props.slackNotifier.excludeRegex)
@@ -452,10 +383,8 @@ export class HolmesApplicationStack extends Stack {
               // the public slack function needs to know the locations of all
               // the lambda - so that it can invoke them in response to Slash commands
               LAMBDA_CHECK_ARN: checkLambda.dockerImageFunction.functionArn,
-              LAMBDA_CHECKX_ARN: checkxLambda.dockerImageFunction.functionArn,
               LAMBDA_LIST_ARN: listLambda.dockerImageFunction.functionArn,
               LAMBDA_RELATE_ARN: relateLambda.dockerImageFunction.functionArn,
-              LAMBDA_RELATEX_ARN: relatexLambda.dockerImageFunction.functionArn,
               ...env,
             },
           }
@@ -463,12 +392,10 @@ export class HolmesApplicationStack extends Stack {
 
         // the slack role executes the relevant lambdas on command
         checkLambda.dockerImageFunction.grantInvoke(publicSlackRole);
-        checkxLambda.dockerImageFunction.grantInvoke(publicSlackRole);
         listLambda.dockerImageFunction.grantInvoke(publicSlackRole);
         relateLambda.dockerImageFunction.grantInvoke(publicSlackRole);
-        relatexLambda.dockerImageFunction.grantInvoke(publicSlackRole);
 
-        checkxLambda.dockerImageFunction.grantInvoke(lambdaRole);
+        checkLambda.dockerImageFunction.grantInvoke(lambdaRole);
 
         const fnUrl = publicSlackFunc.addFunctionUrl({
           // auth is done *in* the Slack function to make sure

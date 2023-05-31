@@ -1,14 +1,14 @@
 import { chdir } from "process";
-import { somalierWork } from "./lib/env";
+import { somalierWork } from "../lib/env";
 import {
   cleanSomalierFiles,
   runSomalierRelate,
-} from "./lib/somalier-download-run-clean";
-import { somalierTsvCorrectIds } from "./lib/somalier-tsv-correct-ids";
-import { getSlackTextAttacher } from "./lib/slack";
-import { reportRelate } from "./lib/report-relate";
-import { downloadIndexSamples } from "./lib/ids";
-import { urlListByRegex } from "./lib/url-list-by-regex";
+} from "../lib/somalier-download-run-clean";
+import { somalierTsvCorrectIds } from "../lib/somalier-tsv-correct-ids";
+import { getSlackTextAttacher } from "../lib/slack";
+import { reportRelate } from "../lib/report-relate";
+import { downloadIndexSamples } from "../lib/ids";
+import { urlListByRegex } from "../lib/url-list-by-regex";
 
 type EventInput = {
   // a list of regexs (ANY match) on URLs that will go to build the indexes for the all pairs report

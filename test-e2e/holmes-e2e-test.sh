@@ -12,8 +12,6 @@
 # e2e tests will not interfere with the operations of the real system (they create a new folder in S3
 # isolated to the test run) so can be run in production safely
 
-# NOTE: you may have to update the StateMachine ARNs if the stack has been refreshed
-
 ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
 
 case $ACCOUNT in
@@ -24,9 +22,8 @@ case $ACCOUNT in
      . \
      "umccr-fingerprint-prod" \
      "gds://production/test-data/holmes-test-data" \
-     "arn:aws:states:ap-southeast-2:472057503814:stateMachine:SomalierCheckStateMachine1DDB4CFA-3DKpngpDWtbz" \
-     "arn:aws:states:ap-southeast-2:472057503814:stateMachine:SomalierExtractStateMachine59E102CC-HQfcp9I1CPkZ" \
-     "arn:aws:states:ap-southeast-2:472057503814:stateMachine:SomalierPairsStateMachine5E171314-GC2WYfq9FEDc"
+     "umccr" \
+     $*
     ;;
 
   "455634345446")
@@ -35,9 +32,8 @@ case $ACCOUNT in
      . \
      "umccr-fingerprint-stg" \
      "gds://staging/test-data/holmes-test-data" \
-     "arn:aws:states:ap-southeast-2:455634345446:stateMachine:SomalierCheckStateMachine1DDB4CFA-hgrtT7cs5XYK" \
-     "arn:aws:states:ap-southeast-2:455634345446:stateMachine:SomalierExtractStateMachine59E102CC-0y8sSr7lSH8R" \
-     "arn:aws:states:ap-southeast-2:455634345446:stateMachine:SomalierPairsStateMachine5E171314-BgxfR32P41kf"
+     "umccr" \
+     $*
     ;;
 
   "843407916570")
@@ -46,9 +42,8 @@ case $ACCOUNT in
      . \
      "umccr-fingerprint-local-dev-test" \
      "gds://development/test-data/holmes-test-data" \
-     "arn:aws:states:ap-southeast-2:843407916570:stateMachine:SomalierCheckStateMachine1DDB4CFA-QlEQkSUmc8Qp" \
-     "arn:aws:states:ap-southeast-2:843407916570:stateMachine:SomalierExtractStateMachine59E102CC-Lrl1LV43kDPD" \
-     "arn:aws:states:ap-southeast-2:843407916570:stateMachine:SomalierPairsStateMachine5E171314-2f7kcAc92ZDt"
+     "umccr" \
+     $*
     ;;
 
   *)

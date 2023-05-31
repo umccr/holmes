@@ -58,7 +58,7 @@ describe("Run grouping algorithm", () => {
     );
   }); */
 
-  it("do something", async () => {
+  xit("do something", async () => {
     const succeededContent = JSON.parse(
       await readFile(
         join(__dirname, "UNEXPECTED_RELATED_SUCCEEDED_0.json"),

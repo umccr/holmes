@@ -4,15 +4,25 @@ import { stepsDoExecution } from "./lib/aws";
 import { SFNClient } from "@aws-sdk/client-sfn";
 import { distributedMapManifestToLambdaResults } from "./lib/distributed-map";
 import { reportCheck } from "./lib/report-check";
+import { urlListByRegex } from "./lib/url-list-by-regex";
+import { MAX_CHECK } from "./limits";
 
 type EventInput = {
   // the BAM urls to use as indexes in our check against the database
-  indexes: string[];
+  indexes?: string[];
+
+  // a set of BAM url regexes ANY of which need to match to be considered for checks
+  regexes?: string[];
 
   // the slash terminated folder where the fingerprints have been sourced in S3 (i.e. the folder key + /)
   fingerprintFolder: string;
 
+  // a threshold to report against
   relatednessThreshold?: number;
+
+  minimumNCount?: number;
+
+  excludeRegex?: string;
 
   expectRelatedRegex?: string;
 
@@ -45,11 +55,37 @@ export const lambdaHandler = async (ev: EventInput, _context: any) => {
   console.log(`Finger bucket = ${fingerprintBucketName}`);
   console.log(`Folder = ${ev.fingerprintFolder}`);
   console.log(`Indexes = ${ev.indexes}`);
+  console.log(`Regexes = ${ev.regexes}`);
+
+  if (ev.regexes && ev.indexes)
+    throw new Error(
+      "Only one of indexes or regexes can be specified on any one check call"
+    );
+
+  let urlsToCheck: string[] = [];
+  let truncated = false;
+
+  if (ev.regexes) {
+    let urls = await urlListByRegex(ev.regexes, [], ev.fingerprintFolder);
+    urlsToCheck = urls.map((u) => u.url);
+  } else if (ev.indexes) {
+    urlsToCheck = ev.indexes;
+  } else
+    throw new Error(
+      "One of indexes or regexes must be specified on any one check call"
+    );
+
+  if (urlsToCheck.length > MAX_CHECK) {
+    urlsToCheck = urlsToCheck.slice(0, MAX_CHECK);
+    truncated = true;
+  }
 
   const stepsArgs = {
     fingerprintFolder: ev.fingerprintFolder,
-    indexes: ev.indexes,
+    indexes: urlsToCheck,
     relatednessThreshold: ev.relatednessThreshold,
+    minimumNCount: ev.minimumNCount,
+    excludeRegex: ev.excludeRegex,
     expectRelatedRegex: ev.expectRelatedRegex,
   };
 
@@ -58,27 +94,6 @@ export const lambdaHandler = async (ev: EventInput, _context: any) => {
     process.env["CHECK_STEPS_ARN"],
     stepsArgs
   );
-
-  // an example check large result (note we have suppressed some values out i.e. <runuuid>)
-  // {
-  //   "expectRelatedRegex": "^\\b$",
-  //   "excludeRegex": "^\\b$",
-  //   "minimumNCount": 50,
-  //   "indexes": [
-  //     "gds://1kg-genomes/extra/HG00100.bam",
-  //     "gds://1kg-genomes/extra/HG00101.bam",
-  //     "gds://1kg-genomes/extra/HG00103.bam"
-  //   ],
-  //   "relatednessThreshold": -0.5,
-  //   "fingerprintFolder": "fingerprints-1kg/",
-  //   "matches": {
-  //     "MapRunArn": "arn:aws:states:<region>:<account>:mapRun:SomalierCheckLargeStateMachine03C80DDB-ABCD/<stepsuuid>:<runuuid>",
-  //     "ResultWriterDetails": {
-  //       "Bucket": "umccr-fingerprint-local-dev-test",
-  //       "Key": "temp/<runuuid>/manifest.json"
-  //     }
-  //   }
-  // }
 
   // all the details of the result are saved into the files - AS LISTED IN THE GIVEN MANIFEST
   // so firstly we turn all that data into a JSON array
@@ -90,9 +105,21 @@ export const lambdaHandler = async (ev: EventInput, _context: any) => {
   if (ev.channelId) {
     const responder = await getSlackTextAttacher(ev.channelId);
 
-    const report = await reportCheck(lambdaResults);
+    const report =
+      (await reportCheck(lambdaResults)) +
+      (truncated
+        ? `\n⚠️ TOO MANY FINGERPRINT INPUTS SO CHECK WAS RUN ONLY ON FIRST ${MAX_CHECK}`
+        : "");
 
-    await responder(report);
+    const reportTitle = ev.indexes
+      ? `Fingerprint check report for explicit indexes ${
+          truncated ? " (truncated)" : ""
+        }`
+      : `Fingerprint check report for regexes【${ev.regexes!.join(" | ")}】${
+          truncated ? " (truncated)" : ""
+        }`;
+
+    await responder(report, reportTitle);
   }
 
   return lambdaResults;

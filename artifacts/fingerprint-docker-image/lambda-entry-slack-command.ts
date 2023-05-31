@@ -67,7 +67,7 @@ export const lambdaHandler = async (event: any) => {
   const params = new URLSearchParams(bodyString);
 
   // example from docs
-  // token=gIkuvaNzQIHg97ATvDxqgjtO
+  // token=atoken
   // &team_id=T0001
   // &team_domain=example
   // &enterprise_id=E0001
@@ -145,6 +145,10 @@ export const lambdaHandler = async (event: any) => {
 
   const client = new LambdaClient({});
 
+  // NOTE: there can be a mismatch between the subCommand name and the name of the lambda
+  // we actually invoke. For instance, check and checkx as subcommands are both serviced by
+  // a single CHECK_LAMBDA_ARN (just with different arguments passed)
+
   let lambdaCommand: InvokeCommand;
 
   switch (subCommand) {
@@ -176,7 +180,7 @@ export const lambdaHandler = async (event: any) => {
       break;
 
     case "checkx":
-      // before even invoking our relatex lambda - we try to catch any input that won't be a regexp
+      // before even invoking our check lambda - we try to catch any input that won't be a regexp
       // and instead immediately return an error response
       let currentCheckxR = "";
       try {
@@ -190,7 +194,7 @@ export const lambdaHandler = async (event: any) => {
         };
       }
       lambdaCommand = new InvokeCommand({
-        FunctionName: process.env["LAMBDA_CHECKX_ARN"],
+        FunctionName: process.env["LAMBDA_CHECK_ARN"],
         InvocationType: "Event",
         Payload: Buffer.from(
           JSON.stringify({
@@ -217,7 +221,7 @@ export const lambdaHandler = async (event: any) => {
         };
       }
       lambdaCommand = new InvokeCommand({
-        FunctionName: process.env["LAMBDA_RELATEX_ARN"],
+        FunctionName: process.env["LAMBDA_RELATE_ARN"],
         InvocationType: "Event",
         Payload: Buffer.from(
           JSON.stringify({
@@ -275,7 +279,7 @@ export const lambdaHandler = async (event: any) => {
     response_type: "in_channel",
     // our check commands are a bit slower than the others so we send back more info..
     text: subCommand.startsWith("check")
-      ? "May take up to 30 seconds..."
+      ? "Fingerprint checks may take up to 30 seconds..."
       : undefined,
   };
 };

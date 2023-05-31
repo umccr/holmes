@@ -23,7 +23,7 @@ new HolmesApplicationStack(app, "HolmesLocalDevTestStack", {
   shouldCreateFingerprintBucket: false,
   fingerprintConfigFolder: "config/",
   slackNotifier: {
-    cron: "cron(0 17 ? * * *)",
+    cron: "cron(30 * ? * * *)",
     days: undefined,
     // change this to the personal id of whichever dev is doing dev work
     channel: "C058W0G54H2",

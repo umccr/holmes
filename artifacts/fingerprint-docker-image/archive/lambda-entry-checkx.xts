@@ -1,10 +1,11 @@
-import { fingerprintBucketName } from "./lib/env";
-import { getSlackTextAttacher } from "./lib/slack";
-import { stepsDoExecution } from "./lib/aws";
+import { fingerprintBucketName } from "../lib/env";
+import { getSlackTextAttacher } from "../lib/slack";
+import { stepsDoExecution } from "../lib/aws";
 import { SFNClient } from "@aws-sdk/client-sfn";
-import { distributedMapManifestToLambdaResults } from "./lib/distributed-map";
-import { reportCheck } from "./lib/report-check";
-import { urlListByRegex } from "./lib/url-list-by-regex";
+import { distributedMapManifestToLambdaResults } from "../lib/distributed-map";
+import { reportCheck } from "../lib/report-check";
+import { urlListByRegex } from "../lib/url-list-by-regex";
+import { MAX_CHECK } from "../limits";
 
 type EventInput = {
   // the BAM urls regexes any of which can match
@@ -51,9 +52,13 @@ export const lambdaHandler = async (ev: EventInput, _context: any) => {
   console.log(`Folder = ${ev.fingerprintFolder}`);
   console.log(`Regexes = ${ev.regexes}`);
 
-  const urls = await urlListByRegex(ev.regexes, ev.fingerprintFolder);
+  let urls = await urlListByRegex(ev.regexes, ev.fingerprintFolder);
+  let truncated = false;
 
-  if (urls.length > 25) throw new Error("Hit max");
+  if (urls.length > MAX_CHECK) {
+    urls = urls.slice(0, MAX_CHECK);
+    truncated = true;
+  }
 
   const stepsArgs = {
     fingerprintFolder: ev.fingerprintFolder,
@@ -101,11 +106,17 @@ export const lambdaHandler = async (ev: EventInput, _context: any) => {
   if (ev.channelId) {
     const responder = await getSlackTextAttacher(ev.channelId);
 
-    const report = await reportCheck(lambdaResults);
+    const report =
+      (await reportCheck(lambdaResults)) +
+      (truncated
+        ? `\n⚠️ TOO MANY FINGERPRINT MATCHES SO CHECK WAS RUN ONLY ON FIRST ${MAX_CHECK}`
+        : "");
 
     await responder(
       report,
-      `Fingerprint checkx report for ${ev.regexes.join(" | ")}`
+      `Fingerprint checkx report for 【${ev.regexes.join(" | ")}】${
+        truncated ? " (truncated)" : ""
+      }`
     );
   }
 

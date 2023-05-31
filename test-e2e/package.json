@@ -3,10 +3,13 @@
   "version": "0.0.0",
   "private": true,
   "dependencies": {
-    "@aws-sdk/client-sfn": "3.236.0",
-    "@aws-sdk/client-s3": "3.236.0",
-    "@aws-sdk/client-sts": "3.236.0",
-    "@aws-sdk/abort-controller": "3.226.0",
+    "@aws-sdk/client-lambda": "3.341.0",
+    "@aws-sdk/client-servicediscovery": "3.341.0",
+    "@aws-sdk/client-sfn": "3.341.0",
+    "@aws-sdk/client-s3": "3.341.0",
+    "@aws-sdk/client-sts": "3.341.0",
+    "@aws-sdk/abort-controller": "3.341.0",
+    "@aws-sdk/util-utf8": "3.310.0",
     "axios-retry": "3.3.1",
     "constructs": "10.1.198",
     "source-map-support": "0.5.21"
