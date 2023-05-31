@@ -48,7 +48,9 @@ export class HolmesPipelineStack extends Stack {
         }),
         env: {},
         commands: [
-          "cd deploy/pipeline",
+          "cd workload-holmes",
+          "npm ci",
+          "cd ../deploy/pipeline",
           "npm ci",
           // our cdk is configured to use ts-node - so we don't need any build step - just synth
           "npx cdk synth",
