@@ -83,6 +83,36 @@ export class HolmesPipelineStack extends Stack {
     // our secret name is consistent across all envs
     const ICA_SEC = "IcaSecretsPortal"; // pragma: allowlist secret
 
+    // temporary production-beta
+    {
+      const prodBetaStage = new HolmesBuildStage(this, "ProdBeta", {
+        env: {
+          account: AWS_PROD_ACCOUNT,
+          region: AWS_PROD_REGION,
+        },
+        namespaceName: NAMESPACE_BETA_NAME,
+        namespaceId: NAMESPACE_PROD_BETA_ID,
+        icaSecretNamePartial: ICA_SEC,
+        fingerprintBucketName: "umccr-fingerprint-prod",
+        shouldCreateFingerprintBucket: false,
+        fingerprintConfigFolder: "config/",
+        slackNotifier: {
+          cron: "cron(30 * ? * * *)",
+          days: undefined,
+          // change this to the personal id of whichever dev is doing dev work
+          channel: "C058W0G54H2",
+          fingerprintFolder: "fingerprints-prod/",
+          // the default settings to use for all our Slack interactions with the API/lambdas
+          relatednessThreshold: 0.8,
+          minimumNCount: 50,
+          expectRelatedRegex: "^.*SBJ(\\d\\d\\d\\d\\d).*$",
+        },
+      });
+
+      // deploy this automatically from staging publish
+      pipeline.addStage(prodBetaStage, {});
+    }
+
     // staging
     {
       // other aspects are specific to staging
@@ -108,26 +138,22 @@ export class HolmesPipelineStack extends Stack {
         // new pipelines.ManualApprovalStep("Run E2E Tests (20 mins)"),
         new pipelines.ShellStep("E2E Tests", {
           envFromCfnOutputs: {
-            //CHECK_STEPS_ARN: stgStage.checkStepsArnOutput,
-            EXTRACT_STEPS_ARN: stgStage.extractStepsArnOutput,
-            //PAIRS_STEPS_ARN: stgStage.pairsStepsArnOutput,
             TESTER_ROLE_ARN: stgStage.testerRoleArnOutput!,
           },
           commands: [
             "npm ci",
             // this is an approx 20 minute test that deletes some fingerprints, then creates some
             // new fingerprints, then does some checks
-            `NODE_OPTIONS="--unhandled-rejections=strict" npx ts-node test-e2e/holmes-e2e-test.ts "$TESTER_ROLE_ARN" "${STG_FINGERPRINT_BUCKET}" "${STG_GDS_TEST_DATA_BASE}" "$CHECK_STEPS_ARN" "$EXTRACT_STEPS_ARN" "$PAIRS_STEPS_ARN" `,
+            `NODE_OPTIONS="--unhandled-rejections=strict" npx ts-node test-e2e/holmes-e2e-test.ts "$TESTER_ROLE_ARN" "${STG_FINGERPRINT_BUCKET}" "${STG_GDS_TEST_DATA_BASE}" "${NAMESPACE_NAME}"`,
           ],
         }),
       ]);
 
       pipeline.addStage(stgStage, {
-        // post: orderedSteps,
+        pre: [new pipelines.ManualApprovalStep("PromoteToStg")],
+        post: orderedSteps,
       });
     }
-
-    const prodWave = pipeline.addWave("ProdWave");
 
     // production
     {
@@ -144,7 +170,7 @@ export class HolmesPipelineStack extends Stack {
         fingerprintConfigFolder: "config/",
       });
 
-      prodWave.addStage(prodStage, {
+      pipeline.addStage(prodStage, {
         pre: [new pipelines.ManualApprovalStep("PromoteToProd")],
       });
 
@@ -153,26 +179,6 @@ export class HolmesPipelineStack extends Stack {
       // HOWEVER it is possible to log in to prod and run
       // homes-e2e-test.sh
       // which will safely run a production test
-    }
-
-    // temporary production-beta
-    {
-      const prodBetaStage = new HolmesBuildStage(this, "ProdBeta", {
-        env: {
-          account: AWS_PROD_ACCOUNT,
-          region: AWS_PROD_REGION,
-        },
-        namespaceName: NAMESPACE_BETA_NAME,
-        namespaceId: NAMESPACE_PROD_BETA_ID,
-        icaSecretNamePartial: ICA_SEC,
-        fingerprintBucketName: "umccr-fingerprint-prod",
-        shouldCreateFingerprintBucket: false,
-        fingerprintConfigFolder: "config/",
-      });
-
-      prodWave.addStage(prodBetaStage, {
-        pre: [new pipelines.ManualApprovalStep("PromoteToProd")],
-      });
     }
   }
 }
