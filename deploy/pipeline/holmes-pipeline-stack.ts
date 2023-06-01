@@ -98,13 +98,15 @@ export class HolmesPipelineStack extends Stack {
         fingerprintBucketName: "umccr-fingerprint-prod",
         shouldCreateFingerprintBucket: false,
         fingerprintConfigFolder: "config/",
+        // the default settings to use for all our Slack interactions with the API/lambdas
+        // most of these are settings that normally are able to be specificed by the API caller
+        // - but for Slack we have preset these
         slackNotifier: {
           cron: "cron(30 * ? * * *)",
           days: undefined,
           // change this to the personal id of whichever dev is doing dev work
           channel: "C058W0G54H2",
-          fingerprintFolder: "fingerprints-prod/",
-          // the default settings to use for all our Slack interactions with the API/lambdas
+          fingerprintFolder: "fingerprints/",
           relatednessThreshold: 0.8,
           minimumNCount: 50,
           expectRelatedRegex: "^.*SBJ(\\d\\d\\d\\d\\d).*$",

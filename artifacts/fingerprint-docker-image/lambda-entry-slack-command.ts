@@ -1,6 +1,6 @@
 import * as crypto from "crypto";
 import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
-import { MAX_RELATE } from "./limits";
+import { MAX_CHECK, MAX_RELATE } from "./limits";
 import { getFromEnv } from "./env";
 import { getSlackSigningSecret } from "./lib/slack";
 
@@ -113,10 +113,11 @@ export const lambdaHandler = async (event: any) => {
             type: "mrkdwn",
             text: `
 \`/fingerprint\`
-     \`listx <re> [<re>...]\` return a list of fingerprints with BAM URLs matching any RE
-     \`checkx <re> [<re>...]\` report threshold relatedness of the BAM URLs matching any RE against the fingerprint database
+     \`listx <re> [<re>...]\` return a list of fingerprints (and dates) with BAM URLs matching any RE
+     \`checkx <re> [<re>...]\` report threshold relatedness of the BAM URLs matching any RE against the fingerprint database (max ${MAX_CHECK})
      \`relatex <re> [<re>...]\` report all relatedness of the BAM URLs matching any RE against each other (max ${MAX_RELATE})
-     \`check <url> [<url>...]\` report threshold relatedness of the given BAM URLs against the fingerprint database
+     \`list <url> [<url>...]\` return a list of fingerprints (and dates) of the given BAM URLs
+     \`check <url> [<url>...]\` report threshold relatedness of the given BAM URLs against the fingerprint database (max ${MAX_CHECK})
      \`relate <url> [<url>...]\` report all relatedness of the given BAM URLs against each other (max ${MAX_RELATE})
      \`help\` this help
             `,
@@ -139,17 +140,16 @@ export const lambdaHandler = async (event: any) => {
       subCommandArgsIfUrls.push(item);
   }
 
-  console.log(subCommand);
-  console.log(subCommandArgs);
-  console.log(subCommandArgsIfUrls);
-
-  const client = new LambdaClient({});
+  console.log(`Sub command = ${subCommand}`);
+  console.log(`Sub command args = ${subCommandArgs}`);
+  console.log(`Sub command url args = ${subCommandArgsIfUrls}`);
 
   // NOTE: there can be a mismatch between the subCommand name and the name of the lambda
   // we actually invoke. For instance, check and checkx as subcommands are both serviced by
   // a single CHECK_LAMBDA_ARN (just with different arguments passed)
 
-  let lambdaCommand: InvokeCommand;
+  let lambdaArn: string | undefined;
+  let lambdaPayloadJson: any;
 
   switch (subCommand) {
     case "listx":
@@ -166,17 +166,12 @@ export const lambdaHandler = async (event: any) => {
           text: `Sorry, Slack command 'listx' failed because input ${currentListxR} could not be interpreted as a regular expression`,
         };
       }
-      lambdaCommand = new InvokeCommand({
-        FunctionName: process.env["LAMBDA_LIST_ARN"],
-        InvocationType: "Event",
-        Payload: Buffer.from(
-          JSON.stringify({
-            ...getFromEnv(),
-            channelId: o.channel_id,
-            regexes: subCommandArgs,
-          })
-        ),
-      });
+      lambdaArn = process.env["LAMBDA_LIST_ARN"];
+      lambdaPayloadJson = {
+        ...getFromEnv(),
+        channelId: o.channel_id,
+        regexes: subCommandArgs,
+      };
       break;
 
     case "checkx":
@@ -193,17 +188,12 @@ export const lambdaHandler = async (event: any) => {
           text: `Sorry, Slack command 'checkx' failed because input ${currentCheckxR} could not be interpreted as a regular expression`,
         };
       }
-      lambdaCommand = new InvokeCommand({
-        FunctionName: process.env["LAMBDA_CHECK_ARN"],
-        InvocationType: "Event",
-        Payload: Buffer.from(
-          JSON.stringify({
-            ...getFromEnv(),
-            channelId: o.channel_id,
-            regexes: subCommandArgs,
-          })
-        ),
-      });
+      lambdaArn = process.env["LAMBDA_CHECK_ARN"];
+      lambdaPayloadJson = {
+        ...getFromEnv(),
+        channelId: o.channel_id,
+        regexes: subCommandArgs,
+      };
       break;
 
     case "relatex":
@@ -220,45 +210,39 @@ export const lambdaHandler = async (event: any) => {
           text: `Sorry, Slack command 'relatex' failed because input ${currentRelatexR} could not be interpreted as a regular expression`,
         };
       }
-      lambdaCommand = new InvokeCommand({
-        FunctionName: process.env["LAMBDA_RELATE_ARN"],
-        InvocationType: "Event",
-        Payload: Buffer.from(
-          JSON.stringify({
-            ...getFromEnv(),
-            channelId: o.channel_id,
-            regexes: subCommandArgs,
-          })
-        ),
-      });
+      lambdaArn = process.env["LAMBDA_RELATE_ARN"];
+      lambdaPayloadJson = {
+        ...getFromEnv(),
+        channelId: o.channel_id,
+        regexes: subCommandArgs,
+      };
+      break;
+
+    case "list":
+      lambdaArn = process.env["LAMBDA_LIST_ARN"];
+      lambdaPayloadJson = {
+        ...getFromEnv(),
+        channelId: o.channel_id,
+        indexes: subCommandArgsIfUrls,
+      };
       break;
 
     case "check":
-      lambdaCommand = new InvokeCommand({
-        FunctionName: process.env["LAMBDA_CHECK_ARN"],
-        InvocationType: "Event",
-        Payload: Buffer.from(
-          JSON.stringify({
-            ...getFromEnv(),
-            channelId: o.channel_id,
-            indexes: subCommandArgsIfUrls,
-          })
-        ),
-      });
+      lambdaArn = process.env["LAMBDA_CHECK_ARN"];
+      lambdaPayloadJson = {
+        ...getFromEnv(),
+        channelId: o.channel_id,
+        indexes: subCommandArgsIfUrls,
+      };
       break;
 
     case "relate":
-      lambdaCommand = new InvokeCommand({
-        FunctionName: process.env["LAMBDA_RELATE_ARN"],
-        InvocationType: "Event",
-        Payload: Buffer.from(
-          JSON.stringify({
-            ...getFromEnv(),
-            channelId: o.channel_id,
-            indexes: subCommandArgsIfUrls,
-          })
-        ),
-      });
+      lambdaArn = process.env["LAMBDA_RELATE_ARN"];
+      lambdaPayloadJson = {
+        ...getFromEnv(),
+        channelId: o.channel_id,
+        indexes: subCommandArgsIfUrls,
+      };
       break;
 
     default:
@@ -270,6 +254,23 @@ export const lambdaHandler = async (event: any) => {
 
   // because we have only 3 seconds to response to a Slack message - we need to asynchronously invoke
   // the subsequent lambda and just let it post back the response
+  const client = new LambdaClient({});
+
+  if (!lambdaArn)
+    return {
+      response_type: "ephemeral",
+      text: `Sorry, Slack sub-command \`${subCommand}\` did not set the subsequent function to call - this is an internal error`,
+    };
+
+  console.log(`Payload being sent to lambda ${lambdaArn}`);
+  console.log(JSON.stringify(lambdaPayloadJson));
+
+  const lambdaCommand = new InvokeCommand({
+    FunctionName: lambdaArn,
+    InvocationType: "Event",
+    Payload: Buffer.from(JSON.stringify(lambdaPayloadJson)),
+  });
+
   const response = await client.send(lambdaCommand);
 
   console.log(response);

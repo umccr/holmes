@@ -6,6 +6,7 @@ import {
   Pass,
   StateMachine,
   Succeed,
+  Timeout,
 } from "aws-cdk-lib/aws-stepfunctions";
 import {
   ContainerDefinition,
@@ -33,6 +34,10 @@ import {
 import { Duration } from "aws-cdk-lib";
 import { standardEnv } from "./fingerprint-lambda-env";
 
+/**
+ * A construct wrapping a state machine (steps) - that performs Fingerprint extracts on
+ * a set of input BAM URLs.
+ */
 export class SomalierExtractStateMachineConstruct extends SomalierBaseStateMachineConstruct {
   readonly stateMachine: StateMachine;
   readonly taskDefinition: TaskDefinition;
@@ -185,7 +190,7 @@ export class SomalierExtractStateMachineConstruct extends SomalierBaseStateMachi
       // we should not get *anywhere* near 6 hours for tasks - each fingerprint takes about 15 mins...
       // but we set it here as a worst case where we have an infinite loop or something - we want steps to
       // step in and kill the task
-      timeout: Duration.hours(6),
+      taskTimeout: Timeout.duration(Duration.hours(6)),
     });
   }
 
