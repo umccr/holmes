@@ -104,7 +104,7 @@ export class HolmesPipelineStack extends Stack {
         slackNotifier: {
           cron: "cron(0 12 ? * * *)",
           days: undefined,
-          channel: "#biofingerprinting",
+          channel: "C058REG24R1",
           fingerprintFolder: "fingerprints/",
           relatednessThreshold: 0.8,
           minimumNCount: 50,
