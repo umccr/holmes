@@ -110,6 +110,7 @@ export class HolmesPipelineStack extends Stack {
           relatednessThreshold: 0.8,
           minimumNCount: 50,
           expectRelatedRegex: "^.*SBJ(\\d\\d\\d\\d\\d).*$",
+          excludeRegex: "^.*(PTC_|NTC_).*$",
         },
       });
 
