@@ -102,10 +102,9 @@ export class HolmesPipelineStack extends Stack {
         // most of these are settings that normally are able to be specificed by the API caller
         // - but for Slack we have preset these
         slackNotifier: {
-          cron: "cron(30 * ? * * *)",
+          cron: "cron(0 12 ? * * *)",
           days: undefined,
-          // change this to the personal id of whichever dev is doing dev work
-          channel: "C058W0G54H2",
+          channel: "#biofingerprinting",
           fingerprintFolder: "fingerprints/",
           relatednessThreshold: 0.8,
           minimumNCount: 50,

@@ -11,7 +11,9 @@ export type UrlListResult = {
 
 /**
  * Find all URLs in the fingerprint database that match ANY
- * of the passed in regexes OR match a passed in index.
+ * of the passed in regexes OR match a passed in index. Has a master
+ * level excludeRegex that can fundamentally block out certain
+ * files (like NTC or PTC)
  *
  * Also allows the regex to match
  * against portions of the printed date of modification of the
@@ -21,16 +23,20 @@ export type UrlListResult = {
  * @param regexes an array of regexs of which ANY can match
  * @param indexes an array of URLs that can match directly as well
  * @param fingerprintFolder the folder the fingerprints are in
+ * @param excludeRegex a possible regex used to exclude by filename
  */
 export async function urlListByRegex(
   regexes: string[],
   indexes: string[],
-  fingerprintFolder: string
+  fingerprintFolder: string,
+  excludeRegex?: string
 ) {
   const result: UrlListResult[] = [];
 
   const regexReals: RegExp[] = regexes.map((r) => RegExp(r));
   const indexesSet = new Set<string>(indexes);
+
+  const excludeRegexReal = excludeRegex ? RegExp(excludeRegex) : undefined;
 
   for await (const s3Object of s3ListAllFiles(
     fingerprintBucketName!,
@@ -42,6 +48,8 @@ export async function urlListByRegex(
     if (s3Object.Key === fingerprintFolder) continue;
 
     const urlAsString = keyToUrl(fingerprintFolder, s3Object.Key).toString();
+
+    if (excludeRegexReal) if (excludeRegexReal.test(urlAsString)) continue;
 
     const lm = s3Object.LastModified
       ? formatInTimeZone(

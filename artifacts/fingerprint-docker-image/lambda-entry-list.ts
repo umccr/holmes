@@ -13,6 +13,8 @@ type EventInput = {
   // the slash terminated folder where the fingerprints have been sourced in S3 (i.e. the folder key + /)
   fingerprintFolder: string;
 
+  excludeRegex?: string;
+
   // if present, tells the lambda to send the response as an attachment to Slack in that channel
   channelId?: string;
 };
@@ -42,18 +44,28 @@ export const lambdaHandler = async (ev: EventInput, _context: any) => {
   const urls = await urlListByRegex(
     ev.regexes,
     ev.indexes,
-    ev.fingerprintFolder
+    ev.fingerprintFolder,
+    ev.excludeRegex
   );
+
+  const reportTitle = `Fingerprint list report for regexes【${ev.regexes!.join(
+    " | "
+  )}】 and ${(ev.indexes || []).length} explicit indexes`;
+
+  if (urls.length === 0) {
+    if (ev.channelId) {
+      const responder = await getSlackTextAttacher(ev.channelId);
+
+      await responder("⚠️ NO FINGERPRINTS FOUND", reportTitle);
+    }
+
+    return [];
+  }
 
   if (ev.channelId) {
     const responder = await getSlackTextAttacher(ev.channelId);
     const report = await reportList(urls);
-    await responder(
-      report,
-      `Fingerprint list report for ${ev.regexes.join(" | ")} and/or ${
-        (ev.indexes || []).length
-      } named files`
-    );
+    await responder(report, reportTitle);
   }
 
   return urls;

@@ -30,19 +30,21 @@ export const lambdaHandler = async (event: any) => {
     "yyyy-MM-dd"
   );
 
+  const payloadAsJson = {
+    ...getFromEnv(),
+    channelId: channel,
+    regexes: [yesterdayString],
+  };
+
+  console.log(JSON.stringify(payloadAsJson));
+
   const client = new LambdaClient({});
 
   const response = await client.send(
     new InvokeCommand({
       FunctionName: process.env["LAMBDA_CHECK_ARN"],
       InvocationType: "Event",
-      Payload: Buffer.from(
-        JSON.stringify({
-          ...getFromEnv(),
-          channelId: channel,
-          regexes: [yesterdayString],
-        })
-      ),
+      Payload: Buffer.from(JSON.stringify(payloadAsJson)),
     })
   );
 

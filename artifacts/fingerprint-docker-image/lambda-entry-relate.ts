@@ -21,6 +21,8 @@ type EventInput = {
   // the slash terminated folder where the fingerprints have been sourced in S3 (i.e. the folder key + /)
   fingerprintFolder: string;
 
+  excludeRegex?: string;
+
   // if present, tells the lambda to send the response as an attachment to Slack in that channel
   channelId?: string;
 };
@@ -50,7 +52,12 @@ export const lambdaHandler = async (ev: EventInput, _context: any) => {
   let truncated = false;
 
   if (ev.regexes) {
-    let urls = await urlListByRegex(ev.regexes, [], ev.fingerprintFolder);
+    let urls = await urlListByRegex(
+      ev.regexes,
+      [],
+      ev.fingerprintFolder,
+      ev.excludeRegex
+    );
     urlsToCheck = urls.map((u) => u.url);
   } else if (ev.indexes) {
     urlsToCheck = ev.indexes;
@@ -62,6 +69,27 @@ export const lambdaHandler = async (ev: EventInput, _context: any) => {
   if (urlsToCheck.length > MAX_RELATE) {
     urlsToCheck = urlsToCheck.slice(0, MAX_RELATE);
     truncated = true;
+  }
+
+  const reportTitle = ev.indexes
+    ? `Fingerprint relate report for explicit indexes ${
+        truncated ? " (truncated)" : ""
+      }`
+    : `Fingerprint relate report for regexes【${ev.regexes!.join(" | ")}】${
+        truncated ? " (truncated)" : ""
+      }`;
+
+  if (urlsToCheck.length === 0) {
+    if (ev.channelId) {
+      const responder = await getSlackTextAttacher(ev.channelId);
+
+      await responder("⚠️ NO FINGERPRINTS FOUND", reportTitle);
+    }
+
+    return {
+      samplesTsv: "",
+      pairsTsv: "",
+    };
   }
 
   const indexSampleIdToBamUrlMap = await downloadIndexSamples(
@@ -95,14 +123,6 @@ export const lambdaHandler = async (ev: EventInput, _context: any) => {
       (truncated
         ? `\n⚠️ TOO MANY FINGERPRINT INPUTS SO RELATE WAS RUN ONLY ON FIRST ${MAX_RELATE}`
         : "");
-
-    const reportTitle = ev.indexes
-      ? `Fingerprint relate report for explicit indexes ${
-          truncated ? " (truncated)" : ""
-        }`
-      : `Fingerprint relate report for regexes【${ev.regexes!.join(" | ")}】${
-          truncated ? " (truncated)" : ""
-        }`;
 
     await responder(report, reportTitle);
   }

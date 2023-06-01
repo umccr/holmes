@@ -13,6 +13,13 @@ export async function reportCheck(
   // we build this report string
   let reportText = "";
 
+  reportText += `ER = expected related
+UR = unexpected related
+UU = unexpected unrelated\n\n`;
+
+  let reportUrBreakoutText: string[] = [];
+  let reportUuBreakoutText: string[] = [];
+
   const tableData: any[][] = [];
 
   tableData.push(["Index URL", "ER\n(self + others)", "UR", "UU"]);
@@ -31,13 +38,50 @@ export async function reportCheck(
         ? 0
         : m.unexpectedUnrelated.length.toString() + " ❌",
     ]);
+
+    if (m.unexpectedRelated.length > 0) {
+      const urTableData: any[][] = [];
+
+      urTableData.push(["Other URL", "Relatedness", "N"]);
+
+      for (const ur of m.unexpectedRelated) {
+        urTableData.push([ur.file, ur.relatedness, ur.n]);
+      }
+
+      reportUrBreakoutText.push(
+        table(urTableData, {
+          header: {
+            alignment: "center",
+            content: `UR ${rKey}`,
+          },
+        })
+      );
+    }
+
+    if (m.unexpectedUnrelated.length > 0) {
+      const uuTableData: any[][] = [];
+
+      uuTableData.push(["Other URL", "Relatedness", "N"]);
+
+      for (const uu of m.unexpectedUnrelated) {
+        uuTableData.push([uu.file, uu.relatedness, uu.n]);
+      }
+
+      reportUuBreakoutText.push(
+        table(uuTableData, {
+          header: {
+            alignment: "center",
+            content: `UU ${rKey}`,
+          },
+        })
+      );
+    }
   }
 
-  reportText += table(tableData, {});
-  reportText += `  ER = expected related
-  UR = unexpected related
-  UU = unexpected unrelated
-  `;
+  reportText += table(tableData, {}) + "\n\n";
+
+  reportText += reportUrBreakoutText.join("\n");
+  reportText += reportUuBreakoutText.join("\n");
 
   return reportText;
 }

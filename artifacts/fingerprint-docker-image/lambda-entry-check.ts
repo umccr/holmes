@@ -66,10 +66,21 @@ export const lambdaHandler = async (ev: EventInput, _context: any) => {
   let truncated = false;
 
   if (ev.regexes) {
-    let urls = await urlListByRegex(ev.regexes, [], ev.fingerprintFolder);
+    let urls = await urlListByRegex(
+      ev.regexes,
+      [],
+      ev.fingerprintFolder,
+      ev.excludeRegex
+    );
     urlsToCheck = urls.map((u) => u.url);
   } else if (ev.indexes) {
-    urlsToCheck = ev.indexes;
+    let urls = await urlListByRegex(
+      [],
+      ev.indexes,
+      ev.fingerprintFolder,
+      ev.excludeRegex
+    );
+    urlsToCheck = urls.map((u) => u.url);
   } else
     throw new Error(
       "One of indexes or regexes must be specified on any one check call"
@@ -78,6 +89,24 @@ export const lambdaHandler = async (ev: EventInput, _context: any) => {
   if (urlsToCheck.length > MAX_CHECK) {
     urlsToCheck = urlsToCheck.slice(0, MAX_CHECK);
     truncated = true;
+  }
+
+  const reportTitle = ev.indexes
+    ? `Fingerprint check report for explicit indexes ${
+        truncated ? " (truncated)" : ""
+      }`
+    : `Fingerprint check report for regexes【${ev.regexes!.join(" | ")}】${
+        truncated ? " (truncated)" : ""
+      }`;
+
+  if (urlsToCheck.length === 0) {
+    if (ev.channelId) {
+      const responder = await getSlackTextAttacher(ev.channelId);
+
+      await responder("⚠️ NO FINGERPRINTS FOUND", reportTitle);
+    }
+
+    return {};
   }
 
   const stepsArgs = {
@@ -110,14 +139,6 @@ export const lambdaHandler = async (ev: EventInput, _context: any) => {
       (truncated
         ? `\n⚠️ TOO MANY FINGERPRINT INPUTS SO CHECK WAS RUN ONLY ON FIRST ${MAX_CHECK}`
         : "");
-
-    const reportTitle = ev.indexes
-      ? `Fingerprint check report for explicit indexes ${
-          truncated ? " (truncated)" : ""
-        }`
-      : `Fingerprint check report for regexes【${ev.regexes!.join(" | ")}】${
-          truncated ? " (truncated)" : ""
-        }`;
 
     await responder(report, reportTitle);
   }

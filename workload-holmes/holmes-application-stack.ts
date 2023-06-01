@@ -331,7 +331,7 @@ export class HolmesApplicationStack extends Stack {
               "Schedules a daily examination of the previous days sequencing fingerprints",
             FlexibleTimeWindow: {
               Mode: "FLEXIBLE",
-              MaximumWindowInMinutes: 60,
+              MaximumWindowInMinutes: 5,
             },
             ScheduleExpression: props.slackNotifier.cron,
             ScheduleExpressionTimezone: "Australia/Melbourne",

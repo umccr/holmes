@@ -23,7 +23,7 @@ new HolmesApplicationStack(app, "HolmesLocalDevTestStack", {
   shouldCreateFingerprintBucket: false,
   fingerprintConfigFolder: "config/",
   slackNotifier: {
-    cron: "cron(30 * ? * * *)",
+    cron: "cron(0 12 ? * * *)",
     days: undefined,
     // change this to the personal id of whichever dev is doing dev work
     channel: "C058W0G54H2",
@@ -33,5 +33,6 @@ new HolmesApplicationStack(app, "HolmesLocalDevTestStack", {
     relatednessThreshold: 0.8,
     minimumNCount: 50,
     expectRelatedRegex: "^.*SBJ(\\d\\d\\d\\d\\d).*$",
+    excludeRegex: "^.*(PTC_|NTC_).*$",
   },
 });
