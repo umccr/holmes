@@ -17,6 +17,7 @@ new HolmesPipelineStack(app, "HolmesPipelineStack", {
     region: AWS_BUILD_REGION,
   },
   tags: {
-    Stack: TAG_STACK_VALUE,
+    "umccr-org:Stack": "HolmesPipeline",
+    "umccr-org:Product": "Holmes",
   },
 });

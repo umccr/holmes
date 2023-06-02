@@ -170,6 +170,7 @@ export const lambdaHandler = async (event: any) => {
       lambdaPayloadJson = {
         ...getFromEnv(),
         channelId: o.channel_id,
+        indexes: [],
         regexes: subCommandArgs,
       };
       break;
@@ -224,6 +225,7 @@ export const lambdaHandler = async (event: any) => {
         ...getFromEnv(),
         channelId: o.channel_id,
         indexes: subCommandArgsIfUrls,
+        regexes: [],
       };
       break;
 

@@ -39,6 +39,8 @@ UU = unexpected unrelated\n\n`;
         : m.unexpectedUnrelated.length.toString() + " ❌",
     ]);
 
+    // if this index has unexpected related - create a breakout table
+    // documenting that
     if (m.unexpectedRelated.length > 0) {
       const urTableData: any[][] = [];
 
@@ -58,6 +60,8 @@ UU = unexpected unrelated\n\n`;
       );
     }
 
+    // if this index has unexpected unrelated - create a breakout table
+    // documenting that
     if (m.unexpectedUnrelated.length > 0) {
       const uuTableData: any[][] = [];
 

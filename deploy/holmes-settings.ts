@@ -63,11 +63,6 @@ export interface HolmesSettings {
      */
     readonly cron: string;
 
-    /**
-     * The number of days to go back looking for new fingerprints, or undefined to mean go back until encountered
-     */
-    readonly days?: number;
-
     // The following are settings that are normally API parameters to the lambdads - but we do not
     // give our Slack users a chance to set these (should we?)
     // So anyhow they have to be baked in at this config level
@@ -93,9 +88,11 @@ export interface HolmesSettings {
      */
     readonly excludeRegex?: string;
 
-    // if present a regex that generates match groups - and expects all fingerprints with group matches
-    // to the index - to also be 'related' genomically.. this is used to detect fingerprints that *should*
-    // be related but come back not related
+    /**
+     * If present a regex that generates match groups - and expects all fingerprints with group matches
+     * to the index - to also be 'related' genomically.. this is used to detect fingerprints that *should*
+     * be related but come back not related
+     */
     readonly expectRelatedRegex?: string;
   };
 }

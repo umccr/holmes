@@ -8,25 +8,27 @@ import { urlListByRegex } from "./lib/url-list-by-regex";
 import { MAX_CHECK } from "./limits";
 
 type EventInput = {
-  // the BAM urls to use as indexes in our check against the database
+  // EITHER the BAM urls to use as indexes
   indexes?: string[];
-
-  // a set of BAM url regexes ANY of which need to match to be considered for checks
+  // OR a set of BAM url regexes ANY of which matching will include the BAM in the index
   regexes?: string[];
 
   // the slash terminated folder where the fingerprints have been sourced in S3 (i.e. the folder key + /)
   fingerprintFolder: string;
 
-  // a threshold to report against
-  relatednessThreshold?: number;
-
-  minimumNCount?: number;
-
+  // if present, a regular expression to apply to all filenames to exclude them from use as indexes entirely
   excludeRegex?: string;
 
+  // if present, a threshold of relatedness for somalier, or use a default
+  relatednessThreshold?: number;
+
+  // if present, impose a minimum N in somalier to be considered a positive "relation" between samples
+  minimumNCount?: number;
+
+  // if present, a regular expression with single capture group that defines expected "relation" between samples
   expectRelatedRegex?: string;
 
-  // if present, tells the lambda to send the response as an attachment to Slack in that channel
+  // if present, tells the lambda to additionally send the response as an attachment to Slack in that channel
   channelId?: string;
 };
 

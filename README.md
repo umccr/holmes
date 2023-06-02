@@ -15,137 +15,21 @@ is high, and therefore the `relatedness` score can help guard against
 sample mix-ups - by uncovering where unexpected relationships exist between
 samples.
 
+Holmes is a low-cost (activity only costing - almost no cost as rest) tool that can be interacted
+with via AWS API (Lambda and Steps) OR via Slack commands. It will perform a variety
+of `somalier` calls over a large database of fingerprints.
+
 ## Developers
 
 Before doing any development work - please see [here](docs/DEV.md) for dev setup instructions.
 
-## Service
+## Service (as API)
 
-### Invoke
+See [here](docs/API.md)
 
-The service provides all entry points as AWS Steps functions.
+## Service (as Slack command)
 
-These functions are registered into the `umccr` namespace.
-
-Only one service instance will ever be registered in the namespace, so
-the technique for service discovery is to locate the `fingerprint`
-service - and then select the one and only service instance present.
-Then choose the custom attribute that matches the Steps function Arn
-to invoke.
-
----
-
-#### Extract
-
-`umccr -> fingerprint -> (single service) -> extractStepsArn`
-
-with an input of
-
-```json
-{
-  "indexes": ["bamUrl1", ..],
-  "reference": "hg38.rna",
-  "fingerprintFolder": "fingerprints/"
-}
-```
-
-`reference` must match references and sites that are present in the `config/` folder of the fingerprint bucket - in practice `hg38.rna` or `hg19.rna`.
-
-`fingerprintFolder` is optional.
-
-and produces output of the form
-
-```json
-{}
-```
-
-Each entry in the `indexes` array will be fingerprinted. There are some advantages to
-doing multiple fingerprints sequentially in the task, so it is up to the
-invoker to chose how many BAMs to process on each Task.
-
-Fingerprinting each BAM takes approximately 15 minutes.
-
----
-
-#### Check
-
-`umccr -> fingerprint -> (single service) -> checkStepsArn`
-
-with an input of
-
-```json
-{
-  "indexes": ["gds://development/sample1.bam", "gds://development/sample2.bam"],
-  "fingerprintFolder": "fingerprints/",
-  "relatednessThreshold": 0.4
-}
-```
-
-`fingerprintFolder` and `relatednessThreshold` are optional.
-
-produces output of the form
-
-```json
-[
-  {
-    "file": "gds://development/sample1.bam",
-    "relatedness": 1,
-    "ibs0": 0,
-    "ibs2": 16146,
-    "hom_concordance": 1,
-    "hets_a": 6163,
-    "hets_b": 6163,
-    "hets_ab": 12326,
-    "shared_hets": 6163,
-    "hom_alts_a": 5389,
-    "hom_alts_b": 5389,
-    "shared_hom_alts": 5389,
-    "n": 16146,
-    "x_ibs0": 0,
-    "x_ibs2": 769
-  }
-]
-```
-
-The index BAM should _always_ be returned with a relatedness of 1 - confirming that
-the service is working. Any other BAMs that have a relatedness above the threshold
-will also be returned.
-
-This service takes approximately 15 seconds to run.
-
-We can also search for 'expected' matches using a very primitive regular expression file name matching
-algorithm. This means that where two files have a regular expression where all matching groups
-also match - their fingerprints MUST also be related.
-
-```json
-{
-  "indexes": ["gds://development/sample1.bam", "gds://development/sample2.bam"],
-  "expectRelatedRegex": "^.*SBJ_(\\d\\d\\d\\d\\d).*\\.bam$"
-}
-```
-
-If the expected relatedness check fails then the following entry will be returned (where regex is the
-regular expression passed in).
-
-```json
-[
-  {
-    "file": "gds://development/sampleX.bam",
-    "unrelatedness": "regex"
-  }
-]
-```
-
-We can also remove from consideration any file that matches a regular expression.
-
-```json
-{
-  "indexes": ["gds://development/sample1.bam", "gds://development/sample2.bam"],
-  "excludeRegex": "^.*PTC.*\\.bam$"
-}
-```
-
----
+See [here](docs/SLACK.md)
 
 ## Costing
 
@@ -155,7 +39,7 @@ practice to be roughly correct.
 ## Design
 
 The service maintains an S3 bucket that stores fingerprint files (~200k per BAM) and then
-provides AWS Steps functions that operate to run `somalier` over these files.
+provides AWS Steps/Lambda functions that operate to run `somalier` over these files.
 
 ```mermaid
   graph TD;
@@ -186,38 +70,6 @@ the canonical definition that a BAM has been fingerprinted.
 The check operation will always operate against all fingerprints that
 exist in the designated fingerprint folder.
 
-### Lambdas
+## Algorithm
 
-A single Docker lambda image is created that contains all code executed via Steps.
-
-This lambda image has the `somalier` tool compiled directly into the Docker image.
-
-`somalier` cannot source fingerprints via network - so each lambda must download
-the subset of fingerprints it is working on to the lambda /tmp directory - call
-`somalier` and then return the results.
-
-The lambdas are distributed concurrently using Steps Map - which means that no
-one lambda is required to spend too much time downloading files, nor can the files
-overflow its /tmp directory.
-
-THe lambda _could_ be taught to source somalier files from any
-source - currently supported are S3 and GDS.
-
-## Step
-
-The step function can be executed with the equivalent of
-
-```
-aws stepfunctions start-execution \
- --state-machine-arn arn:aws:states:ap-southeast-2:843407916570:stateMachine:StateMachineAAAAAA-XXXXXX \
- --cli-input-yaml file://adhoc-test-invoke-input.yaml
-```
-
-where the test input is
-
-```yaml
-input: >
-  {
-    "indexes": ["gds://development/analysis_data/SBJ00480/wgs_alignment_qc/20211128e4a69bdb/L2000966__1_dragen_somalier/PTC_Tsqn201109MB.somalier"]
-  }
-```
+The details of how `somalier` scores are used is documented [here](docs/ALGORITHM.md).

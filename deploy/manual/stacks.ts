@@ -12,6 +12,10 @@ const app = new cdk.App();
 new HolmesApplicationStack(app, "HolmesLocalDevTestStack", {
   description:
     "Local dev/test deployment of Holmes during development - feel free to tear down - this is *not* part of the CodePipeline deploy",
+  tags: {
+    "umccr-org:Stack": "ElsaDataApplication",
+    "umccr-org:Product": "Holmes",
+  },
   icaSecretNamePartial: "IcaSecretsPortal", // pragma: allowlist secret
   namespaceName: "umccr",
   namespaceId: "ns-mjt63c4ppdrly4jd",
@@ -24,11 +28,9 @@ new HolmesApplicationStack(app, "HolmesLocalDevTestStack", {
   fingerprintConfigFolder: "config/",
   slackNotifier: {
     cron: "cron(0 12 ? * * *)",
-    days: undefined,
     // change this to the personal id of whichever dev is doing dev work
     channel: "C058W0G54H2",
-    // fingerprintFolder: "fingerprints-test-bc13669e6503cdd3ab0ec7cef47a5b950968a02d/",
-    fingerprintFolder: "fingerprints-prod/",
+    fingerprintFolder: "fingerprints/",
     // the default settings to use for all our Slack interactions with the API/lambdas
     relatednessThreshold: 0.8,
     minimumNCount: 50,

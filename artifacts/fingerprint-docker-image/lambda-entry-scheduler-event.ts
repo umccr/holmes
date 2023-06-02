@@ -5,8 +5,9 @@ import { subDays } from "date-fns";
 
 /**
  * This lambda is a lambda that will be executed on regular intervals
- * asking for a report on previous sequencing runs. It is turn will call
- * check with a wildcard of a "date".
+ * asking for a report on previous sequencing runs. It will perform a check
+ * using a regex of the previous days date.
+ *
  * Because it is triggered via cron events we do not pass in settings via the lambda event - but instead
  * set the settings in environment variables when it is installed.
  *
@@ -22,6 +23,7 @@ export const lambdaHandler = async (event: any) => {
         "not executed due to missing env variables FINGERPRINT_BUCKET_NAME or CHANNEL",
     };
 
+  // we want to find yesterdays date as a string
   const yesterday = subDays(new Date(), 1);
 
   const yesterdayString = formatInTimeZone(
@@ -30,6 +32,8 @@ export const lambdaHandler = async (event: any) => {
     "yyyy-MM-dd"
   );
 
+  // we now want to trigger a check operation - but using yesterdays date as the regex
+  // to use for building the index cases
   const payloadAsJson = {
     ...getFromEnv(),
     channelId: channel,

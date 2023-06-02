@@ -18,6 +18,7 @@ export class HolmesBuildStage extends Stage {
 
     this.testerRoleArnOutput = stack.testerRoleArnOutput;
 
-    Tags.of(stack).add("Stack", TAG_STACK_VALUE);
+    Tags.of(stack).add("umccr-org:Stack", TAG_STACK_VALUE);
+    Tags.of(stack).add("umccr-org:Product", "Holmes");
   }
 }

@@ -4,15 +4,18 @@ import { reportList } from "./lib/report-list";
 import { urlListByRegex } from "./lib/url-list-by-regex";
 
 type EventInput = {
-  // the URL of the BAMs we are asking for an all pairs report
+  // for list indexes and regexes can both be specified together
+
+  // the BAM urls to use as indexes
   indexes: string[];
 
-  // the regexes to apply to the fingerprints (ANY of the regexes need to match)
+  // AND a set of BAM url regexes ANY of which matching will include the BAM in the index
   regexes: string[];
 
   // the slash terminated folder where the fingerprints have been sourced in S3 (i.e. the folder key + /)
   fingerprintFolder: string;
 
+  // if present, a regular expression to apply to all filenames to exclude them from use as indexes entirely
   excludeRegex?: string;
 
   // if present, tells the lambda to send the response as an attachment to Slack in that channel

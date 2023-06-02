@@ -39,5 +39,4 @@ be stored and paid for. But a service that otherwise has nothing but usage costs
 ## Requirements
 
 Like most genomic labs - the volume of genomic tests is bursty - often batched
-up until the sequencer run is fully utilised. It is not easy to predict exactly
-when
+up until the sequencer run is fully utilised.

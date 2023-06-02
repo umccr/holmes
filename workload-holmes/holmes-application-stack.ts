@@ -284,10 +284,6 @@ export class HolmesApplicationStack extends Stack {
       if (props.slackNotifier.expectRelatedRegex)
         env["EXPECT_RELATED_REGEX"] = props.slackNotifier?.expectRelatedRegex;
 
-      if (props.slackNotifier.days) {
-        env["DAYS"] = props.slackNotifier.days.toString();
-      }
-
       // we install one function that is only for invocation from AWS event bridge
       {
         const eventFunc = new DockerImageFunction(
