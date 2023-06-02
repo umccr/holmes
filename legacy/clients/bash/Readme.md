@@ -1,5 +1,8 @@
 # CLI example of holmes
 
+NOTE this has not been updated to take into account the conversion
+of check from a steps function to a lambda.
+
 ## extract and check
 
 > extract_and_check_a_single_bam.sh

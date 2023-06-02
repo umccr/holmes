@@ -1,20 +1,10 @@
 import { Construct } from "constructs";
 import { DockerImageAsset } from "aws-cdk-lib/aws-ecr-assets";
-import {
-  LambdaInvoke,
-  TaskEnvironmentVariable,
-} from "aws-cdk-lib/aws-stepfunctions-tasks";
+import { LambdaInvoke } from "aws-cdk-lib/aws-stepfunctions-tasks";
 import { ICluster } from "aws-cdk-lib/aws-ecs";
-import {
-  IRole,
-  ManagedPolicy,
-  Role,
-  ServicePrincipal,
-} from "aws-cdk-lib/aws-iam";
+import { Role } from "aws-cdk-lib/aws-iam";
 import { ISecret } from "aws-cdk-lib/aws-secretsmanager";
 import { IBucket } from "aws-cdk-lib/aws-s3";
-import { DockerImageCode, DockerImageFunction } from "aws-cdk-lib/aws-lambda";
-import { Duration } from "aws-cdk-lib";
 import { FingerprintLambda } from "./fingerprint-lambda";
 
 export type SomalierBaseStateMachineProps = {

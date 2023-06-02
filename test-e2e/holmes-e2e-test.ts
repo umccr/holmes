@@ -1,20 +1,14 @@
-import {
-  StartExecutionCommand,
-  SFNClient,
-  DescribeExecutionCommand,
-} from "@aws-sdk/client-sfn";
-import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { SFNClient } from "@aws-sdk/client-sfn";
+import { S3Client } from "@aws-sdk/client-s3";
 import * as assert from "assert";
+import { fail } from "assert";
 import { AssumeRoleCommand, STSClient } from "@aws-sdk/client-sts";
 import * as crypto from "crypto";
-import { writeFile } from "fs/promises";
 import {
   DiscoverInstancesCommand,
   ServiceDiscoveryClient,
 } from "@aws-sdk/client-servicediscovery";
-import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
-import { toUtf8 } from "@aws-sdk/util-utf8";
-import { fail } from "assert";
+import { LambdaClient } from "@aws-sdk/client-lambda";
 import {
   doFingerprintCheck,
   doFingerprintExtract,
@@ -461,6 +455,7 @@ export async function runTest(
       })
     );
 
+    // we need to create clients suitable for the assumed role credentials
     const stepsClient = new SFNClient({
       credentials: {
         accessKeyId: assumeRoleResult.Credentials?.AccessKeyId!,
@@ -505,6 +500,7 @@ export async function runTest(
       process.argv[4]
     );
   } else {
+    // run the test with just regular credentials of the caller environment
     await runTest(
       new SFNClient({}),
       new S3Client({}),

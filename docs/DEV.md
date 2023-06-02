@@ -21,7 +21,7 @@ Changes to the CDK constructs can be tested just by doing a deployment of your l
 
 ## Local Development
 
-See [README.md](../test-local-dev/README.md)
+See [README.md](../legacy/test-local-dev/README.md)
 
 ## CDK Pipeline
 
