@@ -103,7 +103,6 @@ export class HolmesPipelineStack extends Stack {
         // - but for Slack we have preset these
         slackNotifier: {
           cron: "cron(0 12 ? * * *)",
-          days: undefined,
           channel: "C058REG24R1",
           fingerprintFolder: "fingerprints/",
           relatednessThreshold: 0.8,
