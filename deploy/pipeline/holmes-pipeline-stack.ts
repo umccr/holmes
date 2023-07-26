@@ -85,37 +85,6 @@ export class HolmesPipelineStack extends Stack {
     // our secret name is consistent across all envs
     const ICA_SEC = "IcaSecretsPortal"; // pragma: allowlist secret
 
-    // temporary production-beta
-    {
-      const prodBetaStage = new HolmesBuildStage(this, "ProdBeta", {
-        env: {
-          account: AWS_PROD_ACCOUNT,
-          region: AWS_PROD_REGION,
-        },
-        namespaceName: NAMESPACE_BETA_NAME,
-        namespaceId: NAMESPACE_PROD_BETA_ID,
-        icaSecretNamePartial: ICA_SEC,
-        fingerprintBucketName: "umccr-fingerprint-prod",
-        shouldCreateFingerprintBucket: false,
-        fingerprintConfigFolder: "config/",
-        // the default settings to use for all our Slack interactions with the API/lambdas
-        // most of these are settings that normally are able to be specificed by the API caller
-        // - but for Slack we have preset these
-        slackNotifier: {
-          cron: "cron(0 12 ? * * *)",
-          channel: "C058REG24R1",
-          fingerprintFolder: "fingerprints/",
-          relatednessThreshold: 0.8,
-          minimumNCount: 50,
-          expectRelatedRegex: "^.*SBJ(\\d\\d\\d\\d\\d).*$",
-          excludeRegex: "^.*(PTC_|NTC_).*$",
-        },
-      });
-
-      // deploy this automatically from staging publish
-      pipeline.addStage(prodBetaStage, {});
-    }
-
     // staging
     {
       // other aspects are specific to staging
@@ -154,8 +123,39 @@ export class HolmesPipelineStack extends Stack {
       ]);
 
       pipeline.addStage(stgStage, {
-        pre: [new pipelines.ManualApprovalStep("PromoteToStg")],
         post: orderedSteps,
+      });
+    }
+
+    // temporary production-beta
+    {
+      const prodBetaStage = new HolmesBuildStage(this, "ProdBeta", {
+        env: {
+          account: AWS_PROD_ACCOUNT,
+          region: AWS_PROD_REGION,
+        },
+        namespaceName: NAMESPACE_BETA_NAME,
+        namespaceId: NAMESPACE_PROD_BETA_ID,
+        icaSecretNamePartial: ICA_SEC,
+        fingerprintBucketName: "umccr-fingerprint-prod",
+        shouldCreateFingerprintBucket: false,
+        fingerprintConfigFolder: "config/",
+        // the default settings to use for all our Slack interactions with the API/lambdas
+        // most of these are settings that normally are able to be specificed by the API caller
+        // - but for Slack we have preset these
+        slackNotifier: {
+          cron: "cron(0 12 ? * * *)",
+          channel: "C058REG24R1",
+          fingerprintFolder: "fingerprints/",
+          relatednessThreshold: 0.8,
+          minimumNCount: 50,
+          expectRelatedRegex: "^.*SBJ(\\d\\d\\d\\d\\d).*$",
+          excludeRegex: "^.*(PTC_|NTC_).*$",
+        },
+      });
+
+      pipeline.addStage(prodBetaStage, {
+        pre: [new pipelines.ManualApprovalStep("PromoteToProdBeta")],
       });
     }
 

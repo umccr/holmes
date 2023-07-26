@@ -212,7 +212,7 @@ export class HolmesApplicationStack extends Stack {
 
     /* I don't understand CloudMap - there seems no way for me to import in a namespace that
         already exists... other than providing *all* the details... and a blank arn?? */
-    /*const namespace = HttpNamespace.fromHttpNamespaceAttributes(
+    const namespace = HttpNamespace.fromHttpNamespaceAttributes(
       this,
       "Namespace",
       {
@@ -235,7 +235,7 @@ export class HolmesApplicationStack extends Stack {
         listLambdaArn: listLambda.dockerImageFunction.functionArn,
         relateLambdaArn: relateLambda.dockerImageFunction.functionArn,
       },
-    }); */
+    });
 
     if (testerRole) {
       this.testerRoleArnOutput = new CfnOutput(this, "TesterRoleArn", {
