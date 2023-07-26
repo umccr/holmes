@@ -114,6 +114,9 @@ export class HolmesApplicationStack extends Stack {
         ManagedPolicy.fromAwsManagedPolicyName("AWSCloudMapReadOnlyAccess")
       );
 
+      // the test role needs to be able to launch lambda services - these are added later once
+      // lambdas are constructed
+
       // we add steps execution permissions in the state machine constructs
     }
 
@@ -241,6 +244,10 @@ export class HolmesApplicationStack extends Stack {
       this.testerRoleArnOutput = new CfnOutput(this, "TesterRoleArn", {
         value: testerRole.roleArn,
       });
+
+      checkLambda.dockerImageFunction.grantInvoke(testerRole);
+      listLambda.dockerImageFunction.grantInvoke(testerRole);
+      relateLambda.dockerImageFunction.grantInvoke(testerRole);
     }
 
     if (props.slackNotifier) {
