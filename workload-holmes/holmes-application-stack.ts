@@ -109,6 +109,11 @@ export class HolmesApplicationStack extends Stack {
       // enable full access to the fingerprint bucket as the test does some deletion
       fingerprintBucket.grantReadWrite(testerRole);
 
+      // the tester needs to be able to discover the services
+      testerRole.addManagedPolicy(
+        ManagedPolicy.fromAwsManagedPolicyName("AWSCloudMapReadOnlyAccess")
+      );
+
       // we add steps execution permissions in the state machine constructs
     }
 
