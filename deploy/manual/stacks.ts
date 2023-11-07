@@ -36,5 +36,6 @@ new HolmesApplicationStack(app, "HolmesLocalDevTestStack", {
     minimumNCount: 50,
     expectRelatedRegex: "^.*SBJ(\\d\\d\\d\\d\\d).*$",
     excludeRegex: "^.*(PTC_|NTC_).*$",
+    fingerprintControlFolder: "fingerprints-controls/",
   },
 });

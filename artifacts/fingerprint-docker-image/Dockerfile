@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 brentp/somalier:v0.2.16 as somalier-real
+FROM --platform=linux/amd64 brentp/somalier:v0.2.19 as somalier-real
 
 # we are going to grab the compile somalier binary out of the docker image
 
@@ -24,8 +24,9 @@ RUN npx esbuild lambda-entry-relate.ts --bundle --outfile=relate.cjs --platform=
 RUN npx esbuild lambda-entry-check.ts --bundle --outfile=check.cjs --platform=node --target=node18
 RUN npx esbuild lambda-entry-step-check.ts --bundle --outfile=step-check.cjs --platform=node --target=node18
 
-# the extractor
+# the extractors
 RUN npx esbuild fargate-entry-extract.ts --bundle --outfile=extract.cjs --platform=node --target=node18
+RUN npx esbuild fargate-entry-extract-control.ts --bundle --outfile=extract-control.cjs --platform=node --target=node18
 
 RUN npx esbuild lambda-entry-scheduler-event.ts --bundle --outfile=scheduler-event.cjs --platform=node --target=node18
 RUN npx esbuild lambda-entry-slack-command.ts --bundle --outfile=slack-command.cjs --platform=node --target=node18

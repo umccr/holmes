@@ -1,9 +1,12 @@
 import { argv } from "process";
 import { extract } from "./lib/extract";
 import {
-  ENV_NAME_FINGERPRINT_FOLDER,
+  ENV_NAME_FINGERPRINT_CONTROL_FOLDER,
   ENV_NAME_FINGERPRINT_REFERENCE,
-} from "./lib/env";
+} from "./fargate-env";
+
+// NOTE: we use some environment variables here only because steps/fargate conspire to be terrible
+// at allowing us to invoke Fargate sensibly
 
 (async () => {
   try {
@@ -12,15 +15,16 @@ import {
     if (!reference)
       throw Error(`Must set env ${ENV_NAME_FINGERPRINT_REFERENCE}`);
 
-    const fingerprintFolder = process.env[ENV_NAME_FINGERPRINT_FOLDER];
+    const fingerprintControlFolder =
+      process.env[ENV_NAME_FINGERPRINT_CONTROL_FOLDER];
 
-    if (!fingerprintFolder)
-      throw Error(`Must set env ${ENV_NAME_FINGERPRINT_FOLDER}`);
+    if (!fingerprintControlFolder)
+      throw Error(`Must set env ${ENV_NAME_FINGERPRINT_CONTROL_FOLDER}`);
 
-    await extract(reference, fingerprintFolder, argv.slice(2));
+    await extract(reference, fingerprintControlFolder, argv.slice(2));
   } catch (e) {
     console.error(
-      "Fargate entrypoint caught exception from extract() function"
+      "Fargate control entrypoint caught exception from extract() function"
     );
     console.error(e);
 

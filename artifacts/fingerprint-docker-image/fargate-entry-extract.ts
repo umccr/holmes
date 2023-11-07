@@ -3,7 +3,10 @@ import { extract } from "./lib/extract";
 import {
   ENV_NAME_FINGERPRINT_FOLDER,
   ENV_NAME_FINGERPRINT_REFERENCE,
-} from "./lib/env";
+} from "./fargate-env";
+
+// NOTE: we use some environment variables here only because steps/fargate conspire to be terrible
+// at allowing us to invoke Fargate sensibly
 
 (async () => {
   try {

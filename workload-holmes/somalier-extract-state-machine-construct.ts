@@ -172,6 +172,9 @@ export class SomalierExtractStateMachineConstruct extends SomalierBaseStateMachi
       containerOverrides: [
         {
           containerDefinition: containerDefinition,
+          // NOTE if we could get JsonPath to do $.fingerprintFolder $.reference $.indexes
+          // all as one concatted array then we wouldn't need to pass in environment variables which would
+          // then let us improve this code
           command: JsonPath.listAt("$.indexes"),
           // the "command" mapping ability here is a bit limited so we will pass some values
           // that I normally would have said are parameters in via ENV variables
@@ -179,6 +182,10 @@ export class SomalierExtractStateMachineConstruct extends SomalierBaseStateMachi
             {
               name: "FINGERPRINT_FOLDER",
               value: JsonPath.stringAt("$.fingerprintFolder"),
+            },
+            {
+              name: "FINGERPRINT_CONTROL_FOLDER",
+              value: JsonPath.stringAt("$.fingerprintControlFolder"),
             },
             {
               name: "FINGERPRINT_REFERENCE",

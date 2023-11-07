@@ -1,12 +1,6 @@
 import { env as envDict } from "process";
 import { s3Download, s3ListAllFiles } from "./aws";
 
-// NOTE: this is used *only* as an env variable for passing to Fargate because Fargate has crappy input
-export const ENV_NAME_FINGERPRINT_REFERENCE = "FINGERPRINT_REFERENCE";
-
-// NOTE: this is used *only* as an env variable for passing to Fargate because Fargate has crappy input
-export const ENV_NAME_FINGERPRINT_FOLDER = "FINGERPRINT_FOLDER";
-
 // by default, we obviously want this setup to work correctly in a standalone fargate/lambda
 // HOWEVER, it is useful to be able to override these on an execution basis for local testing
 // THIS IS STRICTLY FOR USE IN DEV SETUPS - THESE PATHS ARE NOT CHECKED OR WHITELISTED - BAD THINGS CAN

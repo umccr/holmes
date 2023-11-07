@@ -21,29 +21,9 @@ import {
 
 const s3Client = new S3Client({});
 
-/**
- * Converts a fingerprint bucket key into the URL that that fingerprint
- * came from.
- *
- * @param fingerprintFolder a slash terminated folder (key) where the fingerprints are located in S3
- * @param key
- */
-export function keyToUrl(fingerprintFolder: string, key: string): URL {
-  if (!fingerprintFolder.endsWith("/"))
-    throw new Error("Fingerprint folder must end with a slash");
-
-  // the key is in the format fingerprintFolder/<hexencodedurl>
-  if (!key.startsWith(fingerprintFolder)) {
-    throw new Error(
-      "Key did not belong to fingerprints portion of our fingerprint bucket"
-    );
-  }
-
-  // decode the hex after the leading fingerprintFolder
-  const buf = new Buffer(key.substring(fingerprintFolder.length), "hex");
-
-  return new URL(buf.toString("utf8"));
-}
+// we URL encode the BAM filenames - which leaves a file in S3 in the form s3://blah.bam
+// but these are actually fingerprints - not bams - so we want to add a suffix to make that clear
+const SUFFIX = ".somalier";
 
 /**
  * Turns a URL (of a BAM) into the key that its fingerprint would have
@@ -57,35 +37,49 @@ export function urlToKey(fingerprintFolder: string, url: URL) {
   if (!fingerprintFolder.endsWith("/"))
     throw new Error("Fingerprint folder must end with a slash");
 
-  const buf = Buffer.from(url.toString(), "ascii");
-
-  return `${fingerprintFolder}${buf.toString("hex")}`;
+  // note we used to encode this with a hex encoding - currently we *only* encode to percent encoding
+  //  - but we do support *decoding* both formats
+  return `${fingerprintFolder}${encodeURIComponent(url.toString())}${SUFFIX}`;
 }
 
 /**
- * Return true if a given file exists in S3 and is accessible to us.
+ * Converts a fingerprint bucket key into the URL that that fingerprint
+ * came from.
  *
- * @param bucket
+ * @param fingerprintFolder a slash terminated folder (key) where the fingerprints are located in S3
  * @param key
  */
-export async function s3Exists(
-  bucket: string | undefined,
-  key: string | undefined
-): Promise<boolean> {
-  const bucketParams = {
-    Bucket: bucket,
-    Key: key,
-  };
+export function keyToUrl(fingerprintFolder: string, key: string): URL {
+  if (!fingerprintFolder.endsWith("/"))
+    throw new Error("Fingerprint folder must end with a slash");
 
-  const command = new HeadObjectCommand(bucketParams);
+  // the key is in the format fingerprintFolder/<hexencodedurl> OR fingerprintFolder/<uriencodedurl>.suffix
+  if (!key.startsWith(fingerprintFolder)) {
+    throw new Error(
+      "Key did not belong to fingerprints portion of our fingerprint bucket"
+    );
+  }
 
-  try {
-    const response = await s3Client.send(command);
+  const folderSubstring = key.substring(fingerprintFolder.length);
 
-    return true;
-  } catch (e) {}
+  // we have two ways our fingerprints were encoded - one using percent encoding (the new preferred way)
+  // by definition - the old mechanism would *never* have a percent character - and the new one for any
+  // URL string will have a percent (at the minimum it will encode the colon)
+  if (key.includes("%")) {
+    const decoded = decodeURIComponent(folderSubstring);
 
-  return false;
+    if (!decoded.endsWith(SUFFIX))
+      throw new Error(
+        `File we thought should be a fingerprint did not end with suffix ${SUFFIX} - instead it was ${decoded}`
+      );
+
+    return new URL(decoded.slice(0, -SUFFIX.length));
+  } else {
+    // decode the hex after the leading fingerprintFolder
+    const buf = new Buffer(folderSubstring, "hex");
+
+    return new URL(buf.toString("utf8"));
+  }
 }
 
 /**
@@ -250,36 +244,6 @@ export async function stepsDoExecution(
     console.error(e);
     throw new Error("Step failed to execute");
   }
-}
-
-/**
- * List all the fingerprint files in a bucket and folder.
- *
- * @param bucketName
- * @param fingerprintFolder
- */
-export async function* s3ListAllFingerprintFiles(
-  bucketName: string,
-  fingerprintFolder: string
-): AsyncGenerator<_Object> {
-  const s3Client = new S3Client({});
-
-  let contToken = undefined;
-
-  do {
-    const data: ListObjectsV2Output = await s3Client.send(
-      new ListObjectsV2Command({
-        Bucket: bucketName,
-        Prefix: fingerprintFolder,
-        ContinuationToken: contToken,
-      })
-    );
-
-    contToken = data.NextContinuationToken;
-
-    for (const file of data.Contents || [])
-      if (file.Key !== fingerprintFolder) yield file;
-  } while (contToken);
 }
 
 export async function s3GetObjectAsJson(

@@ -167,6 +167,12 @@ export class HolmesApplicationStack extends Stack {
       stateProps
     );
 
+    const extractControlStateMachine = new SomalierExtractStateMachineConstruct(
+      this,
+      "SomalierExtractControl",
+      stateProps
+    );
+
     const checkLambda = new FingerprintLambda(this, "Check", {
       dockerImageAsset: fingerprintDockerImageAsset,
       icaSecret: icaSecret,
@@ -284,6 +290,7 @@ export class HolmesApplicationStack extends Stack {
         CHANNEL: props.slackNotifier.channel,
         FINGERPRINT_BUCKET_NAME: fingerprintBucket.bucketName,
         FINGERPRINT_FOLDER: props.slackNotifier.fingerprintFolder,
+        FINGERPRINT_CONTROL_FOLDER: props.slackNotifier.fingerprintFolder,
         RELATEDNESS_THRESHOLD:
           props.slackNotifier.relatednessThreshold.toString(),
         MINIMUM_N_COUNT: props.slackNotifier.minimumNCount.toString(),

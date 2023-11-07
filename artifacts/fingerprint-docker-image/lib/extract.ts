@@ -163,7 +163,7 @@ async function fingerprint(file: string, fingerprintFolder: string) {
 }
 
 /**
- * Perform the fingerprint extract for a set of files, according the the
+ * Perform the fingerprint extract for a set of files, according to the
  * given reference. The reference should match the inner portion of the sites filenames
  * that are located in the config/ folder of the fingerprint bucket. See docs
  * for more details but essentially for "config/sites.hg19.rna.vcf.gz" - the "reference" is

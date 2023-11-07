@@ -55,6 +55,8 @@ export async function runTest(
 
   const extractStepsArn =
     instances?.Instances[0]?.Attributes?.["extractStepsArn"];
+  //const extractControlStepsArn =
+  //    instances?.Instances[0]?.Attributes?.["extractControlStepsArn"];
   const checkLambdaArn =
     instances?.Instances[0]?.Attributes?.["checkLambdaArn"];
   const listLambdaArn = instances?.Instances[0]?.Attributes?.["listLambdaArn"];
@@ -62,6 +64,7 @@ export async function runTest(
     instances?.Instances[0]?.Attributes?.["relateLambdaArn"];
 
   if (!extractStepsArn) throw new Error("Missing extractStepsArn in CloudMap");
+  //if (!extractControlStepsArn) throw new Error("Missing extractControlStepsArn in CloudMap");
   if (!checkLambdaArn) throw new Error("Missing checkLambdaArn in CloudMap");
   if (!listLambdaArn) throw new Error("Missing listLambdaArn in CloudMap");
   if (!relateLambdaArn) throw new Error("Missing relateLambdaArn in CloudMap");
@@ -73,6 +76,7 @@ export async function runTest(
   const TRIO_FATHER = `${gdsBase}/family/giab_exome_trio/HG003-ready.bam`;
   const TRIO_MOTHER = `${gdsBase}/family/giab_exome_trio/HG004-ready.bam`;
   const CTDNA = `${gdsBase}/ctdna/PTC_ctTSO220404_L2200417.bam`;
+  const CELLPTC = `${gdsBase}/ptc/PTC_TsqN200511_N.bam`;
 
   console.log(CONSOLE_BREAK_LINE);
   console.log("EXTRACT TESTS");
@@ -86,6 +90,7 @@ export async function runTest(
     TRIO_SON,
     TRIO_FATHER,
     TRIO_MOTHER,
+    CELLPTC,
   ].map((bam) =>
     doFingerprintExtract(
       stepsClient,
