@@ -31,6 +31,10 @@ See [here](docs/API.md)
 
 See [here](docs/SLACK.md)
 
+## Configuration
+
+It is possible to change some of the base settings of Holmes - details are [here](docs/CONFIG.md).
+
 ## Costing
 
 Estimates are available [here](docs/COSTS.md). They have been shown in
