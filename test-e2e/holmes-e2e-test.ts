@@ -78,6 +78,17 @@ export async function runTest(
   const CTDNA = `${gdsBase}/ctdna/PTC_ctTSO220404_L2200417.bam`;
   const CELLPTC = `${gdsBase}/ptc/PTC_TsqN200511_N.bam`;
 
+  await doFingerprintExtract(
+    stepsClient,
+    s3Client,
+    extractStepsArn,
+    fingerprintBucket,
+    fingerprintFolder,
+    "s3://1000genomes/data/NA21144/alignment/NA21144.alt_bwamem_GRCh38DH.20150718.GIH.low_coverage.cram",
+    // "s3://1000genomes-dragen/data/dragen-3.7.4/hg38_altaware_nohla-cnv-anchored/NA12878/NA12878.bam",
+    "hg38.rna"
+  );
+
   console.log(CONSOLE_BREAK_LINE);
   console.log("EXTRACT TESTS");
   console.log(CONSOLE_BREAK_LINE);

@@ -7,29 +7,25 @@ import {
 import { somalierTsvCorrectIds } from "./lib/somalier-tsv-correct-ids";
 import { getSlackTextAttacher } from "./lib/slack";
 import { reportRelate } from "./lib/report-relate";
-import { downloadIndexSamples } from "./lib/ids";
+import { downloadControlSamples, downloadIndexSamples } from "./lib/ids";
 import { urlListByRegex } from "./lib/url-list-by-regex";
 import { MAX_RELATE } from "./limits";
+import { reportControl } from "./lib/report-control";
 
 type EventInput = {
-  // EITHER the BAM urls to use as indexes
-  indexes?: string[];
-  // OR a set of BAM url regexes ANY of which matching will include the BAM in the index
-  regexes?: string[];
+  // a BAM urls to use as index
+  index: string;
 
   // the slash terminated folder where the fingerprints have been sourced in S3 (i.e. the folder key + /)
   fingerprintFolder: string;
-
-  // if present, a regular expression to apply to all filenames to exclude them from use as indexes entirely
-  excludeRegex?: string;
 
   // if present, tells the lambda to send the response as an attachment to Slack in that channel
   channelId?: string;
 };
 
 /**
- * A lambda which does an all pairs somalier report (i.e somalier relate) on all BAM urls passed in
- * and returns the somalier result files as TSV.
+ * A lambda which does a somalier relate report of an index BAM against a set of
+ * control samples.
  *
  * @param ev
  * @param _context
@@ -43,64 +39,33 @@ export const lambdaHandler = async (ev: EventInput, _context: any) => {
   // only small areas of the lambda runtime are read/write so we need to make sure we are in a writeable working dir
   chdir(somalierWork);
 
-  if (ev.regexes && ev.indexes)
-    throw new Error(
-      "Only one of indexes or regexes can be specified on any one relate call"
-    );
+  const reportTitle = `Fingerprint control report for index ${ev.index}`;
 
-  let urlsToCheck: string[] = [];
-  let truncated = false;
-
-  if (ev.regexes) {
-    let urls = await urlListByRegex(
-      ev.regexes,
-      [],
-      ev.fingerprintFolder,
-      ev.excludeRegex
-    );
-    urlsToCheck = urls.map((u) => u.url);
-  } else if (ev.indexes) {
-    urlsToCheck = ev.indexes;
-  } else
-    throw new Error(
-      "One of indexes or regexes must be specified on any one relate call"
-    );
-
-  if (urlsToCheck.length > MAX_RELATE) {
-    urlsToCheck = urlsToCheck.slice(0, MAX_RELATE);
-    truncated = true;
-  }
-
-  const reportTitle = ev.indexes
-    ? `Fingerprint relate report for explicit indexes ${
-        truncated ? " (truncated)" : ""
-      }`
-    : `Fingerprint relate report for regexes【${ev.regexes!.join(" | ")}】${
-        truncated ? " (truncated)" : ""
-      }`;
-
-  if (urlsToCheck.length === 0) {
-    if (ev.channelId) {
-      const responder = await getSlackTextAttacher(ev.channelId);
-
-      await responder("⚠️ NO FINGERPRINTS FOUND", reportTitle);
-    }
-
-    return {
-      samplesTsv: "",
-      pairsTsv: "",
-    };
-  }
+  console.log(JSON.stringify(ev, null, 2));
 
   const indexSampleIdToBamUrlMap = await downloadIndexSamples(
-    urlsToCheck,
+    [ev.index],
     ev.fingerprintFolder
+  );
+
+  console.log(indexSampleIdToBamUrlMap);
+
+  const controlSampleIdToNameMap = await downloadControlSamples(
+    ev.fingerprintFolder,
+    100
   );
 
   const { pairsTsv, samplesTsv } = await runSomalierRelate();
 
+  const combinedSampleIdToNameMap: Record<string, string> = {};
+
+  for (const [k, v] of Object.entries(indexSampleIdToBamUrlMap))
+    combinedSampleIdToNameMap[k] = v;
+  for (const [k, v] of Object.entries(controlSampleIdToNameMap))
+    combinedSampleIdToNameMap[k] = v;
+
   const fixedSamplesTsv = await somalierTsvCorrectIds(
-    indexSampleIdToBamUrlMap,
+    combinedSampleIdToNameMap,
     samplesTsv,
     // column 0 in the samples is a familyid - which we do not use - so we ignore (even though it gets
     // set to the sample id in the absence of a family)
@@ -108,7 +73,7 @@ export const lambdaHandler = async (ev: EventInput, _context: any) => {
   );
 
   const fixedPairsTsv = await somalierTsvCorrectIds(
-    indexSampleIdToBamUrlMap,
+    combinedSampleIdToNameMap,
     pairsTsv,
     [0, 1]
   );
@@ -118,11 +83,11 @@ export const lambdaHandler = async (ev: EventInput, _context: any) => {
   if (ev.channelId) {
     const responder = await getSlackTextAttacher(ev.channelId);
 
-    const report =
-      (await reportRelate(fixedSamplesTsv, fixedPairsTsv)) +
-      (truncated
-        ? `\n⚠️ TOO MANY FINGERPRINT INPUTS SO RELATE WAS RUN ONLY ON FIRST ${MAX_RELATE}`
-        : "");
+    const report = await reportControl(
+      ev.index,
+      fixedSamplesTsv,
+      fixedPairsTsv
+    );
 
     await responder(report, reportTitle);
   }

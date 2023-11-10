@@ -18,6 +18,7 @@ import {
   SFNClient,
   StartExecutionCommand,
 } from "@aws-sdk/client-sfn";
+import axios from "axios";
 
 const s3Client = new S3Client({});
 
@@ -83,6 +84,27 @@ export function keyToUrl(fingerprintFolder: string, key: string): URL {
 }
 
 /**
+ * Download a file via HTTPS to a local file location.
+ *
+ * @param url
+ * @param output
+ */
+export async function httpsDownload(url: string, output: string) {
+  console.time("httpDownload");
+
+  const pipeline = promisify(pipelineCallback);
+
+  const request = await axios.get(url, {
+    responseType: "stream",
+  });
+  await pipeline(request.data, createWriteStream(output));
+
+  console.log(`${output} was produced by downloading ${url}`);
+
+  console.timeEnd("httpDownload");
+}
+
+/**
  * Download a file from S3 to a local file location, and if asked return the checksum of the file.
  *
  * @param bucket the bucket name of the S3 file to download
@@ -101,6 +123,8 @@ export async function s3Download(
     Bucket: bucket,
     Key: key,
   };
+
+  console.time("s3Download");
 
   // for dev/test purposes it is useful that we might already have these files in place - and to not
   // require the download (whether this be by putting them into the docker image, or mounting via docker fs)
@@ -124,6 +148,8 @@ export async function s3Download(
     );
 
     console.log(`${output} was produced by downloading s3://${bucket}/${key}`);
+
+    console.timeEnd("s3Download");
   }
 
   if (doChecksum) {

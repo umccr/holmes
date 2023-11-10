@@ -248,22 +248,18 @@ export const lambdaHandler = async (event: any) => {
       };
       break;
 
-    case "ptc":
+    case "control":
       if (subCommandArgsIfUrls.length != 1) {
         return {
           response_type: "ephemeral",
-          text: `Sorry, Slack command 'ptc' failed because input needs to be exactly on PTC sample BAM URL`,
+          text: `Sorry, Slack command 'control' failed because input needs to be exactly on PTC or NTC sample BAM URL`,
         };
       }
-      lambdaArn = process.env["LAMBDA_RELATE_ARN"];
+      lambdaArn = process.env["LAMBDA_CONTROL_ARN"];
       lambdaPayloadJson = {
         ...getFromEnv(),
-        fingerprintFolder: "fingerprints-controls/",
         channelId: o.channel_id,
-        indexes: [
-          ...subCommandArgsIfUrls,
-          "gds://development/test-data/holmes-test-data/ptc/PTC_TsqN200511_N.bam",
-        ],
+        index: subCommandArgsIfUrls[0],
       };
       break;
 

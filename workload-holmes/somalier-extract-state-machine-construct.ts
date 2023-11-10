@@ -2,7 +2,6 @@ import { Construct } from "constructs";
 import {
   IntegrationPattern,
   JsonPath,
-  Map,
   Pass,
   StateMachine,
   Succeed,
@@ -45,7 +44,7 @@ export class SomalierExtractStateMachineConstruct extends SomalierBaseStateMachi
   constructor(
     scope: Construct,
     id: string,
-    props: SomalierBaseStateMachineProps
+    props: SomalierBaseStateMachineProps & { fingerprintFolderDefault: string }
   ) {
     super(scope, id, props);
 
@@ -65,8 +64,9 @@ export class SomalierExtractStateMachineConstruct extends SomalierBaseStateMachi
 
     this.stateMachine = new StateMachine(this, "StateMachine", {
       definition: new Pass(this, "Define Defaults", {
+        // we allow the default to be set - so we can have different extract state machines configured for different use cases
         parameters: {
-          fingerprintFolder: "fingerprints/",
+          fingerprintFolder: props.fingerprintFolderDefault,
         },
         resultPath: "$.inputDefaults",
       })
@@ -79,6 +79,22 @@ export class SomalierExtractStateMachineConstruct extends SomalierBaseStateMachi
               "args.$":
                 "States.JsonMerge($.inputDefaults, $$.Execution.Input, false)",
             },
+          })
+        )
+        // https://stackoverflow.com/questions/77442579/combining-jsonpath-listat-and-stringat-to-make-a-single-array-in-aws-steps-cdk
+        // A pretty messy Pass stage just so we can concat some array values!
+        .next(
+          new Pass(this, "Merge To Make Command Array", {
+            parameters: {
+              merge: JsonPath.array(
+                JsonPath.array(
+                  JsonPath.stringAt("$.reference"),
+                  JsonPath.stringAt("$.fingerprintFolder")
+                ),
+                JsonPath.stringAt("$.indexes")
+              ),
+            },
+            resultPath: "$.merge",
           })
         )
         .next(extractMapStep)
@@ -108,10 +124,10 @@ export class SomalierExtractStateMachineConstruct extends SomalierBaseStateMachi
         // (we have some developers on M1 macs so we need this to force intel builds)
         cpuArchitecture: CpuArchitecture.X86_64,
       },
-      cpu: 1024,
+      cpu: 4096,
       // some experimentation needed - we definitely don't need this much memory but it may
       // give us better network performance...
-      memoryLimitMiB: 4096,
+      memoryLimitMiB: 8192,
     });
 
     td.taskRole.addManagedPolicy(
@@ -172,26 +188,9 @@ export class SomalierExtractStateMachineConstruct extends SomalierBaseStateMachi
       containerOverrides: [
         {
           containerDefinition: containerDefinition,
-          // NOTE if we could get JsonPath to do $.fingerprintFolder $.reference $.indexes
-          // all as one concatted array then we wouldn't need to pass in environment variables which would
-          // then let us improve this code
-          command: JsonPath.listAt("$.indexes"),
-          // the "command" mapping ability here is a bit limited so we will pass some values
-          // that I normally would have said are parameters in via ENV variables
-          environment: this.createFargateLambdaEnv().concat(
-            {
-              name: "FINGERPRINT_FOLDER",
-              value: JsonPath.stringAt("$.fingerprintFolder"),
-            },
-            {
-              name: "FINGERPRINT_CONTROL_FOLDER",
-              value: JsonPath.stringAt("$.fingerprintControlFolder"),
-            },
-            {
-              name: "FINGERPRINT_REFERENCE",
-              value: JsonPath.stringAt("$.reference"),
-            }
-          ),
+          // note: replace this once Steps ASL has the ability to concat arrays! (see above)
+          command: JsonPath.listAt("$.merge.merge[*][*]"),
+          environment: this.createFargateLambdaEnv(),
         },
       ],
       // we should not get *anywhere* near 6 hours for tasks - each fingerprint takes about 15 mins...
