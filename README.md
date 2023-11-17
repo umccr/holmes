@@ -31,6 +31,40 @@ See [here](docs/API.md)
 
 See [here](docs/SLACK.md)
 
+## Deployment
+
+The stack does not create the fingerprint bucket. Instead this should be created
+manually before installing Holmes.
+
+(in the past this bucket was created in the Holmes stack but that prevented deleting
+the CDK entirely - so instead now the Holmes stack is entirely stateless and the bucket
+needs to be made separately)
+
+Below is the previous definition. The only main thing of note is the two lifecycle rules
+that clean up data. To be honest, it doesn't particularly matter if they are not present, just
+the bucket will fill unnecessarily.
+
+```typescript
+new Bucket(this, "FingerprintBucket", {
+  bucketName: props.fingerprintBucketName,
+  objectOwnership: ObjectOwnership.BUCKET_OWNER_ENFORCED,
+  lifecycleRules: [
+    // we give the test suites the ability to create folders like fingerprints-test-01231432/
+    // and we will auto delete them later
+    {
+      prefix: "fingerprints-test",
+      expiration: Duration.days(1),
+    },
+    // space for us to make temp file results from the DistributedMap
+    {
+      prefix: "temp",
+      expiration: Duration.days(1),
+    },
+  ],
+  removalPolicy: RemovalPolicy.RETAIN,
+});
+```
+
 ## Costing
 
 Estimates are available [here](docs/COSTS.md). They have been shown in
