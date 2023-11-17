@@ -10,11 +10,12 @@ export class HolmesBuildStage extends Stage {
   constructor(
     scope: Construct,
     id: string,
-    props: StageProps & HolmesSettings
+    stageProps: StageProps,
+    stackProps: HolmesSettings
   ) {
-    super(scope, id, props);
+    super(scope, id, stageProps);
 
-    const stack = new HolmesApplicationStack(this, "Holmes", props);
+    const stack = new HolmesApplicationStack(this, "Holmes", stackProps);
 
     this.testerRoleArnOutput = stack.testerRoleArnOutput;
 
