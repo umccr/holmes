@@ -24,7 +24,6 @@ new HolmesApplicationStack(app, "HolmesLocalDevTestStack", {
     region: AWS_DEV_REGION,
   },
   fingerprintBucketName: "umccr-fingerprint-local-dev-test",
-  shouldCreateFingerprintBucket: false,
   fingerprintConfigFolder: "config/",
   slackNotifier: {
     cron: "cron(0 12 ? * * *)",

@@ -52,33 +52,11 @@ export class HolmesApplicationStack extends Stack {
     this.templateOptions.description = STACK_DESCRIPTION;
 
     // for local dev/testing we can defer "creating" this bucket and instead use one that already exists
-    const fingerprintBucket = props.shouldCreateFingerprintBucket
-      ? new Bucket(this, "FingerprintBucket", {
-          bucketName: props.fingerprintBucketName,
-          objectOwnership: ObjectOwnership.BUCKET_OWNER_ENFORCED,
-          lifecycleRules: [
-            // we give the test suites the ability to create folders like fingerprints-test-01231432/
-            // and we will auto delete them later
-            {
-              prefix: "fingerprints-test",
-              expiration: Duration.days(1),
-            },
-            // space for us to make temp file results from the DistributedMap
-            {
-              prefix: "temp",
-              expiration: Duration.days(1),
-            },
-          ],
-          // because there is some thought of deleting some source bams after fingerprinting - we
-          // don't even want the more production buckets to autodelete
-          autoDeleteObjects: false,
-          removalPolicy: RemovalPolicy.RETAIN,
-        })
-      : Bucket.fromBucketName(
-          this,
-          "FingerprintBucket",
-          props.fingerprintBucketName
-        );
+    const fingerprintBucket = Bucket.fromBucketName(
+      this,
+      "FingerprintBucket",
+      props.fingerprintBucketName
+    );
 
     // we sometimes need to execute tasks in a VPC context so we need one of these
     const vpc = Vpc.fromLookup(this, "MainVpc", {

@@ -32,12 +32,6 @@ export interface HolmesSettings {
   readonly fingerprintBucketName: string;
 
   /**
-   * This allows us to setup a stack with a pre-defined bucket fingerprint (good for dev/test) -
-   * but the default here is we would leave it to the CDK stack to create the fingerprint bucket.
-   */
-  readonly shouldCreateFingerprintBucket: boolean;
-
-  /**
    * Fingerprint config folder (in bucket) - must end with slash - will generally be config/
    */
   readonly fingerprintConfigFolder: string;
