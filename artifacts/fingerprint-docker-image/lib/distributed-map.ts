@@ -58,7 +58,7 @@ export async function distributedMapManifestToLambdaResults(
 
 /**
  * Convert a SUCCESS JSON structure into a more neat set of objects/maps. In
- * particular we merge the results from the distributed lambdas into a single
+ * particular, we merge the results from the distributed lambdas into a single
  * result for each index.
  *
  * @param successJson

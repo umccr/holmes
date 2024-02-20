@@ -55,8 +55,6 @@ export async function runTest(
 
   const extractStepsArn =
     instances?.Instances[0]?.Attributes?.["extractStepsArn"];
-  //const extractControlStepsArn =
-  //    instances?.Instances[0]?.Attributes?.["extractControlStepsArn"];
   const checkLambdaArn =
     instances?.Instances[0]?.Attributes?.["checkLambdaArn"];
   const listLambdaArn = instances?.Instances[0]?.Attributes?.["listLambdaArn"];
@@ -64,7 +62,6 @@ export async function runTest(
     instances?.Instances[0]?.Attributes?.["relateLambdaArn"];
 
   if (!extractStepsArn) throw new Error("Missing extractStepsArn in CloudMap");
-  //if (!extractControlStepsArn) throw new Error("Missing extractControlStepsArn in CloudMap");
   if (!checkLambdaArn) throw new Error("Missing checkLambdaArn in CloudMap");
   if (!listLambdaArn) throw new Error("Missing listLambdaArn in CloudMap");
   if (!relateLambdaArn) throw new Error("Missing relateLambdaArn in CloudMap");
@@ -77,17 +74,6 @@ export async function runTest(
   const TRIO_MOTHER = `${gdsBase}/family/giab_exome_trio/HG004-ready.bam`;
   const CTDNA = `${gdsBase}/ctdna/PTC_ctTSO220404_L2200417.bam`;
   const CELLPTC = `${gdsBase}/ptc/PTC_TsqN200511_N.bam`;
-
-  await doFingerprintExtract(
-    stepsClient,
-    s3Client,
-    extractStepsArn,
-    fingerprintBucket,
-    fingerprintFolder,
-    "s3://1000genomes/data/NA21144/alignment/NA21144.alt_bwamem_GRCh38DH.20150718.GIH.low_coverage.cram",
-    // "s3://1000genomes-dragen/data/dragen-3.7.4/hg38_altaware_nohla-cnv-anchored/NA12878/NA12878.bam",
-    "hg38.rna"
-  );
 
   console.log(CONSOLE_BREAK_LINE);
   console.log("EXTRACT TESTS");

@@ -9,6 +9,9 @@ if (argv.length < 5) {
 
 // argv[0] = nodejs
 // argv[1] = extract.cjs
+// argv[2] = reference genome name
+// argv[3] = folder
+// argv[4] = BAM path
 
 const reference = argv[2];
 

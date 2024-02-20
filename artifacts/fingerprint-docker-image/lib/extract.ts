@@ -4,7 +4,11 @@ import { execFile } from "child_process";
 import { join } from "path";
 import { URL } from "url";
 import { getGdsFileAsPresigned } from "./illumina-icav1";
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import {
+  PutObjectCommand,
+  PutObjectCommandInput,
+  S3Client,
+} from "@aws-sdk/client-s3";
 import { mkdir, readdir, readFile, rm } from "fs/promises";
 import { nanoid } from "nanoid/non-secure";
 import { httpsDownload, s3Presign, urlToKey } from "./aws";
@@ -17,7 +21,6 @@ import {
   somalierWork,
 } from "./env";
 import axios from "axios";
-import * as rax from "retry-axios";
 
 // it is sometimes useful to be able to fingerprint public reference samples that exist
 // in open buckets - so this is the name of any buckets of that nature
@@ -221,10 +224,13 @@ async function fingerprint(readsUrlString: string, fingerprintFolder: string) {
 
   // our *last* step is to upload to S3 - if anything above fails we don't want
   // any trace of this fingerprint in the 'done' fingerprints bucket
-  const bucketParams = {
+  const bucketParams: PutObjectCommandInput = {
     Bucket: fingerprintBucketName,
     Key: urlToKey(fingerprintFolder, readsUrl),
     Body: fingerprintData,
+    Metadata: {
+      "Fingerprint-Created": new Date().toISOString(),
+    },
   };
 
   await s3Client.send(new PutObjectCommand(bucketParams));

@@ -2,6 +2,7 @@ import { Construct } from "constructs";
 import { Effect, IRole, PolicyStatement } from "aws-cdk-lib/aws-iam";
 import {
   CustomState,
+  DefinitionBody,
   Map,
   Pass,
   StateMachine,
@@ -15,7 +16,7 @@ import { Arn, ArnFormat, Stack } from "aws-cdk-lib";
 import { FingerprintLambda } from "./fingerprint-lambda";
 
 /**
- * A statemachine thats checks for somalier similarity between a large set of BAM files
+ * A statemachine that checks for somalier similarity between a large set of BAM files
  * and some passed in 'index' BAM files.
  */
 export class SomalierCheckStateMachineConstruct extends SomalierBaseStateMachineConstruct {
@@ -136,7 +137,7 @@ export class SomalierCheckStateMachineConstruct extends SomalierBaseStateMachine
     // NOTE: we use a technique here to allow optional input parameters to the state machine
     // by defining defaults and then JsonMerging them with the actual input params
     this._stateMachine = new StateMachine(this, "StateMachine", {
-      definition: def,
+      definitionBody: DefinitionBody.fromChainable(def),
     });
 
     this._stateMachine.addToRolePolicy(

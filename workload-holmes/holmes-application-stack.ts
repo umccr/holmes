@@ -3,7 +3,6 @@ import {
   CfnOutput,
   CfnResource,
   Duration,
-  RemovalPolicy,
   Stack,
   StackProps,
 } from "aws-cdk-lib";
@@ -13,7 +12,7 @@ import { Secret } from "aws-cdk-lib/aws-secretsmanager";
 import { HttpNamespace, Service } from "aws-cdk-lib/aws-servicediscovery";
 import { HolmesSettings, STACK_DESCRIPTION } from "../deploy/holmes-settings";
 import { SomalierCheckStateMachineConstruct } from "./somalier-check-state-machine-construct";
-import { Bucket, ObjectOwnership } from "aws-cdk-lib/aws-s3";
+import { Bucket } from "aws-cdk-lib/aws-s3";
 import { Vpc } from "aws-cdk-lib/aws-ec2";
 import { Cluster } from "aws-cdk-lib/aws-ecs";
 import { SomalierExtractStateMachineConstruct } from "./somalier-extract-state-machine-construct";
@@ -64,7 +63,11 @@ export class HolmesApplicationStack extends Stack {
     });
 
     // a fargate cluster we use for non-lambda Tasks
-    const cluster = new Cluster(this, "FargateCluster", { vpc });
+    const cluster = new Cluster(this, "FargateCluster", {
+      vpc: vpc,
+      enableFargateCapacityProviders: true,
+      containerInsights: true,
+    });
 
     // we need access to a ICA JWT in order to be able to download from GDS
     const icaSecret = Secret.fromSecretNameV2(
@@ -326,7 +329,7 @@ export class HolmesApplicationStack extends Stack {
           },
         });
 
-        const syncScheduler = new CfnResource(this, "DailyScheduler", {
+        new CfnResource(this, "DailyScheduler", {
           type: "AWS::Scheduler::Schedule",
           properties: {
             Description:

@@ -84,8 +84,8 @@ provides AWS Steps/Lambda functions that operate to run `somalier` over these fi
       end
       subgraph S3 fingerprints bucket
         subgraph S3 folder ABCDEF/
-          f1("ABCDEF/hex encoded URL of BAM1")
-          f2("ABCDEF/hex encoded URL of BAM2")
+          f1("ABCDEF/encoded URL of BAM1")
+          f2("ABCDEF/encoded URL of BAM2")
         end
       end
       bam1-->f1
@@ -98,7 +98,7 @@ a) producing new fingerprints
 b) checking fingerprints against others
 
 There is no other data store for the service - the existence of a fingerprint
-in S3 with a path matching the sites checksum and BAM URL (hex encoded) is
+in S3 with a path matching the sites checksum and BAM URL (encoded) is
 the canonical definition that a BAM has been fingerprinted.
 
 The check operation will always operate against all fingerprints that

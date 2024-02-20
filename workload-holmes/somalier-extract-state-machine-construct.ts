@@ -1,5 +1,6 @@
 import { Construct } from "constructs";
 import {
+  DefinitionBody,
   IntegrationPattern,
   JsonPath,
   Pass,
@@ -58,47 +59,48 @@ export class SomalierExtractStateMachineConstruct extends SomalierBaseStateMachi
     const extractMapStep = this.createExtractMapStep(
       props.fargateCluster,
       taskDefinition,
-      containerDefinition,
-      props
+      containerDefinition
     );
 
     this.stateMachine = new StateMachine(this, "StateMachine", {
-      definition: new Pass(this, "Define Defaults", {
-        // we allow the default to be set - so we can have different extract state machines configured for different use cases
-        parameters: {
-          fingerprintFolder: props.fingerprintFolderDefault,
-        },
-        resultPath: "$.inputDefaults",
-      })
-        .next(
-          new Pass(this, "Apply Defaults", {
-            // merge default parameters into whatever the user has sent us
-            resultPath: "$.withDefaults",
-            outputPath: "$.withDefaults.args",
-            parameters: {
-              "args.$":
-                "States.JsonMerge($.inputDefaults, $$.Execution.Input, false)",
-            },
-          })
-        )
-        // https://stackoverflow.com/questions/77442579/combining-jsonpath-listat-and-stringat-to-make-a-single-array-in-aws-steps-cdk
-        // A pretty messy Pass stage just so we can concat some array values!
-        .next(
-          new Pass(this, "Merge To Make Command Array", {
-            parameters: {
-              merge: JsonPath.array(
-                JsonPath.array(
-                  JsonPath.stringAt("$.reference"),
-                  JsonPath.stringAt("$.fingerprintFolder")
+      definitionBody: DefinitionBody.fromChainable(
+        new Pass(this, "Define Defaults", {
+          // we allow the default to be set - so we can have different extract state machines configured for different use cases
+          parameters: {
+            fingerprintFolder: props.fingerprintFolderDefault,
+          },
+          resultPath: "$.inputDefaults",
+        })
+          .next(
+            new Pass(this, "Apply Defaults", {
+              // merge default parameters into whatever the user has sent us
+              resultPath: "$.withDefaults",
+              outputPath: "$.withDefaults.args",
+              parameters: {
+                "args.$":
+                  "States.JsonMerge($.inputDefaults, $$.Execution.Input, false)",
+              },
+            })
+          )
+          // https://stackoverflow.com/questions/77442579/combining-jsonpath-listat-and-stringat-to-make-a-single-array-in-aws-steps-cdk
+          // A pretty messy Pass stage just so we can concat some array values!
+          .next(
+            new Pass(this, "Merge To Make Command Array", {
+              parameters: {
+                merge: JsonPath.array(
+                  JsonPath.array(
+                    JsonPath.stringAt("$.reference"),
+                    JsonPath.stringAt("$.fingerprintFolder")
+                  ),
+                  JsonPath.stringAt("$.indexes")
                 ),
-                JsonPath.stringAt("$.indexes")
-              ),
-            },
-            resultPath: "$.merge",
-          })
-        )
-        .next(extractMapStep)
-        .next(new Succeed(this, "SucceedStep")),
+              },
+              resultPath: "$.merge",
+            })
+          )
+          .next(extractMapStep)
+          .next(new Succeed(this, "SucceedStep"))
+      ),
     });
 
     if (props.allowExecutionByTesterRole) {
@@ -124,10 +126,10 @@ export class SomalierExtractStateMachineConstruct extends SomalierBaseStateMachi
         // (we have some developers on M1 macs so we need this to force intel builds)
         cpuArchitecture: CpuArchitecture.X86_64,
       },
-      cpu: 4096,
+      cpu: 1024,
       // some experimentation needed - we definitely don't need this much memory but it may
       // give us better network performance...
-      memoryLimitMiB: 8192,
+      memoryLimitMiB: 4096,
     });
 
     td.taskRole.addManagedPolicy(
@@ -169,14 +171,12 @@ export class SomalierExtractStateMachineConstruct extends SomalierBaseStateMachi
    * @param fargateCluster
    * @param taskDefinition
    * @param containerDefinition
-   * @param props
    * @protected
    */
   protected createExtractMapStep(
     fargateCluster: ICluster,
     taskDefinition: TaskDefinition,
-    containerDefinition: ContainerDefinition,
-    props: SomalierBaseStateMachineProps
+    containerDefinition: ContainerDefinition
   ): EcsRunTask {
     return new EcsRunTask(this, "Job", {
       integrationPattern: IntegrationPattern.RUN_JOB,
