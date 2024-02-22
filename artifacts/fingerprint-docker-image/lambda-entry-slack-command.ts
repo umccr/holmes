@@ -119,7 +119,7 @@ export const lambdaHandler = async (event: any) => {
      \`list <url> [<url>...]\` return a list of fingerprints (and dates) of the given BAM URLs
      \`check <url> [<url>...]\` report threshold relatedness of the given BAM URLs against the fingerprint database (max ${MAX_CHECK})
      \`relate <url> [<url>...]\` report all relatedness of the given BAM URLs against each other (max ${MAX_RELATE})
-     \`ptc <url>\` report all relatedness of the given BAM URL against our known PTC reference samples
+     \`control <url>\` report all relatedness of the given BAM URL against our known control reference samples
      \`help\` this help
             `,
           },
