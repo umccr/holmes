@@ -1,4 +1,4 @@
 {
-  "extends": "@tsconfig/node18",
+  "extends": "./node_modules/@tsconfig/node18/tsconfig.json",
   "exclude": ["node_modules", "cdk.out"]
 }
