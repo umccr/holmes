@@ -229,7 +229,8 @@ async function fingerprint(readsUrlString: string, fingerprintFolder: string) {
     Key: urlToKey(fingerprintFolder, readsUrl),
     Body: fingerprintData,
     Metadata: {
-      "Fingerprint-Created": new Date().toISOString(),
+      // note the key name is lower-cased automatically by AWS
+      "fingerprint-created": new Date().toISOString(),
     },
   };
 
