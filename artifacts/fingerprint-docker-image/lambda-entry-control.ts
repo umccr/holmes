@@ -6,10 +6,7 @@ import {
 } from "./lib/somalier-download-run-clean";
 import { somalierTsvCorrectIds } from "./lib/somalier-tsv-correct-ids";
 import { getSlackTextAttacher } from "./lib/slack";
-import { reportRelate } from "./lib/report-relate";
 import { downloadControlSamples, downloadIndexSamples } from "./lib/ids";
-import { urlListByRegex } from "./lib/url-list-by-regex";
-import { MAX_RELATE } from "./limits";
 import { reportControl } from "./lib/report-control";
 
 type EventInput = {
@@ -77,6 +74,9 @@ export const lambdaHandler = async (ev: EventInput, _context: any) => {
     pairsTsv,
     [0, 1]
   );
+
+  console.log(fixedSamplesTsv);
+  console.log(fixedPairsTsv);
 
   await cleanSomalierFiles();
 

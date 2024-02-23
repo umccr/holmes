@@ -80,14 +80,14 @@ export async function reportControl(
     } else {
       const newRow: string[] = [...row];
       // a bit of safety - but also has the advantage of helping skip the header row!
-      if (newRow[0] !== indexBamUrl) {
+      if (newRow[0] !== indexBamUrl && newRow[1] !== indexBamUrl) {
         return [];
       }
-      // if (newRow[1] in sampleUrlToFriendlyId) {
-      //  newRow[1] = sampleUrlToFriendlyId[newRow[1]];
-      //}
       if (parseFloat(newRow[2]) >= 0.8) newRow[2] = newRow[2] + " 🔥";
-      return newRow.slice(1, 15);
+
+      if (newRow[1] === indexBamUrl)
+        return newRow.slice(0, 1).concat(newRow.slice(2, 15));
+      else return newRow.slice(1, 2).concat(newRow.slice(2, 15));
     }
   });
 

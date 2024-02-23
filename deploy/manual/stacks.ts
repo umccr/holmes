@@ -13,7 +13,7 @@ new HolmesApplicationStack(app, "HolmesLocalDevTestStack", {
   description:
     "Local dev/test deployment of Holmes during development - feel free to tear down - this is *not* part of the CodePipeline deploy",
   tags: {
-    "umccr-org:Stack": "ElsaDataApplication",
+    "umccr-org:Stack": "Holmes",
     "umccr-org:Product": "Holmes",
   },
   icaSecretNamePartial: "IcaSecretsPortal", // pragma: allowlist secret
@@ -26,15 +26,16 @@ new HolmesApplicationStack(app, "HolmesLocalDevTestStack", {
   fingerprintBucketName: "umccr-fingerprint-local-dev-test",
   fingerprintConfigFolder: "config/",
   slackNotifier: {
-    cron: "cron(0 12 ? * * *)",
+    cron: "cron(0 12 1 * ? *)",
     // change this to the personal id of whichever dev is doing dev work
     channel: "C058W0G54H2",
-    fingerprintFolder: "fingerprints/",
+    fingerprintFolder:
+      "fingerprints-test-e6a902b71471ae55f0e3e90d8fdc989857eb02f5/",
+    // fingerprintFolder: "fingerprints/",
     // the default settings to use for all our Slack interactions with the API/lambdas
     relatednessThreshold: 0.8,
     minimumNCount: 50,
     expectRelatedRegex: "^.*SBJ(\\d\\d\\d\\d\\d).*$",
     excludeRegex: "^.*(PTC_|NTC_).*$",
-    fingerprintControlFolder: "fingerprints-controls/",
   },
 });

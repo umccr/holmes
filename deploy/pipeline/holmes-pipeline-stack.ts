@@ -171,7 +171,6 @@ export class HolmesPipelineStack extends Stack {
             minimumNCount: 50,
             expectRelatedRegex: "^.*SBJ(\\d\\d\\d\\d\\d).*$",
             excludeRegex: "^.*(PTC_|NTC_).*$",
-            fingerprintControlFolder: "fingerprints-controls/",
           },
         }
       );

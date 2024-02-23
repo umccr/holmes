@@ -67,11 +67,6 @@ export interface HolmesSettings {
     readonly fingerprintFolder: string;
 
     /**
-     * The specific folder to look into for control fingerprints to report for Slack
-     */
-    readonly fingerprintControlFolder: string;
-
-    /**
      * The relatedness threshold to report against for Slack
      */
     readonly relatednessThreshold: number;
@@ -82,14 +77,14 @@ export interface HolmesSettings {
     readonly minimumNCount: number;
 
     /**
-     * If present a regex that is matched to BAM filenames (i.e. not against the hex encoded keys)
+     * If present a regex that is matched to BAM filenames (i.e. not against the encoded keys)
      * and tells us to exclude them from sending to "somalier relate"
      */
     readonly excludeRegex?: string;
 
     /**
      * If present a regex that generates match groups - and expects all fingerprints with group matches
-     * to the index - to also be 'related' genomically.. this is used to detect fingerprints that *should*
+     * to the index - to also be 'related' genomically... this is used to detect fingerprints that *should*
      * be related but come back not related
      */
     readonly expectRelatedRegex?: string;
