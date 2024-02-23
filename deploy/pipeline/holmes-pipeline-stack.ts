@@ -64,7 +64,7 @@ export class HolmesPipelineStack extends Stack {
       }),
       codeBuildDefaults: {
         buildEnvironment: {
-          buildImage: LinuxBuildImage.STANDARD_6_0,
+          buildImage: LinuxBuildImage.STANDARD_7_0,
         },
         // we need to give the codebuild engines permissions to assume a role in STG - in order that they
         // can invoke the tests - we don't know the name of the role yet (as it is built by CDK) - so we

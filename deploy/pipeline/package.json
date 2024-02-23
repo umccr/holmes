@@ -10,17 +10,17 @@
     "@aws-sdk/client-s3": "3.342.0",
     "@aws-sdk/client-sts": "3.342.0",
     "@aws-sdk/abort-controller": "3.342.0",
-    "aws-cdk-lib": "2.81.0",
+    "aws-cdk-lib": "2.130.0",
     "axios-retry": "3.3.1",
-    "constructs": "10.2.38",
+    "constructs": "10.3.0",
     "source-map-support": "0.5.21"
   },
   "devDependencies": {
     "@tsconfig/node18": "1.0.3",
     "@types/node": "18.11.17",
-    "aws-cdk": "2.81.0",
-    "prettier": "2.8.1",
+    "aws-cdk": "2.130.0",
+    "prettier": "3.2.5",
     "ts-node": "10.9.1",
-    "typescript": "4.9.4"
+    "typescript": "5.3.3"
   }
 }

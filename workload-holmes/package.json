@@ -20,12 +20,12 @@
   },
   "dependencies": {},
   "peerDependencies": {
-    "aws-cdk-lib": "^2.127.0",
+    "aws-cdk-lib": "^2.130.0",
     "constructs": "^10.3.0"
   },
   "devDependencies": {
-    "aws-cdk": "2.127.0",
-    "aws-cdk-lib": "2.127.0",
+    "aws-cdk": "2.130.0",
+    "aws-cdk-lib": "2.130.0",
     "constructs": "10.3.0",
     "jsii": "5.3.18",
     "prettier": "3.2.5",
