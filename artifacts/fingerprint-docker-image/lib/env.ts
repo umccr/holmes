@@ -1,12 +1,6 @@
 import { env as envDict } from "process";
 import { s3Download, s3ListAllFiles } from "./aws";
 
-// NOTE: this is used *only* as an env variable for passing to Fargate because Fargate has crappy input
-export const ENV_NAME_FINGERPRINT_REFERENCE = "FINGERPRINT_REFERENCE";
-
-// NOTE: this is used *only* as an env variable for passing to Fargate because Fargate has crappy input
-export const ENV_NAME_FINGERPRINT_FOLDER = "FINGERPRINT_FOLDER";
-
 // by default, we obviously want this setup to work correctly in a standalone fargate/lambda
 // HOWEVER, it is useful to be able to override these on an execution basis for local testing
 // THIS IS STRICTLY FOR USE IN DEV SETUPS - THESE PATHS ARE NOT CHECKED OR WHITELISTED - BAD THINGS CAN
@@ -43,12 +37,12 @@ export async function safeGetFingerprintSites(
 
   if (!fingerprintBucketName)
     throw new Error(
-      "A finger print bucket name must be defined as part of the stack (env FINGERPRINT_BUCKET_NAME)"
+      "A fingerprint bucket name must be defined as part of the stack (env FINGERPRINT_BUCKET_NAME)"
     );
 
   if (!fingerprintConfigFolder || !fingerprintConfigFolder.endsWith("/"))
     throw new Error(
-      "A finger print config folder name ending in a slash must be defined as part of the stack (env FINGERPRINT_CONFIG_FOLDER)"
+      "A fingerprint config folder name ending in a slash must be defined as part of the stack (env FINGERPRINT_CONFIG_FOLDER)"
     );
 
   // given the reference passed in - we have a guess at what paths our corresponding objecst are at
@@ -109,4 +103,40 @@ export async function safeGetFingerprintSites(
   );
 
   return [fingerprintBucketName, sitesChecksum];
+}
+
+/**
+ * Discover the key values for all the control fingerprints in our config folder.
+ */
+export async function getFingerprintControlKeys(): Promise<
+  Record<string, string>
+> {
+  const controls: Record<string, string> = {};
+
+  if (!fingerprintBucketName)
+    throw new Error(
+      "A fingerprint bucket name must be defined as part of the stack (env FINGERPRINT_BUCKET_NAME)"
+    );
+
+  if (!fingerprintConfigFolder || !fingerprintConfigFolder.endsWith("/"))
+    throw new Error(
+      "A fingerprint config folder name ending in a slash must be defined as part of the stack (env FINGERPRINT_CONFIG_FOLDER)"
+    );
+
+  const EXPECTED_PREFIX = "control.";
+  const EXPECTED_SUFFIX = ".bam.somalier";
+
+  for await (const s3Object of s3ListAllFiles(
+    fingerprintBucketName,
+    fingerprintConfigFolder + EXPECTED_PREFIX
+  )) {
+    console.log(s3Object.Key);
+    if (s3Object.Key && s3Object.Key.endsWith(EXPECTED_SUFFIX)) {
+      controls[s3Object.Key] = s3Object.Key.slice(
+        (fingerprintConfigFolder + EXPECTED_PREFIX).length
+      ).slice(0, -EXPECTED_SUFFIX.length);
+    }
+  }
+
+  return controls;
 }

@@ -119,6 +119,7 @@ export const lambdaHandler = async (event: any) => {
      \`list <url> [<url>...]\` return a list of fingerprints (and dates) of the given BAM URLs
      \`check <url> [<url>...]\` report threshold relatedness of the given BAM URLs against the fingerprint database (max ${MAX_CHECK})
      \`relate <url> [<url>...]\` report all relatedness of the given BAM URLs against each other (max ${MAX_RELATE})
+     \`control <url>\` report all relatedness of the given BAM URL against our known control reference samples
      \`help\` this help
             `,
           },
@@ -244,6 +245,21 @@ export const lambdaHandler = async (event: any) => {
         ...getFromEnv(),
         channelId: o.channel_id,
         indexes: subCommandArgsIfUrls,
+      };
+      break;
+
+    case "control":
+      if (subCommandArgsIfUrls.length != 1) {
+        return {
+          response_type: "ephemeral",
+          text: `Sorry, Slack command 'control' failed because input needs to be exactly on PTC or NTC sample BAM URL`,
+        };
+      }
+      lambdaArn = process.env["LAMBDA_CONTROL_ARN"];
+      lambdaPayloadJson = {
+        ...getFromEnv(),
+        channelId: o.channel_id,
+        index: subCommandArgsIfUrls[0],
       };
       break;
 

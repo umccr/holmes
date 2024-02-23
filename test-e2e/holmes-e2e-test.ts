@@ -73,6 +73,7 @@ export async function runTest(
   const TRIO_FATHER = `${gdsBase}/family/giab_exome_trio/HG003-ready.bam`;
   const TRIO_MOTHER = `${gdsBase}/family/giab_exome_trio/HG004-ready.bam`;
   const CTDNA = `${gdsBase}/ctdna/PTC_ctTSO220404_L2200417.bam`;
+  const CELLPTC = `${gdsBase}/ptc/PTC_TsqN200511_N.bam`;
 
   console.log(CONSOLE_BREAK_LINE);
   console.log("EXTRACT TESTS");
@@ -86,6 +87,7 @@ export async function runTest(
     TRIO_SON,
     TRIO_FATHER,
     TRIO_MOTHER,
+    CELLPTC,
   ].map((bam) =>
     doFingerprintExtract(
       stepsClient,

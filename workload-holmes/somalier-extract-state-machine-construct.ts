@@ -1,8 +1,8 @@
 import { Construct } from "constructs";
 import {
+  DefinitionBody,
   IntegrationPattern,
   JsonPath,
-  Map,
   Pass,
   StateMachine,
   Succeed,
@@ -45,7 +45,7 @@ export class SomalierExtractStateMachineConstruct extends SomalierBaseStateMachi
   constructor(
     scope: Construct,
     id: string,
-    props: SomalierBaseStateMachineProps
+    props: SomalierBaseStateMachineProps & { fingerprintFolderDefault: string }
   ) {
     super(scope, id, props);
 
@@ -59,30 +59,48 @@ export class SomalierExtractStateMachineConstruct extends SomalierBaseStateMachi
     const extractMapStep = this.createExtractMapStep(
       props.fargateCluster,
       taskDefinition,
-      containerDefinition,
-      props
+      containerDefinition
     );
 
     this.stateMachine = new StateMachine(this, "StateMachine", {
-      definition: new Pass(this, "Define Defaults", {
-        parameters: {
-          fingerprintFolder: "fingerprints/",
-        },
-        resultPath: "$.inputDefaults",
-      })
-        .next(
-          new Pass(this, "Apply Defaults", {
-            // merge default parameters into whatever the user has sent us
-            resultPath: "$.withDefaults",
-            outputPath: "$.withDefaults.args",
-            parameters: {
-              "args.$":
-                "States.JsonMerge($.inputDefaults, $$.Execution.Input, false)",
-            },
-          })
-        )
-        .next(extractMapStep)
-        .next(new Succeed(this, "SucceedStep")),
+      definitionBody: DefinitionBody.fromChainable(
+        new Pass(this, "Define Defaults", {
+          // we allow the default to be set - so we can have different extract state machines configured for different use cases
+          parameters: {
+            fingerprintFolder: props.fingerprintFolderDefault,
+          },
+          resultPath: "$.inputDefaults",
+        })
+          .next(
+            new Pass(this, "Apply Defaults", {
+              // merge default parameters into whatever the user has sent us
+              resultPath: "$.withDefaults",
+              outputPath: "$.withDefaults.args",
+              parameters: {
+                "args.$":
+                  "States.JsonMerge($.inputDefaults, $$.Execution.Input, false)",
+              },
+            })
+          )
+          // https://stackoverflow.com/questions/77442579/combining-jsonpath-listat-and-stringat-to-make-a-single-array-in-aws-steps-cdk
+          // A pretty messy Pass stage just so we can concat some array values!
+          .next(
+            new Pass(this, "Merge To Make Command Array", {
+              parameters: {
+                merge: JsonPath.array(
+                  JsonPath.array(
+                    JsonPath.stringAt("$.reference"),
+                    JsonPath.stringAt("$.fingerprintFolder")
+                  ),
+                  JsonPath.stringAt("$.indexes")
+                ),
+              },
+              resultPath: "$.merge",
+            })
+          )
+          .next(extractMapStep)
+          .next(new Succeed(this, "SucceedStep"))
+      ),
     });
 
     if (props.allowExecutionByTesterRole) {
@@ -153,14 +171,12 @@ export class SomalierExtractStateMachineConstruct extends SomalierBaseStateMachi
    * @param fargateCluster
    * @param taskDefinition
    * @param containerDefinition
-   * @param props
    * @protected
    */
   protected createExtractMapStep(
     fargateCluster: ICluster,
     taskDefinition: TaskDefinition,
-    containerDefinition: ContainerDefinition,
-    props: SomalierBaseStateMachineProps
+    containerDefinition: ContainerDefinition
   ): EcsRunTask {
     return new EcsRunTask(this, "Job", {
       integrationPattern: IntegrationPattern.RUN_JOB,
@@ -172,19 +188,9 @@ export class SomalierExtractStateMachineConstruct extends SomalierBaseStateMachi
       containerOverrides: [
         {
           containerDefinition: containerDefinition,
-          command: JsonPath.listAt("$.indexes"),
-          // the "command" mapping ability here is a bit limited so we will pass some values
-          // that I normally would have said are parameters in via ENV variables
-          environment: this.createFargateLambdaEnv().concat(
-            {
-              name: "FINGERPRINT_FOLDER",
-              value: JsonPath.stringAt("$.fingerprintFolder"),
-            },
-            {
-              name: "FINGERPRINT_REFERENCE",
-              value: JsonPath.stringAt("$.reference"),
-            }
-          ),
+          // note: replace this once Steps ASL has the ability to concat arrays! (see above)
+          command: JsonPath.listAt("$.merge.merge[*][*]"),
+          environment: this.createFargateLambdaEnv(),
         },
       ],
       // we should not get *anywhere* near 6 hours for tasks - each fingerprint takes about 15 mins...

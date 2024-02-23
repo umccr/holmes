@@ -1,6 +1,7 @@
-FROM --platform=linux/amd64 brentp/somalier:v0.2.16 as somalier-real
+FROM --platform=linux/amd64 brentp/somalier:v0.2.19 as somalier-real
 
-# we are going to grab the compile somalier binary out of the docker image
+# we are going to grab the compiled somalier binary out of the docker image (our linux bases
+# between our different layers are compatible enough for this to work)
 
 FROM --platform=linux/amd64 public.ecr.aws/lambda/nodejs:18 AS lambda-builder
 
@@ -19,6 +20,7 @@ RUN npx tsc --noEmit
 
 RUN npx esbuild lambda-entry-list.ts --bundle --outfile=list.cjs --platform=node --target=node18
 RUN npx esbuild lambda-entry-relate.ts --bundle --outfile=relate.cjs --platform=node --target=node18
+RUN npx esbuild lambda-entry-control.ts --bundle --outfile=control.cjs --platform=node --target=node18
 
 # check is both an invokable lambda AND a steps AND a lambda executed in the steps
 RUN npx esbuild lambda-entry-check.ts --bundle --outfile=check.cjs --platform=node --target=node18

@@ -3,7 +3,6 @@ import {
   CfnOutput,
   CfnResource,
   Duration,
-  RemovalPolicy,
   Stack,
   StackProps,
 } from "aws-cdk-lib";
@@ -13,7 +12,7 @@ import { Secret } from "aws-cdk-lib/aws-secretsmanager";
 import { HttpNamespace, Service } from "aws-cdk-lib/aws-servicediscovery";
 import { HolmesSettings, STACK_DESCRIPTION } from "../deploy/holmes-settings";
 import { SomalierCheckStateMachineConstruct } from "./somalier-check-state-machine-construct";
-import { Bucket, ObjectOwnership } from "aws-cdk-lib/aws-s3";
+import { Bucket } from "aws-cdk-lib/aws-s3";
 import { Vpc } from "aws-cdk-lib/aws-ec2";
 import { Cluster } from "aws-cdk-lib/aws-ecs";
 import { SomalierExtractStateMachineConstruct } from "./somalier-extract-state-machine-construct";
@@ -64,7 +63,11 @@ export class HolmesApplicationStack extends Stack {
     });
 
     // a fargate cluster we use for non-lambda Tasks
-    const cluster = new Cluster(this, "FargateCluster", { vpc });
+    const cluster = new Cluster(this, "FargateCluster", {
+      vpc: vpc,
+      enableFargateCapacityProviders: true,
+      containerInsights: true,
+    });
 
     // we need access to a ICA JWT in order to be able to download from GDS
     const icaSecret = Secret.fromSecretNameV2(
@@ -142,7 +145,7 @@ export class HolmesApplicationStack extends Stack {
     const extractStateMachine = new SomalierExtractStateMachineConstruct(
       this,
       "SomalierExtract",
-      stateProps
+      { ...stateProps, fingerprintFolderDefault: "fingerprints/" }
     );
 
     const checkLambda = new FingerprintLambda(this, "Check", {
@@ -173,12 +176,23 @@ export class HolmesApplicationStack extends Stack {
       fingerprintConfigFolder: props.fingerprintConfigFolder,
     });
 
+    const controlLambda = new FingerprintLambda(this, "Control", {
+      dockerImageAsset: fingerprintDockerImageAsset,
+      icaSecret: icaSecret,
+      fingerprintBucket: fingerprintBucket,
+      cmd: ["control.lambdaHandler"],
+      fingerprintConfigFolder: props.fingerprintConfigFolder,
+    });
+
     // the extractor is the only service that needs access to ICA (to download
     // the BAM files)... the fingerprints themselves live in S3
     icaSecret.grantRead(extractStateMachine.taskRole);
 
     // check large needs to read fingerprints BUT ALSO write back the Large results to the same S3 bucket
+    // AND it also needs ability to "do" things to the lambdas it calls
     fingerprintBucket.grantReadWrite(checkLargeStateMachine.taskRole);
+    checkLargeStateMachine.stateMachine.grantStartExecution(checkLambda.role);
+    checkLargeStateMachine.stateMachine.grantRead(checkLambda.role);
 
     // the extractor needs to be able to write the fingerprints out
     fingerprintBucket.grantReadWrite(extractStateMachine.taskRole);
@@ -187,9 +201,7 @@ export class HolmesApplicationStack extends Stack {
     fingerprintBucket.grantRead(checkLambda.role);
     fingerprintBucket.grantRead(listLambda.role);
     fingerprintBucket.grantRead(relateLambda.role);
-
-    checkLargeStateMachine.stateMachine.grantStartExecution(checkLambda.role);
-    checkLargeStateMachine.stateMachine.grantRead(checkLambda.role);
+    fingerprintBucket.grantRead(controlLambda.role);
 
     /* I don't understand CloudMap - there seems no way for me to import in a namespace that
         already exists... other than providing *all* the details... and a blank arn?? */
@@ -215,6 +227,7 @@ export class HolmesApplicationStack extends Stack {
         checkLambdaArn: checkLambda.dockerImageFunction.functionArn,
         listLambdaArn: listLambda.dockerImageFunction.functionArn,
         relateLambdaArn: relateLambda.dockerImageFunction.functionArn,
+        controlLambdaArn: controlLambda.dockerImageFunction.functionArn,
       },
     });
 
@@ -226,25 +239,30 @@ export class HolmesApplicationStack extends Stack {
       checkLambda.dockerImageFunction.grantInvoke(testerRole);
       listLambda.dockerImageFunction.grantInvoke(testerRole);
       relateLambda.dockerImageFunction.grantInvoke(testerRole);
+      controlLambda.dockerImageFunction.grantInvoke(testerRole);
     }
 
     if (props.slackNotifier) {
+      // if the lambdas are sending reports to Slack - they need the permissions to access the secret
+      // that holds the Slack secret key
       const slackSecret = Secret.fromSecretNameV2(
         this,
         "SlackSecret",
         "SlackApps"
       );
+      slackSecret.grantRead(checkLambda.role);
+      slackSecret.grantRead(listLambda.role);
+      slackSecret.grantRead(relateLambda.role);
+      slackSecret.grantRead(controlLambda.role);
 
+      // the Slack lambda itself also needs special permissions to access the secrets and other
+      // housekeeping services
       const permissions = [
         "service-role/AWSLambdaBasicExecutionRole",
         "AmazonS3ReadOnlyAccess",
         "AWSCloudMapReadOnlyAccess",
         "AWSStepFunctionsFullAccess",
       ];
-
-      slackSecret.grantRead(checkLambda.role);
-      slackSecret.grantRead(listLambda.role);
-      slackSecret.grantRead(relateLambda.role);
 
       const lambdaRole = new Role(this, "Role", {
         assumedBy: new ServicePrincipal("lambda.amazonaws.com"),
@@ -262,6 +280,7 @@ export class HolmesApplicationStack extends Stack {
         CHANNEL: props.slackNotifier.channel,
         FINGERPRINT_BUCKET_NAME: fingerprintBucket.bucketName,
         FINGERPRINT_FOLDER: props.slackNotifier.fingerprintFolder,
+        FINGERPRINT_CONTROL_FOLDER: props.slackNotifier.fingerprintFolder,
         RELATEDNESS_THRESHOLD:
           props.slackNotifier.relatednessThreshold.toString(),
         MINIMUM_N_COUNT: props.slackNotifier.minimumNCount.toString(),
@@ -310,7 +329,7 @@ export class HolmesApplicationStack extends Stack {
           },
         });
 
-        const syncScheduler = new CfnResource(this, "DailyScheduler", {
+        new CfnResource(this, "DailyScheduler", {
           type: "AWS::Scheduler::Schedule",
           properties: {
             Description:
@@ -371,6 +390,7 @@ export class HolmesApplicationStack extends Stack {
               LAMBDA_CHECK_ARN: checkLambda.dockerImageFunction.functionArn,
               LAMBDA_LIST_ARN: listLambda.dockerImageFunction.functionArn,
               LAMBDA_RELATE_ARN: relateLambda.dockerImageFunction.functionArn,
+              LAMBDA_CONTROL_ARN: controlLambda.dockerImageFunction.functionArn,
               ...env,
             },
           }
@@ -380,6 +400,7 @@ export class HolmesApplicationStack extends Stack {
         checkLambda.dockerImageFunction.grantInvoke(publicSlackRole);
         listLambda.dockerImageFunction.grantInvoke(publicSlackRole);
         relateLambda.dockerImageFunction.grantInvoke(publicSlackRole);
+        controlLambda.dockerImageFunction.grantInvoke(publicSlackRole);
 
         checkLambda.dockerImageFunction.grantInvoke(lambdaRole);
 
