@@ -285,6 +285,7 @@ export class HolmesApplicationStack extends Stack {
           props.slackNotifier.relatednessThreshold.toString(),
         MINIMUM_N_COUNT: props.slackNotifier.minimumNCount.toString(),
         LAMBDA_CHECK_ARN: checkLambda.dockerImageFunction.functionArn,
+        LAMBDA_CONTROL_ARN: controlLambda.dockerImageFunction.functionArn,
       };
 
       if (props.slackNotifier.excludeRegex)
@@ -300,7 +301,7 @@ export class HolmesApplicationStack extends Stack {
           `ScheduledGroupFunction`,
           {
             memorySize: 512,
-            timeout: Duration.seconds(30),
+            timeout: Duration.minutes(5),
             architecture: Architecture.X86_64,
             code: DockerImageCode.fromEcr(
               fingerprintDockerImageAsset.repository,
