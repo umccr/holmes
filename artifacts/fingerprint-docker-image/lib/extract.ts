@@ -60,8 +60,13 @@ async function dumpFileHead(httpUrl: string) {
  *
  * @param readsUrlString a URL of a BAM/CRAM etc that we want to fingerprint
  * @param fingerprintFolder the fingerprint folder to store the resulting fingerprint in
+ * @param subjectId the identifier string we want to tag this fingerprint with
  */
-async function fingerprint(readsUrlString: string, fingerprintFolder: string) {
+async function fingerprint(
+  readsUrlString: string,
+  fingerprintFolder: string,
+  subjectId: string
+) {
   console.log(`Computing fingerprint for ${readsUrlString}`);
 
   // we create a working directory that we can cleanup later
@@ -231,6 +236,7 @@ async function fingerprint(readsUrlString: string, fingerprintFolder: string) {
     Metadata: {
       // note the key name is lower-cased automatically by AWS
       "fingerprint-created": new Date().toISOString(),
+      "subject-id": subjectId,
     },
   };
 
@@ -246,11 +252,13 @@ async function fingerprint(readsUrlString: string, fingerprintFolder: string) {
  *
  * @param reference the string representing the genome build our BAM matches up with
  * @param fingerprintFolder the slash terminated folder path for where the fingerprints will be sent
+ * @param subjectId the subject identifer to tag the fingerprint with
  * @param files the list of source BAMs
  */
 export async function extract(
   reference: string,
   fingerprintFolder: string,
+  subjectId: string,
   files: string[]
 ) {
   console.log("Starting extract task");
@@ -262,6 +270,6 @@ export async function extract(
   await safeGetFingerprintSites(reference);
 
   for (const file of files) {
-    await fingerprint(file, fingerprintFolder);
+    await fingerprint(file, fingerprintFolder, subjectId);
   }
 }

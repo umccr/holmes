@@ -13,55 +13,31 @@ import { toUtf8 } from "@aws-sdk/util-utf8";
  * extract if the fingerprint already exists.
  *
  * @param stepsClient a configured Steps client
- * @param s3Client a configured S3 client
  * @param extractStepsArn the ARN of the extract Steps
- * @param fingerprintBucket the bucket for all fingerprint activity
  * @param fingerprintFolder the test specific folder for fingerprints
  * @param bamUrl the URL to extract
+ * @param subjectIdentifier the subject identifier of the human who belongs to the BAM
  * @param reference the id of the reference genome (hg19 or hg38)
  */
 export async function doFingerprintExtract(
   stepsClient: SFNClient,
-  s3Client: S3Client,
   extractStepsArn: string,
-  fingerprintBucket: string,
   fingerprintFolder: string,
   bamUrl: string,
+  subjectIdentifier: string,
   reference: string
 ): Promise<any> {
-  try {
-    await s3Client.send(
-      new GetObjectCommand({
-        Bucket: fingerprintBucket,
-        Key: fingerprintFolder + Buffer.from(bamUrl, "ascii").toString("hex"),
-      })
-    );
+  const timeLabel = `EXTRACT ${bamUrl} for subject ${subjectIdentifier}`;
+  console.time(timeLabel);
 
-    console.log(
-      `Skipping extract for ${bamUrl} as it already exists in test fingerprint db`
-    );
-
-    return Promise.resolve({});
-  } catch (e: any) {
-    if (e?.Code !== "NoSuchKey") {
-      console.error(e);
-      throw Error(
-        "Unexpected S3 error trying to determine if fingerprint exists"
-      );
-    }
-
-    const timeLabel = `EXTRACT ${bamUrl}`;
-    console.time(timeLabel);
-
-    // we actually expect normally to get here... (the skip file thing is only of use when we are actually working on the tests themselves)
-    return doStepsExecution(stepsClient, extractStepsArn, {
-      indexes: [bamUrl],
-      fingerprintFolder: fingerprintFolder,
-      reference: reference,
-    }).then(() => {
-      console.timeEnd(timeLabel);
-    });
-  }
+  return doStepsExecution(stepsClient, extractStepsArn, {
+    indexes: [bamUrl],
+    subjectIdentifier: subjectIdentifier,
+    fingerprintFolder: fingerprintFolder,
+    reference: reference,
+  }).then(() => {
+    console.timeEnd(timeLabel);
+  });
 }
 
 /**

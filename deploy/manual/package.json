@@ -3,7 +3,8 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "dev-deploy": "cdk --app 'npx ts-node stacks.ts' deploy HolmesLocalDevTestStack"
+    "dev-deploy": "cdk --app 'npx ts-node stacks.ts' deploy HolmesLocalDevTestStack",
+    "dev-destroy": "cdk --app 'npx ts-node stacks.ts' destroy HolmesLocalDevTestStack"
   },
   "dependencies": {
     "@aws-sdk/client-sfn": "3.511.0",

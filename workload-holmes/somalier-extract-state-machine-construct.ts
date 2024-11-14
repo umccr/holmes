@@ -36,7 +36,7 @@ import { standardEnv } from "./fingerprint-lambda-env";
 
 /**
  * A construct wrapping a state machine (steps) - that performs Fingerprint extracts on
- * a set of input BAM URLs.
+ * a set of BAM URLs for a single subject.
  */
 export class SomalierExtractStateMachineConstruct extends SomalierBaseStateMachineConstruct {
   readonly stateMachine: StateMachine;
@@ -90,7 +90,8 @@ export class SomalierExtractStateMachineConstruct extends SomalierBaseStateMachi
                 merge: JsonPath.array(
                   JsonPath.array(
                     JsonPath.stringAt("$.reference"),
-                    JsonPath.stringAt("$.fingerprintFolder")
+                    JsonPath.stringAt("$.fingerprintFolder"),
+                    JsonPath.stringAt("$.subjectIdentifier")
                   ),
                   JsonPath.stringAt("$.indexes")
                 ),

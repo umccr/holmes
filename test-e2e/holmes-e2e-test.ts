@@ -67,11 +67,17 @@ export async function runTest(
   if (!relateLambdaArn) throw new Error("Missing relateLambdaArn in CloudMap");
 
   const INDIVIDUAL_96 = `${gdsBase}/individual/HG00096.bam`;
+  const INDIVIDUAL_96_ID = "HG00096";
   const INDIVIDUAL_97 = `${gdsBase}/individual/HG00097.bam`;
+  const INDIVIDUAL_97_ID = "HG00097";
   const INDIVIDUAL_99 = `${gdsBase}/individual/HG00099.bam`;
+  const INDIVIDUAL_99_ID = "HG00099";
   const TRIO_SON = `${gdsBase}/family/giab_exome_trio/HG002-ready.bam`;
+  const TRIO_SON_ID = "HG002";
   const TRIO_FATHER = `${gdsBase}/family/giab_exome_trio/HG003-ready.bam`;
+  const TRIO_FATHER_ID = "HG003";
   const TRIO_MOTHER = `${gdsBase}/family/giab_exome_trio/HG004-ready.bam`;
+  const TRIO_MOTHER_ID = "HG004";
   const CTDNA = `${gdsBase}/ctdna/PTC_ctTSO220404_L2200417.bam`;
   const CELLPTC = `${gdsBase}/ptc/PTC_TsqN200511_N.bam`;
 
@@ -81,21 +87,20 @@ export async function runTest(
 
   // add in extractors for all the HG38 samples
   const allExtractPromises = [
-    INDIVIDUAL_96,
-    INDIVIDUAL_97,
-    INDIVIDUAL_99,
-    TRIO_SON,
-    TRIO_FATHER,
-    TRIO_MOTHER,
-    CELLPTC,
-  ].map((bam) =>
+    [INDIVIDUAL_96, INDIVIDUAL_96_ID],
+    [INDIVIDUAL_97, INDIVIDUAL_97_ID],
+    [INDIVIDUAL_99, INDIVIDUAL_99_ID],
+    [TRIO_SON, TRIO_SON_ID],
+    [TRIO_FATHER, TRIO_FATHER_ID],
+    [TRIO_MOTHER, TRIO_MOTHER_ID],
+    [CELLPTC, "CELLPTC"],
+  ].map((tuple) =>
     doFingerprintExtract(
       stepsClient,
-      s3Client,
       extractStepsArn,
-      fingerprintBucket,
       fingerprintFolder,
-      bam,
+      tuple[0],
+      tuple[1],
       "hg38.rna"
     )
   );
@@ -104,11 +109,10 @@ export async function runTest(
   allExtractPromises.push(
     doFingerprintExtract(
       stepsClient,
-      s3Client,
       extractStepsArn,
-      fingerprintBucket,
       fingerprintFolder,
       CTDNA,
+      "CTDNA",
       "hg19.rna"
     )
   );
