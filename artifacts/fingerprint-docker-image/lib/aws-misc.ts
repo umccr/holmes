@@ -18,7 +18,8 @@ import {
   SFNClient,
   StartExecutionCommand,
 } from "@aws-sdk/client-sfn";
-import axios from "axios";
+import axios, { Axios } from "axios";
+import { finished } from "node:stream/promises";
 
 const s3Client = new S3Client({});
 
@@ -77,7 +78,7 @@ export function keyToUrl(fingerprintFolder: string, key: string): URL {
     return new URL(decoded.slice(0, -SUFFIX.length));
   } else {
     // decode the hex after the leading fingerprintFolder
-    const buf = new Buffer(folderSubstring, "hex");
+    const buf = Buffer.from(folderSubstring, "hex");
 
     return new URL(buf.toString("utf8"));
   }
@@ -92,16 +93,16 @@ export function keyToUrl(fingerprintFolder: string, key: string): URL {
 export async function httpsDownload(url: string, output: string) {
   console.time("httpDownload");
 
-  const pipeline = promisify(pipelineCallback);
-
-  const request = await axios.get(url, {
+  const writer = createWriteStream(output);
+  return axios({
+    method: "get",
+    url: url,
     responseType: "stream",
+  }).then((response) => {
+    response.data.pipe(writer);
+
+    return finished(writer); //this is a Promise
   });
-  await pipeline(request.data, createWriteStream(output));
-
-  console.log(`${output} was produced by downloading ${url}`);
-
-  console.timeEnd("httpDownload");
 }
 
 /**
@@ -124,7 +125,7 @@ export async function s3Download(
     Key: key,
   };
 
-  console.time("s3Download");
+  console.time(`S3 Download ${bucket} ${key}`);
 
   // for dev/test purposes it is useful that we might already have these files in place - and to not
   // require the download (whether this be by putting them into the docker image, or mounting via docker fs)
@@ -149,7 +150,7 @@ export async function s3Download(
 
     console.log(`${output} was produced by downloading s3://${bucket}/${key}`);
 
-    console.timeEnd("s3Download");
+    console.timeEnd(`S3 Download ${bucket} ${key}`);
   }
 
   if (doChecksum) {

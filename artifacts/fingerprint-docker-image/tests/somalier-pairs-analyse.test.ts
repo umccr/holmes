@@ -1,5 +1,5 @@
 import { pairsAnalyse } from "../lib/somalier-pairs-analyse";
-import { urlToKey } from "../lib/aws";
+import { urlToKey } from "../lib/aws-misc";
 import { join } from "path";
 import { readFile } from "fs/promises";
 
@@ -28,18 +28,41 @@ describe("Run pairing analysis", () => {
       pairsTsv,
       FING_FOLDER,
       {
-        "0000000": urlToKey(FING_FOLDER, new URL(index0)),
+        "0000000": {
+          fingerprintKey: urlToKey(FING_FOLDER, new URL(index0)),
+          generatedSampleId: "0000000",
+          generatedPath: "/tmp/0.somalier",
+        },
       },
       {
-        "0000001": urlToKey(FING_FOLDER, new URL(index1)),
-        "0000002": urlToKey(FING_FOLDER, new URL(index2)),
-        "0000003": urlToKey(FING_FOLDER, new URL(index3)),
-        "0000004": urlToKey(FING_FOLDER, new URL(index4)),
-        "0000005": urlToKey(FING_FOLDER, new URL(index5)),
+        "0000001": {
+          fingerprintKey: urlToKey(FING_FOLDER, new URL(index1)),
+          generatedSampleId: "0000001",
+          generatedPath: "/tmp/1.somalier",
+        },
+        "0000002": {
+          fingerprintKey: urlToKey(FING_FOLDER, new URL(index2)),
+          generatedSampleId: "0000002",
+          generatedPath: "/tmp/2.somalier",
+        },
+        "0000003": {
+          fingerprintKey: urlToKey(FING_FOLDER, new URL(index3)),
+          generatedSampleId: "0000003",
+          generatedPath: "/tmp/3.somalier",
+        },
+        "0000004": {
+          fingerprintKey: urlToKey(FING_FOLDER, new URL(index4)),
+          generatedSampleId: "0000004",
+          generatedPath: "/tmp/4.somalier",
+        },
+        "0000005": {
+          fingerprintKey: urlToKey(FING_FOLDER, new URL(index5)),
+          generatedSampleId: "0000005",
+          generatedPath: "/tmp/5.somalier",
+        },
       },
       0.8,
-      50,
-      /^\\b$/
+      50
     );
 
     expect(matches).toBeTruthy();
@@ -87,18 +110,47 @@ describe("Run pairing analysis", () => {
       pairsTsv,
       FING_FOLDER,
       {
-        "0000000": urlToKey(FING_FOLDER, new URL(index0)),
-        "0000001": urlToKey(FING_FOLDER, new URL(index1)),
+        "0000000": {
+          fingerprintKey: urlToKey(FING_FOLDER, new URL(index0)),
+          generatedSampleId: "0000000",
+          generatedPath: "/tmp/0.somalier",
+          subjectIdentifier: "subject_AAAA",
+        },
+        "0000001": {
+          fingerprintKey: urlToKey(FING_FOLDER, new URL(index1)),
+          generatedSampleId: "0000001",
+          generatedPath: "/tmp/1.somalier",
+          subjectIdentifier: "subject_BBBB",
+        },
       },
       {
-        "0000002": urlToKey(FING_FOLDER, new URL(index2)),
-        "0000003": urlToKey(FING_FOLDER, new URL(index3)),
-        "0000004": urlToKey(FING_FOLDER, new URL(index4)),
-        "0000005": urlToKey(FING_FOLDER, new URL(index5)),
+        "0000002": {
+          fingerprintKey: urlToKey(FING_FOLDER, new URL(index2)),
+          generatedSampleId: "0000002",
+          generatedPath: "/tmp/2.somalier",
+          subjectIdentifier: "subject_BBBB",
+        },
+        "0000003": {
+          fingerprintKey: urlToKey(FING_FOLDER, new URL(index3)),
+          generatedSampleId: "0000003",
+          generatedPath: "/tmp/3.somalier",
+          subjectIdentifier: "subject_AAAA",
+        },
+        "0000004": {
+          fingerprintKey: urlToKey(FING_FOLDER, new URL(index4)),
+          generatedSampleId: "0000004",
+          generatedPath: "/tmp/4.somalier",
+          subjectIdentifier: "subject_BBBB",
+        },
+        "0000005": {
+          fingerprintKey: urlToKey(FING_FOLDER, new URL(index5)),
+          generatedSampleId: "0000005",
+          generatedPath: "/tmp/5.somalier",
+          subjectIdentifier: "subject_FFFF",
+        },
       },
       0.9,
-      50,
-      /^.*(subject_....).*$/
+      50
     );
 
     expect(matches).toBeTruthy();
@@ -126,7 +178,7 @@ describe("Run pairing analysis", () => {
       expect(matches00.n).toBe(16219);
       expect(matches00.file).toBe(index5);
       expect(matches00.regexJson).toBe(
-        '{"index":["subject_AAAA"],"sample":["subject_FFFF"]}'
+        '{"index":"subject_AAAA","sample":"subject_FFFF"}'
       );
     }
 
@@ -138,7 +190,7 @@ describe("Run pairing analysis", () => {
       expect(matches01.relatedness).toBe(-0.111);
       expect(matches01.file).toBe(index3);
       expect(matches01.regexJson).toBe(
-        '{"index":["subject_AAAA"],"sample":["subject_AAAA"]}'
+        '{"index":"subject_AAAA","sample":"subject_AAAA"}'
       );
     }
 
@@ -151,7 +203,7 @@ describe("Run pairing analysis", () => {
       expect(matches10.n).toBe(16162);
       expect(matches10.file).toBe(index4);
       expect(matches10.regexJson).toBe(
-        '{"index":["subject_BBBB"],"sample":["subject_BBBB"]}'
+        '{"index":"subject_BBBB","sample":"subject_BBBB"}'
       );
     }
 
@@ -163,7 +215,7 @@ describe("Run pairing analysis", () => {
       expect(matches11.relatedness).toBe(0.888);
       expect(matches11.file).toBe(index2);
       expect(matches11.regexJson).toBe(
-        '{"index":["subject_BBBB"],"sample":["subject_BBBB"]}'
+        '{"index":"subject_BBBB","sample":"subject_BBBB"}'
       );
     }
   });

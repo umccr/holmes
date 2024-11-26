@@ -9,14 +9,14 @@ import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
 import { toUtf8 } from "@aws-sdk/util-utf8";
 
 /**
- * Trigger the extract of a single BAM, with logic to skip the
- * extract if the fingerprint already exists.
+ * Trigger the extract of a single BAM.
  *
  * @param stepsClient a configured Steps client
  * @param extractStepsArn the ARN of the extract Steps
  * @param fingerprintFolder the test specific folder for fingerprints
  * @param bamUrl the URL to extract
  * @param subjectIdentifier the subject identifier of the human who belongs to the BAM
+ * @param libraryIdentifier the library identifier of the sequencing who belongs to the BAM
  * @param reference the id of the reference genome (hg19 or hg38)
  */
 export async function doFingerprintExtract(
@@ -25,14 +25,16 @@ export async function doFingerprintExtract(
   fingerprintFolder: string,
   bamUrl: string,
   subjectIdentifier: string,
+  libraryIdentifier: string,
   reference: string
 ): Promise<any> {
-  const timeLabel = `EXTRACT ${bamUrl} for subject ${subjectIdentifier}`;
+  const timeLabel = `EXTRACT ${bamUrl} for subject ${subjectIdentifier}/library ${libraryIdentifier}`;
   console.time(timeLabel);
 
   return doStepsExecution(stepsClient, extractStepsArn, {
     indexes: [bamUrl],
     subjectIdentifier: subjectIdentifier,
+    libraryIdentifier: libraryIdentifier,
     fingerprintFolder: fingerprintFolder,
     reference: reference,
   }).then(() => {

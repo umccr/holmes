@@ -1,6 +1,6 @@
-import { fingerprintBucketName } from "./lib/env";
+import { fingerprintBucketName } from "./lib/environment-constants";
 import { getSlackTextAttacher } from "./lib/slack";
-import { stepsDoExecution } from "./lib/aws";
+import { stepsDoExecution } from "./lib/aws-misc";
 import { SFNClient } from "@aws-sdk/client-sfn";
 import { distributedMapManifestToLambdaResults } from "./lib/distributed-map";
 import { reportCheck } from "./lib/report-check";
@@ -24,9 +24,6 @@ type EventInput = {
 
   // if present, impose a minimum N in somalier to be considered a positive "relation" between samples
   minimumNCount?: number;
-
-  // if present, a regular expression with single capture group that defines expected "relation" between samples
-  expectRelatedRegex?: string;
 
   // if present, tells the lambda to additionally send the response as an attachment to Slack in that channel
   channelId?: string;
@@ -117,7 +114,6 @@ export const lambdaHandler = async (ev: EventInput, _context: any) => {
     relatednessThreshold: ev.relatednessThreshold,
     minimumNCount: ev.minimumNCount,
     excludeRegex: ev.excludeRegex,
-    expectRelatedRegex: ev.expectRelatedRegex,
   };
 
   const fingerprintCheckResult = await stepsDoExecution(

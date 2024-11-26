@@ -3,24 +3,23 @@ import { chdir } from "process";
 import { execFile } from "child_process";
 import { join } from "path";
 import { URL } from "url";
-import { getGdsFileAsPresigned } from "./illumina-icav1";
 import {
   PutObjectCommand,
   PutObjectCommandInput,
   S3Client,
 } from "@aws-sdk/client-s3";
-import { mkdir, readdir, readFile, rm } from "fs/promises";
-import { nanoid } from "nanoid/non-secure";
-import { httpsDownload, s3Presign, urlToKey } from "./aws";
+import { mkdir, readdir, readFile, rm, stat } from "fs/promises";
+import { httpsDownload, s3Presign, urlToKey } from "./aws-misc";
+import * as crypto from "node:crypto";
 import {
   fingerprintBucketName,
-  safeGetFingerprintSites,
   somalierBinary,
   somalierFasta,
   somalierSites,
   somalierWork,
-} from "./env";
+} from "./environment-constants";
 import axios from "axios";
+import { awsFingerprintDownloadReferenceData } from "./aws-fingerprint-download-reference-data";
 
 // it is sometimes useful to be able to fingerprint public reference samples that exist
 // in open buckets - so this is the name of any buckets of that nature
@@ -61,108 +60,89 @@ async function dumpFileHead(httpUrl: string) {
  * @param readsUrlString a URL of a BAM/CRAM etc that we want to fingerprint
  * @param fingerprintFolder the fingerprint folder to store the resulting fingerprint in
  * @param subjectId the identifier string we want to tag this fingerprint with
+ * @param libraryId the identifier string for the library we want to tag this fingerprint with
  */
 async function fingerprint(
   readsUrlString: string,
   fingerprintFolder: string,
-  subjectId: string
+  subjectId: string,
+  libraryId: string
 ) {
-  console.log(`Computing fingerprint for ${readsUrlString}`);
+  console.log(
+    `Computing fingerprint for '${readsUrlString}' into the folder '${fingerprintFolder}' and with sbj '${subjectId}' and lib '${libraryId}'`
+  );
 
-  // we create a working directory that we can cleanup later
-  const randomString = nanoid();
+  // we create a working directory that we can clean up later
+  const randomString = crypto.randomBytes(16).toString("hex");
   await mkdir(randomString);
 
   // this is a simple way to make sure our inputs conform to URL pattern
   const readsUrl = new URL(readsUrlString);
 
-  let readsIndexUrl: URL;
-
-  // we want to locate our reads index so we can download it locally later
-  if (readsUrlString.endsWith(".bam")) {
-    readsIndexUrl = new URL(readsUrlString + ".bai");
-  } else if (readsUrlString.endsWith(".cram")) {
-    readsIndexUrl = new URL(readsUrlString + ".crai");
-  } else {
+  if (readsUrl.protocol !== "s3:")
     throw new Error(
-      `Unknown file suffix for ${readsUrlString} - must be .bam or .cram`
+      `Url protocol for ${readsUrl} is not one we currently support`
     );
+
+  // we want to locate our index and download it locally
+  const readsIndexLocalPath = `./${randomString}/index`;
+
+  console.time("Download Index");
+  {
+    let readsIndexUrl: URL;
+    let readsIndexHttpPath;
+
+    if (readsUrlString.endsWith(".bam")) {
+      readsIndexUrl = new URL(readsUrlString + ".bai");
+    } else if (readsUrlString.endsWith(".cram")) {
+      readsIndexUrl = new URL(readsUrlString + ".crai");
+    } else {
+      throw new Error(
+        `Unknown file suffix for ${readsUrlString} - must be .bam or .cram`
+      );
+    }
+
+    console.log(`Downloaded index file determined to live at ${readsIndexUrl}`);
+
+    // different paths for downloading open data v private data
+    if (KNOWN_OPEN_DATA_BUCKETS.includes(readsIndexUrl.hostname)) {
+      readsIndexHttpPath = `https://${readsIndexUrl.hostname}.s3.amazonaws.com${readsIndexUrl.pathname}`;
+    } else {
+      readsIndexHttpPath = await s3Presign(readsIndexUrl.toString());
+    }
+
+    console.log(
+      `Downloaded index file can be downloaded from ${readsIndexHttpPath}`
+    );
+
+    await httpsDownload(readsIndexHttpPath, readsIndexLocalPath);
+
+    const s = await stat(readsIndexLocalPath);
+
+    console.log(`Downloaded index file size on disk is ${s.size}`);
   }
+  console.timeEnd("Download Index");
 
-  const indexLocalPath = `./${randomString}/index`;
-
-  // the index string is the eventual string we need to pass to somalier extract..
+  // the toFingerprintString is the eventual string we need to pass to somalier extract...
   // but depending on the protocol we need to do different things (i.e. it is not always just the index)
   let toFingerprintString;
 
-  switch (readsUrl.protocol) {
-    case "s3:":
-      // rather than rely on the S3 support of the somalier binary (we don't have enough control of what libraries
-      // are included for its build) - we construct links manually by pre-signing ourselves
+  // rather than rely on the S3 support of the somalier binary (we don't have enough control of what libraries
+  // are included for its build) - we construct links manually by pre-signing ourselves
+  if (KNOWN_OPEN_DATA_BUCKETS.includes(readsUrl.hostname)) {
+    // if the bucket is an OpenData public bucket - then we need to access directly
+    const s3Url = `https://${readsUrl.hostname}.s3.amazonaws.com${readsUrl.pathname}`;
 
-      if (KNOWN_OPEN_DATA_BUCKETS.includes(readsUrl.hostname)) {
-        // if the bucket is an OpenData public bucket - then we need to access directly
-        const s3Url = `https://${readsUrl.hostname}.s3.amazonaws.com${readsUrl.pathname}`;
-        //const s3UrlBai = `https://${readsUrl.hostname}.s3.amazonaws.com${readsUrl.pathname}.bai`;
+    await dumpFileHead(s3Url);
 
-        await dumpFileHead(s3Url);
-        //await dumpFileHead(s3UrlBai);
+    toFingerprintString = `${s3Url}##idx##${readsIndexLocalPath}`;
+  } else {
+    // construct presigned HTTPS links and get it to source the BAMs that way
+    const s3PresignedUrl = await s3Presign(readsUrlString);
 
-        await httpsDownload(
-          `https://${readsIndexUrl.hostname}.s3.amazonaws.com${readsIndexUrl.pathname}`,
-          indexLocalPath
-        );
+    await dumpFileHead(s3PresignedUrl);
 
-        // toFingerprintString = `${s3Url}##idx##${s3UrlBai}`;
-        toFingerprintString = `${s3Url}##idx##${indexLocalPath}`;
-      } else {
-        // otherwise for the more normal authed access - we construct presigned HTTPS links and get it to source the BAMs that way
-        const s3PresignedUrl = await s3Presign(readsUrlString);
-        //const s3PresignedUrlBai = await s3Presign(readsUrlString + ".bai");
-
-        await dumpFileHead(s3PresignedUrl);
-        //await dumpFileHead(s3PresignedUrlBai);
-
-        await httpsDownload(
-          await s3Presign(readsIndexUrl.toString()),
-          indexLocalPath
-        );
-
-        // toFingerprintString = `${s3PresignedUrl}##idx##${s3PresignedUrlBai}`;
-        toFingerprintString = `${s3PresignedUrl}##idx##${indexLocalPath}`;
-      }
-      break;
-
-    case "gds:":
-      const gdsPresignedUrl = await getGdsFileAsPresigned(
-        readsUrl.hostname,
-        readsUrl.pathname
-      );
-      const gdsPresignedUrlBai = await getGdsFileAsPresigned(
-        readsUrl.hostname,
-        readsUrl.pathname + ".bai"
-      );
-
-      await dumpFileHead(gdsPresignedUrl);
-      await dumpFileHead(gdsPresignedUrlBai);
-
-      await httpsDownload(
-        await getGdsFileAsPresigned(
-          readsIndexUrl.hostname,
-          readsIndexUrl.pathname
-        ),
-        indexLocalPath
-      );
-
-      // this is the undocumented mechanism of nim-htslib to have a path that also specifies the actual index file
-      // toFingerprintString = `${gdsPresignedUrl}##idx##${gdsPresignedUrlBai}`;
-      toFingerprintString = `${gdsPresignedUrl}##idx##${indexLocalPath}`;
-      break;
-
-    default:
-      throw new Error(
-        `Url protocol for ${readsUrl} is not one we currently support`
-      );
+    toFingerprintString = `${s3PresignedUrl}##idx##${readsIndexLocalPath}`;
   }
 
   const execFilePromise = promisify(execFile);
@@ -191,6 +171,8 @@ async function fingerprint(
 
     const { stdout, stderr } = await promiseInvoke;
 
+    console.log(`PID = ${promiseInvoke.child.pid}`);
+    console.log(`Killed = ${promiseInvoke.child.killed}`);
     console.log(`Error code = ${promiseInvoke.child.exitCode}`);
 
     if (stdout) {
@@ -208,7 +190,7 @@ async function fingerprint(
   }
 
   // remove the reads index we downloaded
-  await rm(indexLocalPath, { force: true });
+  await rm(readsIndexLocalPath, { force: true });
 
   const producedFileList = await readdir(randomString);
 
@@ -236,7 +218,8 @@ async function fingerprint(
     Metadata: {
       // note the key name is lower-cased automatically by AWS
       "fingerprint-created": new Date().toISOString(),
-      "subject-id": subjectId,
+      "subject-identifier": subjectId,
+      "library-identifier": libraryId,
     },
   };
 
@@ -252,13 +235,15 @@ async function fingerprint(
  *
  * @param reference the string representing the genome build our BAM matches up with
  * @param fingerprintFolder the slash terminated folder path for where the fingerprints will be sent
- * @param subjectId the subject identifer to tag the fingerprint with
+ * @param subjectId the subject identifier to tag the fingerprint with
+ * @param libraryId the library identifier to tag the fingerprint with
  * @param files the list of source BAMs
  */
 export async function extract(
   reference: string,
   fingerprintFolder: string,
   subjectId: string,
+  libraryId: string,
   files: string[]
 ) {
   console.log("Starting extract task");
@@ -267,9 +252,9 @@ export async function extract(
   chdir(somalierWork);
 
   // setup the local env for extraction
-  await safeGetFingerprintSites(reference);
+  await awsFingerprintDownloadReferenceData(reference);
 
   for (const file of files) {
-    await fingerprint(file, fingerprintFolder, subjectId);
+    await fingerprint(file, fingerprintFolder, subjectId, libraryId);
   }
 }

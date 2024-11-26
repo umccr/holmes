@@ -1,4 +1,5 @@
 import { parse, stringify, transform } from "csv/sync";
+import { FingerprintDownloaded } from "./aws-fingerprint";
 
 /**
  * For a somalier TSV file (either pairs or samples) - correct the sample ids so that
@@ -9,7 +10,7 @@ import { parse, stringify, transform } from "csv/sync";
  * @param tsvCorrectionColumns an array of column numbers to correct
  */
 export async function somalierTsvCorrectIds(
-  indexSampleIdToBamUrlMap: { [sid: string]: string },
+  indexSampleIdToBamUrlMap: { [sid: string]: FingerprintDownloaded },
   tsv: string,
   tsvCorrectionColumns: number[]
 ) {
@@ -26,7 +27,7 @@ export async function somalierTsvCorrectIds(
           throw new Error(
             `Parsing somalier TSV with unknown sample id ${row[c]} in designated column ${c}`
           );
-        row[c] = indexSampleIdToBamUrlMap[row[c]];
+        row[c] = indexSampleIdToBamUrlMap[row[c]].fingerprintKey;
       }
     }
 

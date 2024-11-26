@@ -1,5 +1,5 @@
 import { chdir } from "process";
-import { somalierWork } from "./lib/env";
+import { somalierWork } from "./lib/environment-constants";
 import {
   cleanSomalierFiles,
   runSomalierRelate,

@@ -1,5 +1,5 @@
 import { chdir } from "process";
-import { somalierWork } from "./lib/env";
+import { somalierWork } from "./lib/environment-constants";
 import {
   cleanSomalierFiles,
   runSomalierRelate,
@@ -8,6 +8,7 @@ import { somalierTsvCorrectIds } from "./lib/somalier-tsv-correct-ids";
 import { getSlackTextAttacher } from "./lib/slack";
 import { downloadControlSamples, downloadIndexSamples } from "./lib/ids";
 import { reportControl } from "./lib/report-control";
+import { FingerprintDownloaded } from "./lib/aws-fingerprint";
 
 type EventInput = {
   // a BAM urls to use as index
@@ -54,7 +55,7 @@ export const lambdaHandler = async (ev: EventInput, _context: any) => {
 
   const { pairsTsv, samplesTsv } = await runSomalierRelate();
 
-  const combinedSampleIdToNameMap: Record<string, string> = {};
+  const combinedSampleIdToNameMap: Record<string, FingerprintDownloaded> = {};
 
   for (const [k, v] of Object.entries(indexSampleIdToBamUrlMap))
     combinedSampleIdToNameMap[k] = v;

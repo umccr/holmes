@@ -1,14 +1,17 @@
 import { chdir } from "process";
 import { URL } from "url";
-import { somalierWork } from "./lib/env";
-import { keyToUrl, urlToKey } from "./lib/aws";
+import { somalierWork } from "./lib/environment-constants";
+import { keyToUrl, urlToKey } from "./lib/aws-misc";
 import {
   cleanSomalierFiles,
-  downloadAndCorrectFingerprint,
   runSomalierRelate,
 } from "./lib/somalier-download-run-clean";
 import { HolmesReturnType } from "./lib/somalier-types";
 import { pairsAnalyse } from "./lib/somalier-pairs-analyse";
+import {
+  downloadAndCorrectFingerprint,
+  FingerprintDownloaded,
+} from "./lib/aws-fingerprint";
 
 /**
  * NOTE this is the guts of the actual fingerprint check
@@ -63,11 +66,6 @@ type EventInput = {
     // if present a regex that is matched to BAM filenames (i.e. not against the hex encoded keys)
     // and tells us to exclude them from sending to "somalier relate"
     excludeRegex?: string;
-
-    // if present a regex that generates match groups - and expects all fingerprints with group matches
-    // to the index - to also be 'related' genomically.. this is used to detect fingerprints that *should*
-    // be related but come back not related
-    expectRelatedRegex?: string;
   };
 
   // a set of fingerprint URLs which we will check the index against
@@ -111,7 +109,6 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
   console.log(`Fingerprint folder = ${ev.BatchInput.fingerprintFolder}`);
   console.log(`Relatedness threshold = ${ev.BatchInput.relatednessThreshold}`);
   console.log(`Exclude regex = ${ev.BatchInput.excludeRegex}`);
-  console.log(`Expect related regex = ${ev.BatchInput.expectRelatedRegex}`);
   // console.log(indexes).. these will be printed as part of the debug for the somalier invoke
 
   // only small areas of the lambda runtime are read/write so we need to make sure we are in a writeable working dir
@@ -127,7 +124,9 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
   let sampleCount = 0;
 
   // download all the 'index' samples that we want to compare against everything else
-  const indexSampleIdToFingerprintKeyMap: { [sid: string]: string } = {};
+  const indexSampleIdToFingerprintKeyMap: {
+    [sid: string]: FingerprintDownloaded;
+  } = {};
 
   for (const indexUrl of ev.BatchInput.indexes) {
     // (NOTE: unlike the fingerprints - these all comes in as a URL BAM file location)
@@ -136,11 +135,13 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
       new URL(indexUrl)
     );
 
-    const newIndexSampleId = await downloadAndCorrectFingerprint(
+    const indexFingerprintDownloaded = await downloadAndCorrectFingerprint(
       indexAsKey,
       sampleCount
     );
-    indexSampleIdToFingerprintKeyMap[newIndexSampleId] = indexAsKey;
+    indexSampleIdToFingerprintKeyMap[
+      indexFingerprintDownloaded.generatedSampleId
+    ] = indexFingerprintDownloaded;
     sampleCount++;
   }
 
@@ -148,7 +149,8 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
   console.log(JSON.stringify(indexSampleIdToFingerprintKeyMap, null, 2));
 
   // download and 'fix' the sample ids for all the other fingerprint files we have been passed
-  const sampleIdToFingerprintKeyMap: { [sid: string]: string } = {};
+  const sampleIdToFingerprintKeyMap: { [sid: string]: FingerprintDownloaded } =
+    {};
 
   for (const fingerprintItem of ev.Items) {
     const fingerprintAsKey = fingerprintItem.Key;
@@ -169,11 +171,12 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
     }
 
     // build a map to help us correlate sample ids and fingerprint files
-    const newSampleId = await downloadAndCorrectFingerprint(
+    const sampleFingerprintDownloaded = await downloadAndCorrectFingerprint(
       fingerprintAsKey,
       sampleCount
     );
-    sampleIdToFingerprintKeyMap[newSampleId] = fingerprintAsKey;
+    sampleIdToFingerprintKeyMap[sampleFingerprintDownloaded.generatedSampleId] =
+      sampleFingerprintDownloaded;
     sampleCount++;
   }
 
@@ -183,18 +186,13 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
   if (sampleCount > 1) {
     const { pairsTsv } = await runSomalierRelate();
 
-    const expectRelatedRegex = ev.BatchInput.expectRelatedRegex
-      ? new RegExp(ev.BatchInput.expectRelatedRegex)
-      : new RegExp("^\\b$");
-
     return await pairsAnalyse(
       pairsTsv,
       ev.BatchInput.fingerprintFolder,
       indexSampleIdToFingerprintKeyMap,
       sampleIdToFingerprintKeyMap,
       ev.BatchInput.relatednessThreshold,
-      ev.BatchInput.minimumNCount,
-      expectRelatedRegex
+      ev.BatchInput.minimumNCount
     );
   } else {
     // if due to our exclude regex or bad luck - we ended up with a batch that has no useable

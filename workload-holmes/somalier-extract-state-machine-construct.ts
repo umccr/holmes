@@ -91,7 +91,8 @@ export class SomalierExtractStateMachineConstruct extends SomalierBaseStateMachi
                   JsonPath.array(
                     JsonPath.stringAt("$.reference"),
                     JsonPath.stringAt("$.fingerprintFolder"),
-                    JsonPath.stringAt("$.subjectIdentifier")
+                    JsonPath.stringAt("$.subjectIdentifier"),
+                    JsonPath.stringAt("$.libraryIdentifier")
                   ),
                   JsonPath.stringAt("$.indexes")
                 ),

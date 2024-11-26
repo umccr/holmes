@@ -87,13 +87,13 @@ export async function runTest(
 
   // add in extractors for all the HG38 samples
   const allExtractPromises = [
-    [INDIVIDUAL_96, INDIVIDUAL_96_ID],
-    [INDIVIDUAL_97, INDIVIDUAL_97_ID],
-    [INDIVIDUAL_99, INDIVIDUAL_99_ID],
-    [TRIO_SON, TRIO_SON_ID],
-    [TRIO_FATHER, TRIO_FATHER_ID],
-    [TRIO_MOTHER, TRIO_MOTHER_ID],
-    [CELLPTC, "CELLPTC"],
+    [INDIVIDUAL_96, INDIVIDUAL_96_ID, "L654321"],
+    [INDIVIDUAL_97, INDIVIDUAL_97_ID, "L111111"],
+    [INDIVIDUAL_99, INDIVIDUAL_99_ID, "L222222"],
+    [TRIO_SON, TRIO_SON_ID, "L333333"],
+    [TRIO_FATHER, TRIO_FATHER_ID, "L444444"],
+    [TRIO_MOTHER, TRIO_MOTHER_ID, "L123456"],
+    [CELLPTC, "CELLPTC", "LXYX"],
   ].map((tuple) =>
     doFingerprintExtract(
       stepsClient,
@@ -101,6 +101,7 @@ export async function runTest(
       fingerprintFolder,
       tuple[0],
       tuple[1],
+      tuple[2],
       "hg38.rna"
     )
   );
@@ -113,6 +114,7 @@ export async function runTest(
       fingerprintFolder,
       CTDNA,
       "CTDNA",
+      "L2200417",
       "hg19.rna"
     )
   );
@@ -160,7 +162,7 @@ export async function runTest(
       "ctdna"
     );
 
-    // console.log(JSON.stringify(sonCheckResult, null, 2));
+    console.log(JSON.stringify(sonCheckResult, null, 2));
 
     assert.ok(
       sonCheckResult.unexpectedRelated.length == 2,
@@ -194,7 +196,7 @@ export async function runTest(
       "ctdna"
     );
 
-    // console.log(JSON.stringify(fatherCheckResult, null, 2));
+    console.log(JSON.stringify(fatherCheckResult, null, 2));
 
     assert.ok(
       fatherCheckResult.unexpectedRelated.length == 1,
@@ -222,7 +224,7 @@ export async function runTest(
       "ctdna"
     );
 
-    // console.log(JSON.stringify(motherCheckResult, null, 2));
+    console.log(JSON.stringify(motherCheckResult, null, 2));
 
     assert.ok(
       motherCheckResult.unexpectedRelated.length == 1,

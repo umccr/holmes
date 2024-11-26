@@ -8,7 +8,6 @@
 # in how the docker is run that it was too complex to attempt
 
 # these can safely be checked into github - despite detect-secrets thinking they might be passwords
-export ICA_SECRET_ARN="arn:aws:secretsmanager:ap-southeast-2:843407916570:secret:IcaSecretsPortal" # pragma: allowlist secret
 export FINGERPRINT_BUCKET_NAME="umccr-fingerprint-local-dev-test"                                  # pragma: allowlist secret
 export FINGERPRINT_CONFIG_FOLDER="config/"
 export DOCKER_IMAGE_NAME="fingerprint"
@@ -25,7 +24,7 @@ function check_is_dev() {
 
 function docker_build() {
   # somalier binary is only set up for AMD64 images so we have to force that platform
-  docker build --platform linux/amd64 -t $DOCKER_IMAGE_NAME "$(dirname "${BASH_SOURCE[0]}")/../../application/fingerprint-docker-image"
+  docker build --platform linux/amd64 -t $DOCKER_IMAGE_NAME "$(dirname "${BASH_SOURCE[0]}")/../../artifacts/fingerprint-docker-image"
 }
 
 function docker_start_check() {
@@ -90,18 +89,15 @@ function docker_start_extract() {
     --env AWS_ACCESS_KEY_ID \
     --env AWS_SECRET_ACCESS_KEY \
     --env AWS_SESSION_TOKEN \
-    --env SECRET_ARN="$ICA_SECRET_ARN" \
     --env FINGERPRINT_BUCKET_NAME="$FINGERPRINT_BUCKET_NAME" \
     --env FINGERPRINT_CONFIG_FOLDER="$FINGERPRINT_CONFIG_FOLDER" \
-    --env FINGERPRINT_FOLDER="$2" \
-    --env FINGERPRINT_REFERENCE="$3" \
     --entrypoint node \
     $DOCKER_IMAGE_NAME \
     "/var/task/extract.cjs" \
-    "$1")
+    "$3" "$2" "SBJ1" "LIB2" "$1")
 
   # return the Docker PID of the container we started
-  printf '%s' "$C"
+  printf '%s\n' "$C"
 
   return 0
 }

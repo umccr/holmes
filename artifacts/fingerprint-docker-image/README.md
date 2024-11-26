@@ -21,11 +21,11 @@ We could split them into separate Docker assets if need be though.
 
 ## Testing
 
-Elsewhere in this repo is test scripts that exercise the code
-_as Docker images_ within the real AWS environment. This is due to
-much of the correct behaviour of the code being entirely dependent
-on the AWS infrastructure that calls it (Steps), or the AWS infrastructure it
-calls (S3).
+There is a Jest test suite that currently _only_ tests Slack reporting on the local
+machine and requires no AWS.
 
-I have started on a more well-structured Jest test set - and we should
-progress this.
+There is an E2E test suite that is used to test the deployed software in AWS - and launches
+proper long running Fargate tasks etc.
+
+In between those extremes should be some more testing but the way this project evolved
+meant that something to do that slipped through the cracks.

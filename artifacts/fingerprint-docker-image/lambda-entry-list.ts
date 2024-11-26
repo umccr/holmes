@@ -1,4 +1,4 @@
-import { fingerprintBucketName } from "./lib/env";
+import { fingerprintBucketName } from "./lib/environment-constants";
 import { getSlackResponder, getSlackTextAttacher } from "./lib/slack";
 import { reportList } from "./lib/report-list";
 import { urlListByRegex } from "./lib/url-list-by-regex";
