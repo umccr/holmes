@@ -1,11 +1,9 @@
 import { somalierBinary } from "./environment-constants";
-import { pipeline as pipelineCallback } from "stream";
 import { promisify } from "util";
 import { readdir, readFile, unlink } from "fs/promises";
-import { exec as execCallback } from "child_process";
+import { exec as execCallback } from "node:child_process";
 
 // get this functionality as promise compatible function
-const pipeline = promisify(pipelineCallback);
 const exec = promisify(execCallback);
 
 /**

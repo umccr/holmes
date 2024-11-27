@@ -9,6 +9,12 @@ export type FingerprintDownloaded = {
   // the key of the fingerprint that was downloaded
   fingerprintKey: string;
 
+  // depending on where the input fingerprint key comes from - the "display"
+  // of the fingerprint might be different. So instance, some fingerprints
+  // are displayed as URLs ("s3://a-bucket/mine.bam"), whereas some control
+  // fingerprints are displayed as "NA12345 control" (say)
+  fingerprintDisplay: string;
+
   // the sample id that we inserted into the fingerprint
   generatedSampleId: string;
 
@@ -35,6 +41,7 @@ export type FingerprintDownloaded = {
  * fingerprint that we might obtain from the metadata (things like the date of extraction etc).
  *
  * @param fingerprintKey the key in our fingerprint bucket of the fingerprint file to download
+ * @param fingerprintDisplay the display value of the key if needing reporting on downstream
  * @param count the count used to generate a new id
  * @return data about the newly created local fingerprint
  *
@@ -49,6 +56,7 @@ export type FingerprintDownloaded = {
  */
 export async function downloadAndCorrectFingerprint(
   fingerprintKey: string,
+  fingerprintDisplay: string,
   count: number
 ): Promise<FingerprintDownloaded> {
   const s3Client = new S3Client({});
@@ -89,6 +97,7 @@ export async function downloadAndCorrectFingerprint(
 
   const result: FingerprintDownloaded = {
     fingerprintKey: fingerprintKey,
+    fingerprintDisplay: fingerprintDisplay,
     generatedPath: localPath,
     generatedSampleId: newSampleId,
   };

@@ -49,10 +49,10 @@ export async function getSlackTextAttacher(slackChannel: string) {
   const web = await getSlackWebClient();
 
   return async (slackTextMessage: string, title?: string) => {
-    return await web.files.upload({
-      channels: slackChannel,
+    return await web.files.uploadV2({
+      channel_id: slackChannel,
       content: slackTextMessage,
-      filetype: "text",
+      filename: "report.txt",
       title: title,
     });
   };

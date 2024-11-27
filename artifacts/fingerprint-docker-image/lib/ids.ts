@@ -25,6 +25,7 @@ export async function downloadIndexSamples(
   for (const indexAsBamUrl of bamUrls) {
     const indexFingerprintDownloaded = await downloadAndCorrectFingerprint(
       urlToKey(fingerprintFolder, new URL(indexAsBamUrl)),
+      indexAsBamUrl,
       sampleCount
     );
     indexSampleIdToBamUrlMap[indexFingerprintDownloaded.generatedSampleId] =
@@ -57,11 +58,10 @@ export async function downloadControlSamples(
 
   const controls = await getFingerprintControlKeys();
 
-  console.log(JSON.stringify(controls, null, 2));
-
   for (const [controlKey, controlName] of Object.entries(controls)) {
     const controlFingerprintDownloaded = await downloadAndCorrectFingerprint(
       controlKey,
+      controlName,
       sampleCount
     );
     fingerprintSampleIdToControlNameMap[
@@ -69,9 +69,6 @@ export async function downloadControlSamples(
     ] = controlFingerprintDownloaded;
     sampleCount++;
   }
-
-  console.log("Control samples found");
-  console.log(JSON.stringify(fingerprintSampleIdToControlNameMap, null, 2));
 
   return fingerprintSampleIdToControlNameMap;
 }

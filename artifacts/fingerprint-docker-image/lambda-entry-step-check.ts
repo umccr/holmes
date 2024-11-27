@@ -80,7 +80,7 @@ type EventInput = {
  * A lambda which does the main work of comparing fingerprint files
  * using the somalier command line tool.
  *
- * It is passed an index fingerprint file and compares it to a small subset of
+ * It is passed index fingerprint URLs and compares them to a small subset of
  * other fingerprint files (all in a fingerprint bucket in S3).
  *
  * There are file naming conventions on the fingerprint files which allow us
@@ -129,7 +129,7 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
   } = {};
 
   for (const indexUrl of ev.BatchInput.indexes) {
-    // (NOTE: unlike the fingerprints - these all comes in as a URL BAM file location)
+    // (NOTE: unlike the fingerprints - these all comes in as a BAM URLs - we need to convert them to a fingerprint key)
     const indexAsKey = urlToKey(
       ev.BatchInput.fingerprintFolder,
       new URL(indexUrl)
@@ -137,6 +137,7 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
 
     const indexFingerprintDownloaded = await downloadAndCorrectFingerprint(
       indexAsKey,
+      indexUrl,
       sampleCount
     );
     indexSampleIdToFingerprintKeyMap[
@@ -173,6 +174,7 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
     // build a map to help us correlate sample ids and fingerprint files
     const sampleFingerprintDownloaded = await downloadAndCorrectFingerprint(
       fingerprintAsKey,
+      fingerprintItem.Key,
       sampleCount
     );
     sampleIdToFingerprintKeyMap[sampleFingerprintDownloaded.generatedSampleId] =

@@ -21,11 +21,14 @@ We could split them into separate Docker assets if need be though.
 
 ## Testing
 
-There is a Jest test suite that currently _only_ tests Slack reporting on the local
-machine and requires no AWS.
+There is a Jest test suite that is being fleshed out. It requires AWS credentials to our
+`dev` account to be present in the environment - then just `npx jest`. The Jest tests _will_
+cover operations like fingerprint checks etc because they run reasonably quickly. It however
+does not exercise the 'extract' functionality at all. This test suite runs locally
+(in the sense it runs against the local code - it still requires access to the dev
+fingerprint bucket for its test cases).
+It does not test any aspect of the CDK/deployment.
 
 There is an E2E test suite that is used to test the deployed software in AWS - and launches
-proper long running Fargate tasks etc.
-
-In between those extremes should be some more testing but the way this project evolved
-meant that something to do that slipped through the cracks.
+proper long-running Fargate tasks etc. This can be run from dev, stg or prod. It is used
+in the build pipeline as a gate.
