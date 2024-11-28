@@ -1,6 +1,7 @@
-import { keyToUrl, s3ListAllFiles } from "./aws-misc";
+import { keyToUrl } from "./aws-misc";
 import { fingerprintBucketName } from "./environment-constants";
 import { formatInTimeZone } from "date-fns-tz";
+import { awsListObjects } from "./aws-list-objects";
 
 export type UrlListResult = {
   url: string;
@@ -38,7 +39,7 @@ export async function urlListByRegex(
 
   const excludeRegexReal = excludeRegex ? RegExp(excludeRegex) : undefined;
 
-  for await (const s3Object of s3ListAllFiles(
+  for await (const s3Object of awsListObjects(
     fingerprintBucketName!,
     fingerprintFolder
   )) {

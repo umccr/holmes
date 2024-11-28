@@ -2,10 +2,9 @@ import { pairsAnalyse } from "../lib/somalier-pairs-analyse";
 import { urlToKey } from "../lib/aws-misc";
 import { join } from "path";
 import { readFile } from "fs/promises";
+import { SAMPLE_PAIRS_PATH } from "./sample";
 
 const FING_FOLDER = "fing/";
-
-const SAMPLE_PAIRS_PATH = join(__dirname, "sample-pairs.tsv");
 
 // the sample pairs has the following notable relationships (all faked directly in the data - makes no sense bioinformatically)
 // 0 -> 4 (rel=0.812 n=16179)
@@ -30,6 +29,7 @@ describe("Run pairing analysis", () => {
       {
         "0000000": {
           fingerprintKey: urlToKey(FING_FOLDER, new URL(index0)),
+          fingerprintDisplay: index0,
           generatedSampleId: "0000000",
           generatedPath: "/tmp/0.somalier",
         },
@@ -37,26 +37,31 @@ describe("Run pairing analysis", () => {
       {
         "0000001": {
           fingerprintKey: urlToKey(FING_FOLDER, new URL(index1)),
+          fingerprintDisplay: index1,
           generatedSampleId: "0000001",
           generatedPath: "/tmp/1.somalier",
         },
         "0000002": {
           fingerprintKey: urlToKey(FING_FOLDER, new URL(index2)),
+          fingerprintDisplay: index2,
           generatedSampleId: "0000002",
           generatedPath: "/tmp/2.somalier",
         },
         "0000003": {
           fingerprintKey: urlToKey(FING_FOLDER, new URL(index3)),
+          fingerprintDisplay: index3,
           generatedSampleId: "0000003",
           generatedPath: "/tmp/3.somalier",
         },
         "0000004": {
           fingerprintKey: urlToKey(FING_FOLDER, new URL(index4)),
+          fingerprintDisplay: index4,
           generatedSampleId: "0000004",
           generatedPath: "/tmp/4.somalier",
         },
         "0000005": {
           fingerprintKey: urlToKey(FING_FOLDER, new URL(index5)),
+          fingerprintDisplay: index5,
           generatedSampleId: "0000005",
           generatedPath: "/tmp/5.somalier",
         },
@@ -112,12 +117,14 @@ describe("Run pairing analysis", () => {
       {
         "0000000": {
           fingerprintKey: urlToKey(FING_FOLDER, new URL(index0)),
+          fingerprintDisplay: index0,
           generatedSampleId: "0000000",
           generatedPath: "/tmp/0.somalier",
           subjectIdentifier: "subject_AAAA",
         },
         "0000001": {
           fingerprintKey: urlToKey(FING_FOLDER, new URL(index1)),
+          fingerprintDisplay: index1,
           generatedSampleId: "0000001",
           generatedPath: "/tmp/1.somalier",
           subjectIdentifier: "subject_BBBB",
@@ -126,24 +133,28 @@ describe("Run pairing analysis", () => {
       {
         "0000002": {
           fingerprintKey: urlToKey(FING_FOLDER, new URL(index2)),
+          fingerprintDisplay: index2,
           generatedSampleId: "0000002",
           generatedPath: "/tmp/2.somalier",
           subjectIdentifier: "subject_BBBB",
         },
         "0000003": {
           fingerprintKey: urlToKey(FING_FOLDER, new URL(index3)),
+          fingerprintDisplay: index3,
           generatedSampleId: "0000003",
           generatedPath: "/tmp/3.somalier",
           subjectIdentifier: "subject_AAAA",
         },
         "0000004": {
           fingerprintKey: urlToKey(FING_FOLDER, new URL(index4)),
+          fingerprintDisplay: index4,
           generatedSampleId: "0000004",
           generatedPath: "/tmp/4.somalier",
           subjectIdentifier: "subject_BBBB",
         },
         "0000005": {
           fingerprintKey: urlToKey(FING_FOLDER, new URL(index5)),
+          fingerprintDisplay: index5,
           generatedSampleId: "0000005",
           generatedPath: "/tmp/5.somalier",
           subjectIdentifier: "subject_FFFF",

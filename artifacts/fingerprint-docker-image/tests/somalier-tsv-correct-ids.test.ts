@@ -1,42 +1,14 @@
-import { join } from "path";
 import { somalierTsvCorrectIds } from "../lib/somalier-tsv-correct-ids";
 import { readFile } from "fs/promises";
-import { FingerprintDownloaded } from "../lib/aws-fingerprint";
+import { SAMPLE_PAIRS_PATH, SAMPLE_SAMPLES_PATH } from "./sample";
 
-const SAMPLE_PAIRS_PATH = join(__dirname, "sample-pairs.tsv");
-const SAMPLE_SAMPLES_PATH = join(__dirname, "sample-samples.tsv");
-
-const idMap: Record<string, FingerprintDownloaded> = {
-  "0000000": {
-    fingerprintKey: "gds://bucket/my-zzz.bam",
-    generatedSampleId: "0000000",
-    generatedPath: "/tmp/0.somalier",
-  },
-  "0000001": {
-    fingerprintKey: "gds://bucket/my-aaa.bam",
-    generatedSampleId: "0000001",
-    generatedPath: "/tmp/1.somalier",
-  },
-  "0000002": {
-    fingerprintKey: "gds://bucket/my-bbb.bam",
-    generatedSampleId: "0000002",
-    generatedPath: "/tmp/2.somalier",
-  },
-  "0000003": {
-    fingerprintKey: "gds://bucket/my-ccc.bam",
-    generatedSampleId: "0000003",
-    generatedPath: "/tmp/3.somalier",
-  },
-  "0000004": {
-    fingerprintKey: "gds://bucket/my-ddd.bam",
-    generatedSampleId: "0000004",
-    generatedPath: "/tmp/4.somalier",
-  },
-  "0000005": {
-    fingerprintKey: "gds://bucket/my-eee.bam",
-    generatedSampleId: "0000005",
-    generatedPath: "/tmp/5.somalier",
-  },
+const idMap: Record<string, string> = {
+  "0000000": "gds://bucket/my-zzz.bam",
+  "0000001": "gds://bucket/my-aaa.bam",
+  "0000002": "gds://bucket/my-bbb.bam",
+  "0000003": "gds://bucket/my-ccc.bam",
+  "0000004": "gds://bucket/my-ddd.bam",
+  "0000005": "gds://bucket/my-eee.bam",
 };
 
 describe("Parse in TSVs and correct the sample ids", () => {

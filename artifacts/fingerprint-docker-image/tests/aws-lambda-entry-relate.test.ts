@@ -1,20 +1,23 @@
-import { lambdaHandler } from "../lambda-entry-control";
+import { lambdaHandler } from "../lambda-entry-relate";
 
 import {
   HG002_URL,
+  HG003_URL,
   UNIT_TEST_FINGERPRINT_FOLDER,
   UNIT_TEST_SLACK_CHANNEL,
 } from "./aws-test-constants";
 
-describe("Fingerprint control in AWS", () => {
-  test("basic check of a sample against controls", async () => {
+describe("Fingerprint relate in AWS", () => {
+  xtest("basic check of a sample against another", async () => {
     const r = await lambdaHandler(
       {
-        index: HG002_URL,
+        indexes: [HG002_URL, HG003_URL],
         fingerprintFolder: `${UNIT_TEST_FINGERPRINT_FOLDER}/`,
       },
       {}
     );
+
+    console.log(r);
 
     // assert the basic shape of the Pairs file - though noting that somalier can process the
     // fingerprint files in different orders so we have to be able to handle that
@@ -85,10 +88,10 @@ describe("Fingerprint control in AWS", () => {
     }
   });
 
-  xtest("send a report to Slack", async () => {
+  test("send a report to Slack", async () => {
     const r = await lambdaHandler(
       {
-        index: HG002_URL,
+        indexes: [HG002_URL, HG003_URL],
         fingerprintFolder: `${UNIT_TEST_FINGERPRINT_FOLDER}/`,
         channelId: UNIT_TEST_SLACK_CHANNEL,
       },

@@ -92,15 +92,20 @@ export const lambdaHandler = async (ev: EventInput, _context: any) => {
     };
   }
 
-  const indexSampleIdToBamUrlMap = await downloadIndexSamples(
+  const indexSampleIdsToDownloadedFingerprintMap = await downloadIndexSamples(
     urlsToCheck,
     ev.fingerprintFolder
   );
 
   const { pairsTsv, samplesTsv } = await runSomalierRelate();
 
+  const sampleIdToNameMap: Record<string, string> = {};
+
+  for (const [k, v] of Object.entries(indexSampleIdsToDownloadedFingerprintMap))
+    sampleIdToNameMap[k] = v.fingerprintDisplay;
+
   const fixedSamplesTsv = await somalierTsvCorrectIds(
-    indexSampleIdToBamUrlMap,
+    sampleIdToNameMap,
     samplesTsv,
     // column 0 in the samples is a familyid - which we do not use - so we ignore (even though it gets
     // set to the sample id in the absence of a family)
@@ -108,7 +113,7 @@ export const lambdaHandler = async (ev: EventInput, _context: any) => {
   );
 
   const fixedPairsTsv = await somalierTsvCorrectIds(
-    indexSampleIdToBamUrlMap,
+    sampleIdToNameMap,
     pairsTsv,
     [0, 1]
   );

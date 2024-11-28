@@ -12,7 +12,7 @@ const { tmpdir } = require("node:os");
 module.exports = async () => {
   const localTmp = await mkdtemp(join(tmpdir(), "holmes-"));
 
-  console.debug(`Executing somalier jest tests in ${localTmp}`);
+  // console.debug(`Executing somalier jest tests in ${localTmp}`);
 
   // for unit testing purposes we don't want to ever download the reference genomes
   // as that takes minutes

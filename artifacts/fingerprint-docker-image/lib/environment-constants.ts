@@ -1,5 +1,6 @@
 import { env as envDict } from "process";
-import { s3Download, s3ListAllFiles } from "./aws-misc";
+import { s3Download } from "./aws-misc";
+import { awsListObjects } from "./aws-list-objects";
 
 // by default, we obviously want this setup to work correctly in a standalone fargate/lambda
 // HOWEVER, it is useful to be able to override these on an execution basis for local testing
@@ -43,7 +44,7 @@ export async function getFingerprintControlKeys(): Promise<
   const EXPECTED_PREFIX = "control.";
   const EXPECTED_SUFFIX = ".bam.somalier";
 
-  for await (const s3Object of s3ListAllFiles(
+  for await (const s3Object of awsListObjects(
     fingerprintBucketName,
     fingerprintConfigFolder + EXPECTED_PREFIX
   )) {

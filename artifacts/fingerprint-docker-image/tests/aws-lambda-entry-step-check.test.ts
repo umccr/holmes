@@ -7,8 +7,8 @@ import {
   HG003_URL,
   HG004_KEY,
   HG004_URL,
-  HG0096_KEY,
-  HG0096_URL,
+  HG00096_KEY,
+  HG00096_URL,
   UNIT_TEST_FINGERPRINT_FOLDER,
 } from "./aws-test-constants";
 
@@ -19,7 +19,7 @@ describe("Fingerprint check operation in AWS", () => {
     const r = await lambdaHandler(
       {
         BatchInput: {
-          indexes: [HG0096_URL],
+          indexes: [HG00096_URL],
           fingerprintFolder: `${UNIT_TEST_FINGERPRINT_FOLDER}/`,
           relatednessThreshold: 0.8,
           minimumNCount: 5,
@@ -37,7 +37,7 @@ describe("Fingerprint check operation in AWS", () => {
             Size: 1,
           },
           {
-            Key: HG0096_KEY,
+            Key: HG00096_KEY,
             LastModified: 1,
             Size: 1,
           },
@@ -54,7 +54,7 @@ describe("Fingerprint check operation in AWS", () => {
     // these are all unrelated samples - the only match will be against itself
     expect(Object.entries(r).length).toBe(1);
 
-    const hg96Matches = r[HG0096_URL];
+    const hg96Matches = r[HG00096_URL];
 
     expect(hg96Matches).toBeDefined();
     expect(hg96Matches.length).toBe(1);
@@ -62,7 +62,7 @@ describe("Fingerprint check operation in AWS", () => {
     const hg96Self = hg96Matches[0];
 
     expect(hg96Self).toBeDefined();
-    expect(hg96Self.file).toBe(HG0096_URL);
+    expect(hg96Self.file).toBe(HG00096_URL);
     expect(hg96Self.type).toBe("Self");
     expect(hg96Self.relatedness).toBe(1);
     expect(hg96Self.n).toBe(16209);
@@ -139,7 +139,7 @@ describe("Fingerprint check operation in AWS", () => {
     const r = await lambdaHandler(
       {
         BatchInput: {
-          indexes: [HG0096_URL],
+          indexes: [HG00096_URL],
           fingerprintFolder: `${UNIT_TEST_FINGERPRINT_FOLDER}/`,
           relatednessThreshold: 0.8,
           minimumNCount: 5,
@@ -150,7 +150,7 @@ describe("Fingerprint check operation in AWS", () => {
         },
         Items: [
           {
-            Key: HG0096_KEY,
+            Key: HG00096_KEY,
             LastModified: 1,
             Size: 1,
           },
@@ -165,7 +165,7 @@ describe("Fingerprint check operation in AWS", () => {
     );
 
     expect(Object.entries(r).length).toBe(1);
-    expect(r[HG0096_URL]).toBeDefined();
-    expect(r[HG0096_URL].length).toBe(0);
+    expect(r[HG00096_URL]).toBeDefined();
+    expect(r[HG00096_URL].length).toBe(0);
   });
 });

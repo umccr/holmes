@@ -4,6 +4,7 @@ describe("Fingerprints in AWS", () => {
   it("can read a fingerprint and return metadata", async () => {
     const r = await downloadAndCorrectFingerprint(
       "fingerprints-for-unit-tests/s3%3A%2F%2Fumccr-fingerprint-local-dev-test%2Ftest-bams%2Fctdna%2FPTC_ctTSO220404_L2200417.bam.somalier",
+      "s3://blah",
       5
     );
 
@@ -24,6 +25,7 @@ describe("Fingerprints in AWS", () => {
     // IT DOES HOWEVER HAVE A LIBRARY IDENTIFIER (so it has _some_ metadata)
     const r = await downloadAndCorrectFingerprint(
       "fingerprints-for-unit-tests/s3%3A%2F%2Fa-bucket%2Findividual-SBJ00125.bam.somalier",
+      "s3://blah",
       2
     );
 

@@ -1,9 +1,6 @@
-import { join } from "path";
 import { readFile } from "fs/promises";
 import { reportRelate } from "../lib/report-relate";
-
-const SAMPLE_PAIRS_PATH = join(__dirname, "sample-pairs.tsv");
-const SAMPLE_SAMPLES_PATH = join(__dirname, "sample-samples.tsv");
+import { SAMPLE_PAIRS_PATH, SAMPLE_SAMPLES_PATH } from "./sample";
 
 describe("Report Relate", () => {
   it("basic report", async () => {

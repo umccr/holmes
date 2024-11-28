@@ -4,6 +4,7 @@ import { streamToBuffer } from "./misc";
 import { createWriteStream } from "fs";
 import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
+import { s3FingerprintMetadataApply } from "./s3-fingerprint-db/s3-fingerprint-metadata-apply";
 
 export type FingerprintDownloaded = {
   // the key of the fingerprint that was downloaded
@@ -104,30 +105,8 @@ export async function downloadAndCorrectFingerprint(
 
   // convert object metadata into useful fields for the checker
   if (data.Metadata) {
-    const createdMeta = data.Metadata["fingerprint-created"];
-
-    if (createdMeta)
-      result.fingerprintCreated = new Date(Date.parse(createdMeta));
-    else {
-      // if nothing specified this way then use the S3 creation
-      result.fingerprintCreated = data.LastModified;
-    }
-
-    const subjectMeta = data.Metadata["subject-identifier"];
-
-    if (subjectMeta) result.subjectIdentifier = subjectMeta.trim();
-    else {
-      // we can have older samples that used to get subject ids from their filename
-      const re = new RegExp(/.*(SBJ\d\d\d\d\d).*/);
-      const r = fingerprintKey.match(re);
-      if (r) result.subjectIdentifier = r[1];
-    }
-
-    const libraryMeta = data.Metadata["library-identifier"];
-
-    if (libraryMeta) result.libraryIdentifier = libraryMeta.trim();
+    s3FingerprintMetadataApply(fingerprintKey, data.Metadata, result);
   }
-
   // let the caller know what sample id we ended up generating for matching back to the original BAM
   return result;
 }

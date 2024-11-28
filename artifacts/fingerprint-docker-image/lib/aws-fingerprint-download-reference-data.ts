@@ -1,4 +1,4 @@
-import { s3Download, s3ListAllFiles } from "./aws-misc";
+import { s3Download } from "./aws-misc";
 import {
   fingerprintBucketName,
   fingerprintConfigFolder,
@@ -6,6 +6,7 @@ import {
   somalierFastaIndex,
   somalierSites,
 } from "./environment-constants";
+import { awsListObjects } from "./aws-list-objects";
 
 /**
  * For a given reference string (i.e. hg38) retrieve the relevant
@@ -37,7 +38,7 @@ export async function awsFingerprintDownloadReferenceData(
     foundFasta = false,
     foundFastaIndex = false;
 
-  for await (const s3Object of s3ListAllFiles(
+  for await (const s3Object of awsListObjects(
     fingerprintBucketName,
     fingerprintConfigFolder
   )) {

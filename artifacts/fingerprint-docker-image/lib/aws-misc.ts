@@ -163,43 +163,6 @@ export async function s3Download(
 }
 
 /**
- * List all the fingerprint files in a bucket for a given prefix.
- *
- * @param bucketName the bucket to list files from
- * @param prefix the prefix key to restrict the list to
- */
-export async function* s3ListAllFiles(
-  bucketName: string,
-  prefix: string
-): AsyncGenerator<_Object> {
-  let contToken = undefined;
-
-  let count = 0;
-
-  do {
-    const data: ListObjectsV2Output = await s3Client.send(
-      new ListObjectsV2Command({
-        Bucket: bucketName,
-        Prefix: prefix,
-        ContinuationToken: contToken,
-      })
-    );
-
-    contToken = data.NextContinuationToken;
-
-    if (data.IsTruncated)
-      console.log(
-        `S3 file list was truncated so going again with continuation ${contToken}`
-      );
-
-    for (const file of data.Contents || []) {
-      count++;
-      yield file;
-    }
-  } while (contToken);
-}
-
-/**
  * Generate a short term presigned link to the given S3 URL.
  *
  * @param s3url
