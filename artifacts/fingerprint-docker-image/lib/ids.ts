@@ -24,6 +24,7 @@ export async function downloadIndexSamples(
 
   for (const indexAsBamUrl of bamUrls) {
     const indexFingerprintDownloaded = await downloadAndCorrectFingerprint(
+      fingerprintFolder,
       urlToKey(fingerprintFolder, new URL(indexAsBamUrl)),
       indexAsBamUrl,
       sampleCount
@@ -60,6 +61,7 @@ export async function downloadControlSamples(
 
   for (const [controlKey, controlName] of Object.entries(controls)) {
     const controlFingerprintDownloaded = await downloadAndCorrectFingerprint(
+      fingerprintFolder,
       controlKey,
       controlName,
       sampleCount

@@ -136,6 +136,7 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
     );
 
     const indexFingerprintDownloaded = await downloadAndCorrectFingerprint(
+      ev.BatchInput.fingerprintFolder,
       indexAsKey,
       indexUrl,
       sampleCount
@@ -173,6 +174,7 @@ export const lambdaHandler = async (ev: EventInput, context: any) => {
 
     // build a map to help us correlate sample ids and fingerprint files
     const sampleFingerprintDownloaded = await downloadAndCorrectFingerprint(
+      ev.BatchInput.fingerprintFolder,
       fingerprintAsKey,
       fingerprintItem.Key,
       sampleCount

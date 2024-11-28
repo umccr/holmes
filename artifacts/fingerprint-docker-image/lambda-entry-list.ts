@@ -44,32 +44,29 @@ export const lambdaHandler = async (ev: EventInput, _context: any) => {
   console.log(`Regexps = ${ev.regexes}`);
   console.log(`Indexes = ${ev.indexes}`);
 
-  const urls = await urlListByRegex(
+  const fingerprints = await urlListByRegex(
     ev.regexes,
     ev.indexes,
     ev.fingerprintFolder,
     ev.excludeRegex
   );
 
-  const reportTitle = `Fingerprint list report for regexes【${ev.regexes!.join(
-    " | "
-  )}】 and ${(ev.indexes || []).length} explicit indexes`;
+  // if asked, report back to Slack
+  if (ev.channelId) {
+    const reportTitle = `Fingerprint list report for regexes【${ev.regexes!.join(
+      " | "
+    )}】 and ${(ev.indexes || []).length} explicit indexes`;
 
-  if (urls.length === 0) {
-    if (ev.channelId) {
+    if (fingerprints.length === 0) {
       const responder = await getSlackTextAttacher(ev.channelId);
 
       await responder("⚠️ NO FINGERPRINTS FOUND", reportTitle);
+    } else {
+      const responder = await getSlackTextAttacher(ev.channelId);
+      const report = await reportList(fingerprints);
+      await responder(report, reportTitle);
     }
-
-    return [];
   }
 
-  if (ev.channelId) {
-    const responder = await getSlackTextAttacher(ev.channelId);
-    const report = await reportList(urls);
-    await responder(report, reportTitle);
-  }
-
-  return urls;
+  return fingerprints;
 };

@@ -1,24 +1,38 @@
 import { S3Fingerprint } from "./s3-fingerprint";
+import { formatInTimeZone } from "date-fns-tz";
 
 /**
  * Take the metadata records from an S3 Head or Get and set
  * any applicable fields of our fingerprint record.
  *
- * @param key the S3 fingerprint key
- * @param m the metadata from an S3 GET or HEAD on a fingerprint
  * @param f the fingerprint object to set
+ * @param key the S3 fingerprint key
+ * @param lastModified the S3 last modified field or empty
+ * @param m the metadata from an S3 GET or HEAD on a fingerprint or empty
  * @returns the fingerprint object passed in
  */
 export function s3FingerprintMetadataApply(
+  f: S3Fingerprint,
   key: string,
-  m: Record<string, string>,
-  f: S3Fingerprint
+  lastModified: Date | undefined,
+  m: Record<string, string> | undefined
 ): S3Fingerprint {
-  const createdMeta = m["fingerprint-created"];
+  const createdMeta = m ? m["fingerprint-created"] : undefined;
 
   if (createdMeta) f.created = new Date(Date.parse(createdMeta));
+  else {
+    if (lastModified) f.created = lastModified;
+  }
 
-  const subjectMeta = m["subject-identifier"];
+  if (f.created) {
+    f.createdMelbourneDisplay = formatInTimeZone(
+      f.created,
+      "Australia/Melbourne",
+      "yyyy-MM-dd HH:mm:ss zzz"
+    );
+  }
+
+  const subjectMeta = m ? m["subject-identifier"] : undefined;
 
   if (subjectMeta) f.subjectIdentifier = subjectMeta.trim();
   else {
@@ -28,7 +42,7 @@ export function s3FingerprintMetadataApply(
     if (r) f.subjectIdentifier = r[1];
   }
 
-  const libraryMeta = m["library-identifier"];
+  const libraryMeta = m ? m["library-identifier"] : undefined;
 
   if (libraryMeta) f.libraryIdentifier = libraryMeta.trim();
   else {

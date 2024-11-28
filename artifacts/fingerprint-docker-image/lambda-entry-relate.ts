@@ -10,6 +10,7 @@ import { reportRelate } from "./lib/report-relate";
 import { downloadIndexSamples } from "./lib/ids";
 import { urlListByRegex } from "./lib/url-list-by-regex";
 import { MAX_RELATE } from "./limits";
+import { S3Fingerprint } from "./lib/s3-fingerprint-db/s3-fingerprint";
 
 type EventInput = {
   // EITHER the BAM urls to use as indexes
@@ -48,26 +49,27 @@ export const lambdaHandler = async (ev: EventInput, _context: any) => {
       "Only one of indexes or regexes can be specified on any one relate call"
     );
 
-  let urlsToCheck: string[] = [];
+  let fingerprintUrlsToCheck: string[] = [];
   let truncated = false;
 
   if (ev.regexes) {
-    let urls = await urlListByRegex(
-      ev.regexes,
-      [],
-      ev.fingerprintFolder,
-      ev.excludeRegex
-    );
-    urlsToCheck = urls.map((u) => u.url);
+    fingerprintUrlsToCheck = (
+      await urlListByRegex(
+        ev.regexes,
+        [],
+        ev.fingerprintFolder,
+        ev.excludeRegex
+      )
+    ).map((f) => f.url?.toString() || "");
   } else if (ev.indexes) {
-    urlsToCheck = ev.indexes;
+    fingerprintUrlsToCheck = ev.indexes;
   } else
     throw new Error(
       "One of indexes or regexes must be specified on any one relate call"
     );
 
-  if (urlsToCheck.length > MAX_RELATE) {
-    urlsToCheck = urlsToCheck.slice(0, MAX_RELATE);
+  if (fingerprintUrlsToCheck.length > MAX_RELATE) {
+    fingerprintUrlsToCheck = fingerprintUrlsToCheck.slice(0, MAX_RELATE);
     truncated = true;
   }
 
@@ -79,7 +81,7 @@ export const lambdaHandler = async (ev: EventInput, _context: any) => {
         truncated ? " (truncated)" : ""
       }`;
 
-  if (urlsToCheck.length === 0) {
+  if (fingerprintUrlsToCheck.length === 0) {
     if (ev.channelId) {
       const responder = await getSlackTextAttacher(ev.channelId);
 
@@ -93,7 +95,7 @@ export const lambdaHandler = async (ev: EventInput, _context: any) => {
   }
 
   const indexSampleIdsToDownloadedFingerprintMap = await downloadIndexSamples(
-    urlsToCheck,
+    fingerprintUrlsToCheck,
     ev.fingerprintFolder
   );
 

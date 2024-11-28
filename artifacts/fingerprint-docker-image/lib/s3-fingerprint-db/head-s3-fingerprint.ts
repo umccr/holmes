@@ -1,6 +1,7 @@
 import { HeadObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { S3Fingerprint } from "./s3-fingerprint";
 import { s3FingerprintMetadataApply } from "./s3-fingerprint-metadata-apply";
+import { keyToUrl } from "../aws-misc";
 
 const s3Client = new S3Client({});
 
@@ -9,11 +10,13 @@ const s3Client = new S3Client({});
  * db and return a strongly typed S3Fingerprint object.
  *
  * @param fingerprintBucketName
+ * @param fingerprintFolder
  * @param s3Key
  * @param s3LastModified
  */
 export async function headS3Fingerprint(
   fingerprintBucketName: string,
+  fingerprintFolder: string,
   s3Key: string,
   s3LastModified: Date
 ): Promise<S3Fingerprint> {
@@ -28,11 +31,15 @@ export async function headS3Fingerprint(
       const f: S3Fingerprint = {
         bucket: fingerprintBucketName,
         key: s3Key,
+        url: keyToUrl(fingerprintFolder, s3Key),
       };
 
-      s3FingerprintMetadataApply(s3Key, result.Metadata, f);
-
-      if (!f.created) f.created = s3LastModified;
+      s3FingerprintMetadataApply(
+        f,
+        s3Key,
+        result.LastModified,
+        result.Metadata
+      );
 
       return f;
     });

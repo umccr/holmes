@@ -6,7 +6,7 @@
   "license": "MIT",
   "scripts": {
     "//test": "This is obviously a mess of a launch so please do better if the whole Node/TS/ESM/Jest debacle sorts itself out",
-    "test": "node --experimental-vm-modules --no-warnings ./node_modules/jest/bin/jest.js tests/*.ts"
+    "test": "tsc && node --experimental-vm-modules --no-warnings ./node_modules/jest/bin/jest.js tests/*.ts"
   },
   "dependencies": {
     "@aws-sdk/client-lambda": "3.693.0",

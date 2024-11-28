@@ -1,6 +1,8 @@
 import { listS3Fingerprints } from "../lib/s3-fingerprint-db/list-s3-fingerprints";
 import {
   HG00096_KEY,
+  SOME_METADATA_BUT_SUBJECT_KEY,
+  NOMETADATA_KEY,
   UNIT_TEST_FINGERPRINT_BUCKET,
   UNIT_TEST_FINGERPRINT_FOLDER,
 } from "./aws-test-constants";
@@ -37,18 +39,12 @@ describe("S3 Fingerprint Database List", () => {
     // this will force just the listing of the single entry we want to inspect
     for await (const f of listS3Fingerprints(
       UNIT_TEST_FINGERPRINT_BUCKET,
-      UNIT_TEST_FINGERPRINT_FOLDER +
-        "/" +
-        "s3%3A%2F%2Fa-bucket%2Findividual-no-metadata."
+      UNIT_TEST_FINGERPRINT_FOLDER + "/"
     )) {
-      res.push(f);
+      if (f.key.startsWith(NOMETADATA_KEY)) res.push(f);
     }
 
     expect(res.length).toBe(1);
-
-    expect(res[0].key).toBe(
-      "fingerprints-for-unit-tests/s3%3A%2F%2Fa-bucket%2Findividual-no-metadata.bam.somalier"
-    );
 
     // no metadata and nothing useful in Key means these will be undefined
     expect(res[0].subjectIdentifier).toBeUndefined();
@@ -58,14 +54,11 @@ describe("S3 Fingerprint Database List", () => {
   test("entries with some metadata but some filename info will work", async () => {
     const res: S3Fingerprint[] = [];
 
-    // this will force just the listing of the single entry we want to inspect
     for await (const f of listS3Fingerprints(
       UNIT_TEST_FINGERPRINT_BUCKET,
-      UNIT_TEST_FINGERPRINT_FOLDER +
-        "/" +
-        "s3%3A%2F%2Fa-bucket%2Findividual-some-metadata-but-named"
+      UNIT_TEST_FINGERPRINT_FOLDER + "/"
     )) {
-      res.push(f);
+      if (f.key.startsWith(SOME_METADATA_BUT_SUBJECT_KEY)) res.push(f);
     }
 
     expect(res.length).toBe(1);

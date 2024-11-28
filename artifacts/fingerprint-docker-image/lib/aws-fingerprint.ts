@@ -5,11 +5,10 @@ import { createWriteStream } from "fs";
 import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
 import { s3FingerprintMetadataApply } from "./s3-fingerprint-db/s3-fingerprint-metadata-apply";
+import { S3Fingerprint } from "./s3-fingerprint-db/s3-fingerprint";
+import { keyToUrl } from "./aws-misc";
 
-export type FingerprintDownloaded = {
-  // the key of the fingerprint that was downloaded
-  fingerprintKey: string;
-
+export type FingerprintDownloaded = S3Fingerprint & {
   // depending on where the input fingerprint key comes from - the "display"
   // of the fingerprint might be different. So instance, some fingerprints
   // are displayed as URLs ("s3://a-bucket/mine.bam"), whereas some control
@@ -21,18 +20,6 @@ export type FingerprintDownloaded = {
 
   // the path to the fingerprint locally on disk
   generatedPath: string;
-
-  // if present, the date of when this fingerprint was created (stored in object metadata - not the actual object created date)
-  fingerprintCreated?: Date;
-
-  // the subject identifier for this fingerprint
-  subjectIdentifier?: string;
-
-  // the library identifier for this fingerprint
-  libraryIdentifier?: string;
-
-  // true if this fingerprint was identified as a control sample
-  isControl?: boolean;
 };
 
 /**
@@ -41,6 +28,7 @@ export type FingerprintDownloaded = {
  * 'count' (up to the previous sample id size). Returns other details of the
  * fingerprint that we might obtain from the metadata (things like the date of extraction etc).
  *
+ * @param fingerprintFolder the folder our fingerprints are in
  * @param fingerprintKey the key in our fingerprint bucket of the fingerprint file to download
  * @param fingerprintDisplay the display value of the key if needing reporting on downstream
  * @param count the count used to generate a new id
@@ -56,6 +44,7 @@ export type FingerprintDownloaded = {
  * sample ids - and then match back to the original BAM.
  */
 export async function downloadAndCorrectFingerprint(
+  fingerprintFolder: string,
   fingerprintKey: string,
   fingerprintDisplay: string,
   count: number
@@ -96,8 +85,20 @@ export async function downloadAndCorrectFingerprint(
   let writeStream = createWriteStream(localPath);
   await pipeline(Readable.from(fileBuffer), writeStream);
 
+  // our control fingerprints are a set of fingerprints that are actually not
+  // URLs... so this hack handles them
+  let u: URL | undefined;
+
+  try {
+    u = keyToUrl(fingerprintFolder, fingerprintKey);
+  } catch (e) {
+    u = undefined;
+  }
+
   const result: FingerprintDownloaded = {
-    fingerprintKey: fingerprintKey,
+    bucket: fingerprintBucketName!,
+    key: fingerprintKey,
+    url: u,
     fingerprintDisplay: fingerprintDisplay,
     generatedPath: localPath,
     generatedSampleId: newSampleId,
@@ -105,7 +106,12 @@ export async function downloadAndCorrectFingerprint(
 
   // convert object metadata into useful fields for the checker
   if (data.Metadata) {
-    s3FingerprintMetadataApply(fingerprintKey, data.Metadata, result);
+    s3FingerprintMetadataApply(
+      result,
+      fingerprintKey,
+      data.LastModified,
+      data.Metadata
+    );
   }
   // let the caller know what sample id we ended up generating for matching back to the original BAM
   return result;

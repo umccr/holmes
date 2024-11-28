@@ -30,11 +30,11 @@ export async function pairsAnalyse(
     // the printable URL name of the index sample we are processing i.e. gds://foo/bar.bam
     const indexUrlAsString = keyToUrl(
       fingerprintFolder,
-      indexFingerprintDownloaded.fingerprintKey
+      indexFingerprintDownloaded.key
     ).toString();
 
     console.log(
-      `Extracting matches for index sample id ${indexSampleId} which = ${indexUrlAsString}/${indexFingerprintDownloaded.fingerprintKey}`
+      `Extracting matches for index sample id ${indexSampleId} which = ${indexUrlAsString}/${indexFingerprintDownloaded.key}`
     );
 
     const parser = parse(pairsTsv, {
@@ -80,7 +80,7 @@ export async function pairsAnalyse(
       // the printable URL name of the sample we are comparing the index to
       const sampleUrlAsString = keyToUrl(
         fingerprintFolder,
-        sampleFingerprintDownloaded.fingerprintKey
+        sampleFingerprintDownloaded.key
       ).toString();
 
       // we are an automatic match against ourselves irrespective of the settings - we just

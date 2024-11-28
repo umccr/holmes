@@ -34,8 +34,14 @@ export async function* awsListObjects(
     contToken = data.NextContinuationToken;
 
     for (const file of data.Contents || []) {
+      // not sure how this could happen but we chose to skip these
+      if (!file.Key) continue;
+
+      // same here
+      if (!file.LastModified) continue;
+
       // we want to skip returning "directory entries"
-      if (file.Key && file.Key.endsWith("/")) continue;
+      if (file.Key.endsWith("/")) continue;
 
       yield file;
     }

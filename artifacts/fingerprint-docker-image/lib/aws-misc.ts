@@ -1,12 +1,5 @@
 import { createWriteStream, existsSync } from "fs";
-import {
-  _Object,
-  GetObjectCommand,
-  HeadObjectCommand,
-  ListObjectsV2Command,
-  ListObjectsV2Output,
-  S3Client,
-} from "@aws-sdk/client-s3";
+import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { readFile } from "fs/promises";
 import { createHash } from "crypto";
 import { promisify } from "util";
@@ -18,7 +11,7 @@ import {
   SFNClient,
   StartExecutionCommand,
 } from "@aws-sdk/client-sfn";
-import axios, { Axios } from "axios";
+import axios from "axios";
 import { finished } from "node:stream/promises";
 
 const s3Client = new S3Client({});

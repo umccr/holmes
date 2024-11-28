@@ -6,6 +6,7 @@ import { distributedMapManifestToLambdaResults } from "./lib/distributed-map";
 import { reportCheck } from "./lib/report-check";
 import { urlListByRegex } from "./lib/url-list-by-regex";
 import { MAX_CHECK } from "./limits";
+import { S3Fingerprint } from "./lib/s3-fingerprint-db/s3-fingerprint";
 
 type EventInput = {
   // EITHER the BAM urls to use as indexes
@@ -61,32 +62,30 @@ export const lambdaHandler = async (ev: EventInput, _context: any) => {
       "Only one of indexes or regexes can be specified on any one check call"
     );
 
-  let urlsToCheck: string[] = [];
+  let fingerprintsToCheck: S3Fingerprint[] = [];
   let truncated = false;
 
   if (ev.regexes) {
-    let urls = await urlListByRegex(
+    fingerprintsToCheck = await urlListByRegex(
       ev.regexes,
       [],
       ev.fingerprintFolder,
       ev.excludeRegex
     );
-    urlsToCheck = urls.map((u) => u.url);
   } else if (ev.indexes) {
-    let urls = await urlListByRegex(
+    fingerprintsToCheck = await urlListByRegex(
       [],
       ev.indexes,
       ev.fingerprintFolder,
       ev.excludeRegex
     );
-    urlsToCheck = urls.map((u) => u.url);
   } else
     throw new Error(
       "One of indexes or regexes must be specified on any one check call"
     );
 
-  if (urlsToCheck.length > MAX_CHECK) {
-    urlsToCheck = urlsToCheck.slice(0, MAX_CHECK);
+  if (fingerprintsToCheck.length > MAX_CHECK) {
+    fingerprintsToCheck = fingerprintsToCheck.slice(0, MAX_CHECK);
     truncated = true;
   }
 
@@ -98,7 +97,7 @@ export const lambdaHandler = async (ev: EventInput, _context: any) => {
         truncated ? " (truncated)" : ""
       }`;
 
-  if (urlsToCheck.length === 0) {
+  if (fingerprintsToCheck.length === 0) {
     if (ev.channelId) {
       const responder = await getSlackTextAttacher(ev.channelId);
 
@@ -110,7 +109,7 @@ export const lambdaHandler = async (ev: EventInput, _context: any) => {
 
   const stepsArgs = {
     fingerprintFolder: ev.fingerprintFolder,
-    indexes: urlsToCheck,
+    indexes: fingerprintsToCheck,
     relatednessThreshold: ev.relatednessThreshold,
     minimumNCount: ev.minimumNCount,
     excludeRegex: ev.excludeRegex,

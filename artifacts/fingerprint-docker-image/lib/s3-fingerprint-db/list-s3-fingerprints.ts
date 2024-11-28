@@ -1,6 +1,5 @@
 import { _Object } from "@aws-sdk/client-s3";
 import { awsListObjects } from "../aws-list-objects";
-import { pMapIterable } from "p-map";
 import { S3Fingerprint } from "./s3-fingerprint";
 import { headS3Fingerprint } from "./head-s3-fingerprint";
 
@@ -25,11 +24,14 @@ export async function* listS3Fingerprints(
   const headBridge = (s3Object: _Object) =>
     headS3Fingerprint(
       fingerprintBucketName,
-      s3Object.Key,
-      s3Object.LastModified
+      fingerprintFolder,
+      s3Object.Key!,
+      s3Object.LastModified!
     );
 
-  for await (const post of pMapIterable(asyncObjects, headBridge, {
+  const pi = await import("p-map");
+
+  for await (const post of pi.pMapIterable(asyncObjects, headBridge, {
     // what should this be?? who knows... had to simulate real fingerprint dbs in a unit test
     // so will set this in prod and adjust
     // S3 documentation talks of limits around 5500 HEAD/second
