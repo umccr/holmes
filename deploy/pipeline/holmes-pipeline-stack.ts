@@ -46,7 +46,7 @@ export class HolmesPipelineStack extends Stack {
         }),
         env: {},
         commands: [
-          "n 18",
+          "n 22",
           "cd workload-holmes",
           "npm ci",
           "cd ../deploy/pipeline",
