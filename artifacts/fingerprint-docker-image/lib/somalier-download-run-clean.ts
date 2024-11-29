@@ -1,78 +1,10 @@
-import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { fingerprintBucketName, somalierBinary, somalierWork } from "./env";
-import { streamToBuffer } from "./misc";
-import { createWriteStream } from "fs";
-import { pipeline as pipelineCallback, Readable } from "stream";
+import { somalierBinary } from "./environment-constants";
 import { promisify } from "util";
 import { readdir, readFile, unlink } from "fs/promises";
-import { exec as execCallback } from "child_process";
+import { exec as execCallback } from "node:child_process";
 
 // get this functionality as promise compatible function
-const pipeline = promisify(pipelineCallback);
 const exec = promisify(execCallback);
-
-/**
- * Fetches a fingerprint (somalier) object from an object store and saves it to local
- * working directory. Along the way fixes the file so its somalier id is the left padded
- * 'count' (up to the previous sample id size).
- *
- * @param fingerprintKey the key in our fingerprint bucket of the fingerprint file to download
- * @param count the count used to generate a new id
- * @return the sample id we generated matching the count
- *
- * NOTE so somalier itself relies too heavily on the sample ids *inside* the fingerprint
- * files. This has two problems
- * (1) they might be wrong/set incorrectly on creation and we can't fix
- * (2) where they are identical - the output of somalier won't let us distinguish between two samples
- *     with the same id (i.e. we can't tell which BAM was which)
- * Which when the job of this is to detect incorrectly labelled samples - is a problem. So we
- * do some magic here to replace the inbuilt fingerprint sample ids with our own 'per run'
- * sample ids - and then match back to the original BAM.
- */
-export async function downloadAndCorrectFingerprint(
-  fingerprintKey: string,
-  count: number
-): Promise<string> {
-  const s3Client = new S3Client({});
-
-  let fileBuffer: Buffer | null = null;
-
-  const data = await s3Client.send(
-    new GetObjectCommand({
-      Bucket: fingerprintBucketName,
-      Key: fingerprintKey,
-    })
-  );
-
-  fileBuffer = await streamToBuffer(data.Body);
-
-  // check the file version matches what we expect
-  const ver = fileBuffer.readInt8(0);
-  if (ver !== 2)
-    throw new Error(
-      "Our fingerprint service is designed to only work with Somalier V2 fingerprint files"
-    );
-
-  // find out how much sample id space we have for our replacement sample ids
-  const sampleIdLength = fileBuffer.readInt8(1);
-
-  if (sampleIdLength < 2)
-    throw new Error(
-      "Due to the way we replace sample ids in Somalier we require all sample ids to be at least 2 characters for fingerprinting"
-    );
-
-  const newSampleId = count.toString().padStart(sampleIdLength, "0");
-  fileBuffer.fill(newSampleId, 2, 2 + sampleIdLength);
-
-  // now stream the buffer we have edited out to disk
-  let writeStream = createWriteStream(
-    `${somalierWork}/${newSampleId}.somalier`
-  );
-  await pipeline(Readable.from(fileBuffer), writeStream);
-
-  // let the caller know what sample id we ended up generating for matching back to the original BAM
-  return newSampleId;
-}
 
 /**
  * Runs somalier relate on all .somalier files in the current directory

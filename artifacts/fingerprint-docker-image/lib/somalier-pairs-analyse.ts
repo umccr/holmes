@@ -1,6 +1,7 @@
 import { parse } from "csv/sync";
-import { keyToUrl } from "./aws";
+import { keyToUrl } from "./aws-misc";
 import { HolmesReturnType, SomalierCommonType } from "./somalier-types";
+import { FingerprintDownloaded } from "./fingerprint-download";
 
 /**
  * From the somalier output pairs file - we analyse all the pairs to find
@@ -12,28 +13,28 @@ import { HolmesReturnType, SomalierCommonType } from "./somalier-types";
  * @param sampleIdToKeyMap the details of the comparison samples
  * @param relatednessThreshold the threshold to apply for reporting relations
  * @param minimumNCount minimum N count of match to apply for positive relation reporting
- * @param expectRelatedRegex regex for pairs that should be related based on name
  */
 export async function pairsAnalyse(
   pairsTsv: string,
   fingerprintFolder: string,
-  indexSampleIdToKeyMap: { [sid: string]: string },
-  sampleIdToKeyMap: { [sid: string]: string },
+  indexSampleIdToKeyMap: { [sid: string]: FingerprintDownloaded },
+  sampleIdToKeyMap: { [sid: string]: FingerprintDownloaded },
   relatednessThreshold: number,
-  minimumNCount: number,
-  expectRelatedRegex: RegExp
+  minimumNCount: number
 ): Promise<{ [sid: string]: HolmesReturnType[] }> {
   const matches: { [url: string]: HolmesReturnType[] } = {};
 
   for (const indexSampleId of Object.keys(indexSampleIdToKeyMap)) {
+    const indexFingerprintDownloaded = indexSampleIdToKeyMap[indexSampleId];
+
     // the printable URL name of the index sample we are processing i.e. gds://foo/bar.bam
     const indexUrlAsString = keyToUrl(
       fingerprintFolder,
-      indexSampleIdToKeyMap[indexSampleId]
+      indexFingerprintDownloaded.key
     ).toString();
 
     console.log(
-      `Extracting matches for index sample id ${indexSampleId} which = ${indexUrlAsString}/${indexSampleIdToKeyMap[indexSampleId]}`
+      `Extracting matches for index sample id ${indexSampleId} which = ${indexUrlAsString}/${indexFingerprintDownloaded.key}`
     );
 
     const parser = parse(pairsTsv, {
@@ -74,10 +75,12 @@ export async function pairsAnalyse(
       // all indexes should end up with a matches array - even if it ends up empty
       if (!(indexUrlAsString in matches)) matches[indexUrlAsString] = [];
 
+      const sampleFingerprintDownloaded = sampleIdToKeyMap[record[1]];
+
       // the printable URL name of the sample we are comparing the index to
       const sampleUrlAsString = keyToUrl(
         fingerprintFolder,
-        sampleIdToKeyMap[record[1]]
+        sampleFingerprintDownloaded.key
       ).toString();
 
       // we are an automatic match against ourselves irrespective of the settings - we just
@@ -98,40 +101,31 @@ export async function pairsAnalyse(
       const relatedness = parseFloat(record[2]);
 
       // see if the names of the files imply a relation
-      let regexMatch = false;
+      let identifierMatch = false;
 
-      const indexRegexMatch = expectRelatedRegex.exec(indexUrlAsString);
-      const sampleRegexMatch = expectRelatedRegex.exec(sampleUrlAsString);
-
-      // we only need to do the regex check if they DO match the regexp AND there is a capture group in the regex
+      // we want there to be identifiers of a decent length AND for them to match
       if (
-        indexRegexMatch &&
-        sampleRegexMatch &&
-        indexRegexMatch.length == sampleRegexMatch.length &&
-        indexRegexMatch.length >= 2
+        indexFingerprintDownloaded.individualId &&
+        sampleFingerprintDownloaded.individualId &&
+        indexFingerprintDownloaded.individualId.length >= 1
       ) {
-        // all the match groups of the regex need to match for us to declare this to be a "regex match"
-        let allMatch = true;
-        // match group 0 we skip as it is the whole regex match
-        for (let i = 1; i < indexRegexMatch.length; i = i + 1) {
-          if (indexRegexMatch[i] !== sampleRegexMatch[i]) {
-            allMatch = false;
-          }
-        }
-
-        if (allMatch) regexMatch = true;
+        if (
+          indexFingerprintDownloaded.individualId ===
+          sampleFingerprintDownloaded.individualId
+        )
+          identifierMatch = true;
       }
 
       const regexJson = JSON.stringify({
         // return the match groups that matched
-        index: indexRegexMatch?.slice(1),
-        sample: sampleRegexMatch?.slice(1),
+        index: indexFingerprintDownloaded.individualId,
+        sample: sampleFingerprintDownloaded.individualId,
       });
 
       // NOTE we DO NOT use the minimumNCount here - as ruling out relations with low N counts
       // is counterproductive for Unexpected Unrelated (a low N just means that we can't make strong assertions
       // which is why we *only* use it for Related)
-      if (regexMatch && relatedness < relatednessThreshold) {
+      if (identifierMatch && relatedness < relatednessThreshold) {
         // these appear to be genomically unrelated but the regex says they are - which means we report
         // that they are Unexpected Unrelated
         console.log(
@@ -155,7 +149,7 @@ export async function pairsAnalyse(
         if (relatedness >= relatednessThreshold && n >= minimumNCount) {
           // if they are genomically related according to the threshold we want to report that
           // but we can report it as expected or unexpected
-          if (regexMatch) {
+          if (identifierMatch) {
             console.log(
               `ExpectedRelated of ${relatedness} to sample id ${
                 record[1]

@@ -4,7 +4,7 @@ import {
 } from "@aws-sdk/client-secrets-manager";
 import { env as envDict } from "process";
 import axios from "axios";
-import * as rax from "retry-axios";
+// import * as rax from "retry-axios";
 
 // module level cache of ICA JWT
 let icaJwt: string | null = null;
@@ -169,10 +169,11 @@ export async function* gdsFileSearchInVolume(
   // we are occasionally hitting a DNS lookup issue - which I
   // think is Illuminas rate limiting mechanism
   const gdsAxios = axios.create();
-  gdsAxios.defaults.raxConfig = {
-    instance: gdsAxios,
-  };
-  const interceptorId = rax.attach(gdsAxios);
+  // Disabled as GDSv1 is being switched off and axios-retry is not ESM
+  //gdsAxios.defaults.raxConfig = {
+  //  instance: gdsAxios,
+  //};
+  //const interceptorId = rax.attach(gdsAxios);
 
   // NOTE: this controls the degree to which we smash the Illumina API server - as for each folder page
   // we make concurrent! calls to list the folder.

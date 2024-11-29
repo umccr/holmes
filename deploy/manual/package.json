@@ -3,24 +3,22 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "dev-deploy": "cdk --app 'npx ts-node stacks.ts' deploy HolmesLocalDevTestStack"
+    "dev-deploy": "cdk --app 'npx ts-node stacks.ts' deploy HolmesLocalDevTestStack",
+    "dev-destroy": "cdk --app 'npx ts-node stacks.ts' destroy HolmesLocalDevTestStack"
   },
   "dependencies": {
-    "@aws-sdk/client-sfn": "3.511.0",
-    "@aws-sdk/client-s3": "3.511.0",
-    "@aws-sdk/client-sts": "3.511.0",
-    "@smithy/abort-controller": "2.1.1",
-    "aws-cdk-lib": "2.127.0",
+    "@smithy/abort-controller": "2.2.0",
+    "aws-cdk-lib": "2.171.1",
     "axios-retry": "3.3.1",
-    "constructs": "10.3.0",
+    "constructs": "10.4.2",
     "source-map-support": "0.5.21"
   },
   "devDependencies": {
     "@tsconfig/node18": "1.0.3",
     "@types/node": "18.11.17",
-    "aws-cdk": "2.127.0",
-    "prettier": "3.2.5",
+    "aws-cdk": "2.171.1",
+    "prettier": "3.4.1",
     "ts-node": "10.9.2",
-    "typescript": "5.3.3"
+    "typescript": "5.7.2"
   }
 }

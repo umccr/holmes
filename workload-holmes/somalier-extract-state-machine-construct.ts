@@ -31,12 +31,42 @@ import {
   EcsRunTask,
   TaskEnvironmentVariable,
 } from "aws-cdk-lib/aws-stepfunctions-tasks";
-import { Duration } from "aws-cdk-lib";
+import { Duration, Token } from "aws-cdk-lib";
 import { standardEnv } from "./fingerprint-lambda-env";
+
+// we pass through the entire input JSON as a string argument to Fargate
+// it will decode it back to fields there
+// BE CAREFUL TO KEEP THIS JSON STRUCTURE AND FARGATE ENTRY EXTRACT IN SYNC
+
+/**
+ * The input structure for the launch of the extract Steps machine.
+ */
+export type SomalierExtractInput = {
+  // the URL of the BAM file to fingerprint
+  index: string;
+
+  // the reference data to use (e.g "hg38.rna")
+  reference: string;
+
+  // the slash terminated folder for storing fingerprints
+  fingerprintFolder: string;
+
+  // an optional tag of this fingerprint as a person
+  individualId: string | undefined;
+
+  // an optional tag of this fingerprint with a library
+  libraryId: string | undefined;
+
+  // an optional boolean that if true says to ignore these fingerprints during check
+  excludeFromCheck: boolean | undefined;
+
+  // an optional boolean that if true says to make this fingerprint auto expire after a few weeks
+  autoExpire: boolean | undefined;
+};
 
 /**
  * A construct wrapping a state machine (steps) - that performs Fingerprint extracts on
- * a set of input BAM URLs.
+ * a set of BAM URLs for a single subject.
  */
 export class SomalierExtractStateMachineConstruct extends SomalierBaseStateMachineConstruct {
   readonly stateMachine: StateMachine;
@@ -62,13 +92,18 @@ export class SomalierExtractStateMachineConstruct extends SomalierBaseStateMachi
       containerDefinition
     );
 
+    const defaults: Omit<SomalierExtractInput, "index" | "reference"> = {
+      fingerprintFolder: props.fingerprintFolderDefault,
+      individualId: undefined,
+      libraryId: undefined,
+      excludeFromCheck: undefined,
+      autoExpire: undefined,
+    };
+
     this.stateMachine = new StateMachine(this, "StateMachine", {
       definitionBody: DefinitionBody.fromChainable(
         new Pass(this, "Define Defaults", {
-          // we allow the default to be set - so we can have different extract state machines configured for different use cases
-          parameters: {
-            fingerprintFolder: props.fingerprintFolderDefault,
-          },
+          parameters: defaults,
           resultPath: "$.inputDefaults",
         })
           .next(
@@ -78,24 +113,8 @@ export class SomalierExtractStateMachineConstruct extends SomalierBaseStateMachi
               outputPath: "$.withDefaults.args",
               parameters: {
                 "args.$":
-                  "States.JsonMerge($.inputDefaults, $$.Execution.Input, false)",
+                  "States.JsonToString(States.JsonMerge($.inputDefaults, $$.Execution.Input, false))",
               },
-            })
-          )
-          // https://stackoverflow.com/questions/77442579/combining-jsonpath-listat-and-stringat-to-make-a-single-array-in-aws-steps-cdk
-          // A pretty messy Pass stage just so we can concat some array values!
-          .next(
-            new Pass(this, "Merge To Make Command Array", {
-              parameters: {
-                merge: JsonPath.array(
-                  JsonPath.array(
-                    JsonPath.stringAt("$.reference"),
-                    JsonPath.stringAt("$.fingerprintFolder")
-                  ),
-                  JsonPath.stringAt("$.indexes")
-                ),
-              },
-              resultPath: "$.merge",
             })
           )
           .next(extractMapStep)
@@ -188,15 +207,15 @@ export class SomalierExtractStateMachineConstruct extends SomalierBaseStateMachi
       containerOverrides: [
         {
           containerDefinition: containerDefinition,
-          // note: replace this once Steps ASL has the ability to concat arrays! (see above)
-          command: JsonPath.listAt("$.merge.merge[*][*]"),
+          // this odd syntax is because command needs to be an array - but we want to just pass in the input state as a JSON serialized string
+          command: Token.asList(JsonPath.array(JsonPath.stringAt("$"))),
           environment: this.createFargateLambdaEnv(),
         },
       ],
-      // we should not get *anywhere* near 6 hours for tasks - each fingerprint takes about 15 mins...
+      // we should not get *anywhere* near 2 hours for tasks - each fingerprint takes about 15 mins...
       // but we set it here as a worst case where we have an infinite loop or something - we want steps to
       // step in and kill the task
-      taskTimeout: Timeout.duration(Duration.hours(6)),
+      taskTimeout: Timeout.duration(Duration.hours(2)),
     });
   }
 

@@ -114,7 +114,11 @@ export class HolmesApplicationStack extends Stack {
       "FingerprintDockerImage",
       {
         directory: fingerprintDockerImageFolder,
-        buildArgs: {},
+        buildArgs: {
+          // encountered https://github.com/aws/aws-cdk/issues/31548
+          // this is hopefully temporary (could be fixed at AWS end OR at CDK end OR at docker end)
+          provenance: "false",
+        },
       }
     );
 

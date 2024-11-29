@@ -1,12 +1,5 @@
 import { createWriteStream, existsSync } from "fs";
-import {
-  _Object,
-  GetObjectCommand,
-  HeadObjectCommand,
-  ListObjectsV2Command,
-  ListObjectsV2Output,
-  S3Client,
-} from "@aws-sdk/client-s3";
+import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { readFile } from "fs/promises";
 import { createHash } from "crypto";
 import { promisify } from "util";
@@ -19,6 +12,7 @@ import {
   StartExecutionCommand,
 } from "@aws-sdk/client-sfn";
 import axios from "axios";
+import { finished } from "node:stream/promises";
 
 const s3Client = new S3Client({});
 
@@ -77,7 +71,7 @@ export function keyToUrl(fingerprintFolder: string, key: string): URL {
     return new URL(decoded.slice(0, -SUFFIX.length));
   } else {
     // decode the hex after the leading fingerprintFolder
-    const buf = new Buffer(folderSubstring, "hex");
+    const buf = Buffer.from(folderSubstring, "hex");
 
     return new URL(buf.toString("utf8"));
   }
@@ -92,16 +86,16 @@ export function keyToUrl(fingerprintFolder: string, key: string): URL {
 export async function httpsDownload(url: string, output: string) {
   console.time("httpDownload");
 
-  const pipeline = promisify(pipelineCallback);
-
-  const request = await axios.get(url, {
+  const writer = createWriteStream(output);
+  return axios({
+    method: "get",
+    url: url,
     responseType: "stream",
+  }).then((response) => {
+    response.data.pipe(writer);
+
+    return finished(writer); //this is a Promise
   });
-  await pipeline(request.data, createWriteStream(output));
-
-  console.log(`${output} was produced by downloading ${url}`);
-
-  console.timeEnd("httpDownload");
 }
 
 /**
@@ -124,7 +118,7 @@ export async function s3Download(
     Key: key,
   };
 
-  console.time("s3Download");
+  console.time(`S3 Download ${bucket} ${key}`);
 
   // for dev/test purposes it is useful that we might already have these files in place - and to not
   // require the download (whether this be by putting them into the docker image, or mounting via docker fs)
@@ -149,7 +143,7 @@ export async function s3Download(
 
     console.log(`${output} was produced by downloading s3://${bucket}/${key}`);
 
-    console.timeEnd("s3Download");
+    console.timeEnd(`S3 Download ${bucket} ${key}`);
   }
 
   if (doChecksum) {
@@ -159,43 +153,6 @@ export async function s3Download(
   }
 
   return;
-}
-
-/**
- * List all the fingerprint files in a bucket for a given prefix.
- *
- * @param bucketName the bucket to list files from
- * @param prefix the prefix key to restrict the list to
- */
-export async function* s3ListAllFiles(
-  bucketName: string,
-  prefix: string
-): AsyncGenerator<_Object> {
-  let contToken = undefined;
-
-  let count = 0;
-
-  do {
-    const data: ListObjectsV2Output = await s3Client.send(
-      new ListObjectsV2Command({
-        Bucket: bucketName,
-        Prefix: prefix,
-        ContinuationToken: contToken,
-      })
-    );
-
-    contToken = data.NextContinuationToken;
-
-    if (data.IsTruncated)
-      console.log(
-        `S3 file list was truncated so going again with continuation ${contToken}`
-      );
-
-    for (const file of data.Contents || []) {
-      count++;
-      yield file;
-    }
-  } while (contToken);
 }
 
 /**

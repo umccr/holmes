@@ -1,7 +1,9 @@
-import { downloadAndCorrectFingerprint } from "./somalier-download-run-clean";
-import { urlToKey } from "./aws";
-import { getFingerprintControlKeys } from "./env";
-import { fi } from "date-fns/locale";
+import { urlToKey } from "./aws-misc";
+import { getFingerprintControlKeys } from "./environment-constants";
+import {
+  downloadAndCorrectFingerprint,
+  FingerprintDownloaded,
+} from "./fingerprint-download";
 
 /**
  * Bring down a set of fingerprints for the given BAM urls and return
@@ -18,14 +20,17 @@ export async function downloadIndexSamples(
   let sampleCount = 1;
 
   // download all the 'index' samples that we want to compare against everything else
-  const indexSampleIdToBamUrlMap: { [sid: string]: string } = {};
+  const indexSampleIdToBamUrlMap: { [sid: string]: FingerprintDownloaded } = {};
 
   for (const indexAsBamUrl of bamUrls) {
-    const newIndexSampleId = await downloadAndCorrectFingerprint(
+    const indexFingerprintDownloaded = await downloadAndCorrectFingerprint(
+      fingerprintFolder,
       urlToKey(fingerprintFolder, new URL(indexAsBamUrl)),
+      indexAsBamUrl,
       sampleCount
     );
-    indexSampleIdToBamUrlMap[newIndexSampleId] = indexAsBamUrl;
+    indexSampleIdToBamUrlMap[indexFingerprintDownloaded.generatedSampleId] =
+      indexFingerprintDownloaded;
     sampleCount++;
   }
 
@@ -48,23 +53,24 @@ export async function downloadControlSamples(
   let sampleCount = startingSampleCount;
 
   // download all the 'control' samples that we want to compare against everything else
-  const fingerprintSampleIdToControlNameMap: { [sid: string]: string } = {};
+  const fingerprintSampleIdToControlNameMap: {
+    [sid: string]: FingerprintDownloaded;
+  } = {};
 
   const controls = await getFingerprintControlKeys();
 
-  console.log(JSON.stringify(controls, null, 2));
-
   for (const [controlKey, controlName] of Object.entries(controls)) {
-    const newIndexSampleId = await downloadAndCorrectFingerprint(
+    const controlFingerprintDownloaded = await downloadAndCorrectFingerprint(
+      fingerprintFolder,
       controlKey,
+      controlName,
       sampleCount
     );
-    fingerprintSampleIdToControlNameMap[newIndexSampleId] = controlName;
+    fingerprintSampleIdToControlNameMap[
+      controlFingerprintDownloaded.generatedSampleId
+    ] = controlFingerprintDownloaded;
     sampleCount++;
   }
-
-  console.log("Control samples found");
-  console.log(JSON.stringify(fingerprintSampleIdToControlNameMap, null, 2));
 
   return fingerprintSampleIdToControlNameMap;
 }

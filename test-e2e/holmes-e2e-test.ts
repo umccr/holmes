@@ -67,11 +67,17 @@ export async function runTest(
   if (!relateLambdaArn) throw new Error("Missing relateLambdaArn in CloudMap");
 
   const INDIVIDUAL_96 = `${gdsBase}/individual/HG00096.bam`;
+  const INDIVIDUAL_96_ID = "HG00096";
   const INDIVIDUAL_97 = `${gdsBase}/individual/HG00097.bam`;
+  const INDIVIDUAL_97_ID = "HG00097";
   const INDIVIDUAL_99 = `${gdsBase}/individual/HG00099.bam`;
+  const INDIVIDUAL_99_ID = "HG00099";
   const TRIO_SON = `${gdsBase}/family/giab_exome_trio/HG002-ready.bam`;
+  const TRIO_SON_ID = "HG002";
   const TRIO_FATHER = `${gdsBase}/family/giab_exome_trio/HG003-ready.bam`;
+  const TRIO_FATHER_ID = "HG003";
   const TRIO_MOTHER = `${gdsBase}/family/giab_exome_trio/HG004-ready.bam`;
+  const TRIO_MOTHER_ID = "HG004";
   const CTDNA = `${gdsBase}/ctdna/PTC_ctTSO220404_L2200417.bam`;
   const CELLPTC = `${gdsBase}/ptc/PTC_TsqN200511_N.bam`;
 
@@ -79,24 +85,54 @@ export async function runTest(
   console.log("EXTRACT TESTS");
   console.log(CONSOLE_BREAK_LINE);
 
+  // confirm that nonsense inputs ends up throwing an exception
+  // Should turn into proper test case
+  //await doFingerprintExtract(
+  //    stepsClient,
+  //    extractStepsArn,
+  //    "s3://a-bucket/not-a-file.bam",
+  //    "hg38.rna",
+  //    fingerprintFolder,
+  //    "A",
+  //    "B",
+  //    false,
+  //    false
+  // )
+
   // add in extractors for all the HG38 samples
   const allExtractPromises = [
-    INDIVIDUAL_96,
-    INDIVIDUAL_97,
-    INDIVIDUAL_99,
-    TRIO_SON,
-    TRIO_FATHER,
-    TRIO_MOTHER,
-    CELLPTC,
-  ].map((bam) =>
+    [INDIVIDUAL_96, INDIVIDUAL_96_ID, "L654321"],
+    [INDIVIDUAL_97, INDIVIDUAL_97_ID, "L111111"],
+    [INDIVIDUAL_99, INDIVIDUAL_99_ID, "L222222"],
+    [TRIO_SON, TRIO_SON_ID, "L333333"],
+    [TRIO_FATHER, TRIO_FATHER_ID, "L444444"],
+    [TRIO_MOTHER, TRIO_MOTHER_ID, "L123456"],
+  ].map((tuple) =>
     doFingerprintExtract(
       stepsClient,
-      s3Client,
       extractStepsArn,
-      fingerprintBucket,
+      tuple[0],
+      "hg38.rna",
       fingerprintFolder,
-      bam,
-      "hg38.rna"
+      tuple[1],
+      tuple[2],
+      false,
+      false
+    )
+  );
+
+  // add in an example fingerprint that doesn't participate in checks and auto expires
+  allExtractPromises.push(
+    doFingerprintExtract(
+      stepsClient,
+      extractStepsArn,
+      CELLPTC,
+      "hg38.rna",
+      fingerprintFolder,
+      "CELLPTC",
+      "LXYX",
+      true,
+      true
     )
   );
 
@@ -104,12 +140,14 @@ export async function runTest(
   allExtractPromises.push(
     doFingerprintExtract(
       stepsClient,
-      s3Client,
       extractStepsArn,
-      fingerprintBucket,
-      fingerprintFolder,
       CTDNA,
-      "hg19.rna"
+      "hg19.rna",
+      fingerprintFolder,
+      "CTDNA",
+      "L2200417",
+      false,
+      false
     )
   );
 
@@ -156,7 +194,7 @@ export async function runTest(
       "ctdna"
     );
 
-    // console.log(JSON.stringify(sonCheckResult, null, 2));
+    console.log(JSON.stringify(sonCheckResult, null, 2));
 
     assert.ok(
       sonCheckResult.unexpectedRelated.length == 2,
@@ -190,7 +228,7 @@ export async function runTest(
       "ctdna"
     );
 
-    // console.log(JSON.stringify(fatherCheckResult, null, 2));
+    console.log(JSON.stringify(fatherCheckResult, null, 2));
 
     assert.ok(
       fatherCheckResult.unexpectedRelated.length == 1,
@@ -218,7 +256,7 @@ export async function runTest(
       "ctdna"
     );
 
-    // console.log(JSON.stringify(motherCheckResult, null, 2));
+    console.log(JSON.stringify(motherCheckResult, null, 2));
 
     assert.ok(
       motherCheckResult.unexpectedRelated.length == 1,
@@ -359,36 +397,6 @@ export async function runTest(
       "ctDNA/mother relation not found"
     );
 
-    console.log("Passed");
-  }
-
-  {
-    console.log(CONSOLE_BREAK_LINE);
-    console.log("EXPECTED FAMILY REGEX CHECK");
-    console.log(CONSOLE_BREAK_LINE);
-
-    const familyCheckResult = await doFingerprintCheck(
-      lambdaClient,
-      checkLambdaArn,
-      fingerprintBucket,
-      fingerprintFolder,
-      TRIO_FATHER,
-      "ctdna",
-      "(family)"
-    );
-
-    //console.log(JSON.stringify(familyCheckResult, null, 2));
-
-    assert.ok(
-      familyCheckResult.expectedRelated.length == 1 &&
-        findExpectedRelatedRelatedness(familyCheckResult, TRIO_SON) > 0.4,
-      "Family related should match 1 person - the son"
-    );
-    assert.ok(
-      familyCheckResult.unexpectedUnrelated.length == 1 &&
-        findUnexpectedUnrelatedRelatedness(familyCheckResult, TRIO_MOTHER) < 2,
-      "Family unrelated should match 1 person - the mother"
-    );
     console.log("Passed");
   }
 

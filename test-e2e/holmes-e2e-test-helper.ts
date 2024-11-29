@@ -9,59 +9,43 @@ import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
 import { toUtf8 } from "@aws-sdk/util-utf8";
 
 /**
- * Trigger the extract of a single BAM, with logic to skip the
- * extract if the fingerprint already exists.
+ * Trigger the extract of a single BAM.
  *
  * @param stepsClient a configured Steps client
- * @param s3Client a configured S3 client
  * @param extractStepsArn the ARN of the extract Steps
- * @param fingerprintBucket the bucket for all fingerprint activity
- * @param fingerprintFolder the test specific folder for fingerprints
  * @param bamUrl the URL to extract
  * @param reference the id of the reference genome (hg19 or hg38)
+ * @param fingerprintFolder the test specific folder for fingerprints
+ * @param individualId the individual identifier of the human who belongs to the BAM (e.g SBJ12345)
+ * @param libraryId the library identifier of the sequencing who belongs to the BAM (e.g. L1234567)
+ * @param excludeFromCheck whether to set the ignore in check field
+ * @param autoExpire whether to set the auto expire tag
  */
 export async function doFingerprintExtract(
   stepsClient: SFNClient,
-  s3Client: S3Client,
   extractStepsArn: string,
-  fingerprintBucket: string,
-  fingerprintFolder: string,
   bamUrl: string,
-  reference: string
+  reference: string,
+  fingerprintFolder: string,
+  individualId: string,
+  libraryId: string,
+  excludeFromCheck: boolean,
+  autoExpire: boolean
 ): Promise<any> {
-  try {
-    await s3Client.send(
-      new GetObjectCommand({
-        Bucket: fingerprintBucket,
-        Key: fingerprintFolder + Buffer.from(bamUrl, "ascii").toString("hex"),
-      })
-    );
+  const timeLabel = `EXTRACT ${bamUrl} for subject ${individualId}/library ${libraryId}`;
+  console.time(timeLabel);
 
-    console.log(
-      `Skipping extract for ${bamUrl} as it already exists in test fingerprint db`
-    );
-
-    return Promise.resolve({});
-  } catch (e: any) {
-    if (e?.Code !== "NoSuchKey") {
-      console.error(e);
-      throw Error(
-        "Unexpected S3 error trying to determine if fingerprint exists"
-      );
-    }
-
-    const timeLabel = `EXTRACT ${bamUrl}`;
-    console.time(timeLabel);
-
-    // we actually expect normally to get here... (the skip file thing is only of use when we are actually working on the tests themselves)
-    return doStepsExecution(stepsClient, extractStepsArn, {
-      indexes: [bamUrl],
-      fingerprintFolder: fingerprintFolder,
-      reference: reference,
-    }).then(() => {
-      console.timeEnd(timeLabel);
-    });
-  }
+  return doStepsExecution(stepsClient, extractStepsArn, {
+    index: bamUrl,
+    reference: reference,
+    fingerprintFolder: fingerprintFolder,
+    individualId: individualId,
+    libraryId: libraryId,
+    excludeFromCheck: excludeFromCheck ? true : undefined,
+    autoExpire: autoExpire ? true : undefined,
+  }).then(() => {
+    console.timeEnd(timeLabel);
+  });
 }
 
 /**
@@ -83,8 +67,7 @@ export async function doFingerprintCheck(
   fingerprintBucket: string,
   fingerprintFolder: string,
   bamUrl: string,
-  excludeRegex?: string,
-  expectRelatedRegex?: string
+  excludeRegex?: string
 ) {
   const lambaResult = await lambdaClient.send(
     new InvokeCommand({
@@ -99,7 +82,6 @@ export async function doFingerprintCheck(
           minimumNCount: 10,
           fingerprintFolder: fingerprintFolder,
           excludeRegex: excludeRegex,
-          expectRelatedRegex: expectRelatedRegex,
         })
       ),
     })

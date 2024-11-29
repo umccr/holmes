@@ -1,4 +1,4 @@
-import { s3GetObjectAsJson } from "./aws";
+import { s3GetObjectAsJson } from "./aws-misc";
 import {
   ExpectedRelatedType,
   HolmesReturnType,

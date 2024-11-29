@@ -1,16 +1,20 @@
 import { chdir } from "process";
-import { somalierWork } from "./lib/env";
+import { somalierWork } from "../lib/environment-constants";
 import {
   cleanSomalierFiles,
   runSomalierRelate,
-} from "./lib/somalier-download-run-clean";
-import { somalierTsvCorrectIds } from "./lib/somalier-tsv-correct-ids";
-import { getSlackTextAttacher } from "./lib/slack";
-import { downloadControlSamples, downloadIndexSamples } from "./lib/ids";
-import { reportControl } from "./lib/report-control";
+} from "../lib/somalier-download-run-clean";
+import { somalierTsvCorrectIds } from "../lib/somalier-tsv-correct-ids";
+import { getSlackTextAttacher } from "../lib/slack";
+import {
+  downloadControlSamples,
+  downloadIndexSamples,
+} from "../lib/download-samples";
+import { reportControl } from "../lib/report-control";
+import { FingerprintDownloaded } from "../lib/fingerprint-download";
 
 type EventInput = {
-  // a BAM urls to use as index
+  // a BAM urls to use as index (i.e. to compare against the controls)
   index: string;
 
   // the slash terminated folder where the fingerprints have been sourced in S3 (i.e. the folder key + /)
@@ -45,21 +49,25 @@ export const lambdaHandler = async (ev: EventInput, _context: any) => {
     ev.fingerprintFolder
   );
 
-  console.log(indexSampleIdToBamUrlMap);
+  console.log(JSON.stringify(indexSampleIdToBamUrlMap, null, 2));
 
   const controlSampleIdToNameMap = await downloadControlSamples(
     ev.fingerprintFolder,
     100
   );
 
+  console.log(JSON.stringify(controlSampleIdToNameMap, null, 2));
+
   const { pairsTsv, samplesTsv } = await runSomalierRelate();
 
   const combinedSampleIdToNameMap: Record<string, string> = {};
 
   for (const [k, v] of Object.entries(indexSampleIdToBamUrlMap))
-    combinedSampleIdToNameMap[k] = v;
+    combinedSampleIdToNameMap[k] = v.fingerprintDisplay;
   for (const [k, v] of Object.entries(controlSampleIdToNameMap))
-    combinedSampleIdToNameMap[k] = v;
+    combinedSampleIdToNameMap[k] = v.fingerprintDisplay;
+
+  console.log(JSON.stringify(combinedSampleIdToNameMap, null, 2));
 
   const fixedSamplesTsv = await somalierTsvCorrectIds(
     combinedSampleIdToNameMap,

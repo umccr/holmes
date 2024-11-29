@@ -1,8 +1,8 @@
 import * as crypto from "crypto";
 import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
-import { MAX_CHECK, MAX_RELATE } from "./limits";
-import { getFromEnv } from "./env";
-import { getSlackSigningSecret } from "./lib/slack";
+import { MAX_CHECK, MAX_RELATE } from "../limits";
+import { getFromEnv } from "../env";
+import { getSlackSigningSecret } from "../lib/slack";
 
 /**
  * A handler that gets called as a result of a Slack hook

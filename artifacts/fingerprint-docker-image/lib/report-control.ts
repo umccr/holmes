@@ -20,7 +20,7 @@ function fixHeaderRow(row: string[]): string[] {
  * Takes TSVs from a somalier report and formats a
  * plain text report for use in the "control" report.
  *
- * @param indexBamUrl the main BAM URL that we want to make the hilight of the report
+ * @param indexBamUrl the main BAM URL that we want to make the highlight of the report
  * @param samplesTsv
  * @param pairsTsv
  */
@@ -53,6 +53,7 @@ export async function reportControl(
           ...newHeaderRow.slice(START_INCLUDE_COLUMN, END_INCLUDE_COLUMN),
         ];
       } else {
+        console.log(`Comparing ${row[1]} to ${indexBamUrl}`);
         if (row[1] === indexBamUrl)
           return [
             row[1],

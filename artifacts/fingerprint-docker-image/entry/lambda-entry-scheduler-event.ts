@@ -1,5 +1,5 @@
 import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
-import { getFromEnv } from "./env";
+import { getFromEnv } from "../env";
 import { formatInTimeZone } from "date-fns-tz";
 import { subDays } from "date-fns";
 

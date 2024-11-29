@@ -1,11 +1,8 @@
-import { join } from "path";
 import { somalierTsvCorrectIds } from "../lib/somalier-tsv-correct-ids";
 import { readFile } from "fs/promises";
+import { SAMPLE_PAIRS_PATH, SAMPLE_SAMPLES_PATH } from "./sample";
 
-const SAMPLE_PAIRS_PATH = join(__dirname, "sample-pairs.tsv");
-const SAMPLE_SAMPLES_PATH = join(__dirname, "sample-samples.tsv");
-
-const idMap = {
+const idMap: Record<string, string> = {
   "0000000": "gds://bucket/my-zzz.bam",
   "0000001": "gds://bucket/my-aaa.bam",
   "0000002": "gds://bucket/my-bbb.bam",
