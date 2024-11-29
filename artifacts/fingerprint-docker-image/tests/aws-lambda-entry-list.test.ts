@@ -1,4 +1,4 @@
-import { lambdaHandler } from "../lambda-entry-list";
+import { lambdaHandler } from "../entry/lambda-entry-list";
 
 import {
   HG002_URL,

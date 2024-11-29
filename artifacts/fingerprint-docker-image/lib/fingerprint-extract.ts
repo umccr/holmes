@@ -1,5 +1,4 @@
 import { promisify } from "util";
-import { chdir } from "process";
 import { execFile } from "child_process";
 import { join } from "path";
 import { URL } from "url";
@@ -19,65 +18,65 @@ import {
   somalierWork,
 } from "./environment-constants";
 import axios from "axios";
-import { awsFingerprintDownloadReferenceData } from "./aws-fingerprint-download-reference-data";
+import { chdir } from "process";
+import { downloadReferenceData } from "./download-reference-data";
 
 // it is sometimes useful to be able to fingerprint public reference samples that exist
 // in open buckets - so this is the name of any buckets of that nature
-// (we need to treat them separately as we need to make sure we *don't* auth)
+// (we need to treat them separately as we need to make sure we *don't* pre-sign the URLs)
 const KNOWN_OPEN_DATA_BUCKETS = [
   "giab",
   "1000genomes",
   "1000genomes-dragen",
   "1000genomes-dragen-3.7.6", // us-west-2
   "1000genomes-dragen-v3.7.6", // us-east-1
+  "1000genomes-dragen-v4.0.3",
+  "1000genomes-dragen-v4-2-7",
   "biorefdata", // ap-southeast-2,
   "gatk-sv-data-us-east-1",
+  "gtgseq",
+  "tcga-2-open",
 ];
 
 const s3Client = new S3Client({});
 
 /**
- * Useful proof of life of the (remote https) file we are about to send to somalier binary.
- * Given lots of our issues are to do with access/auth/file not found - this gives us
- * an early and useful error message if we can't read.
- *
- * @param httpUrl
- */
-async function dumpFileHead(httpUrl: string) {
-  const head = await axios.get(httpUrl, {
-    headers: { Range: "bytes=0-64" },
-  });
-
-  console.log(head.status);
-  console.log(head.statusText);
-  console.log(head.headers);
-}
-
-/**
  * For the given reads file (as URL), perform a somalier extract to produce a
  * fingerprint object and save it to the fingerprint store.
  *
- * @param readsUrlString a URL of a BAM/CRAM etc that we want to fingerprint
+ * @param index a URL of a BAM/CRAM etc that we want to fingerprint
+ * @param reference the part name of the reference data (sites/fasta) to use (e.g. "hg38.rna")
  * @param fingerprintFolder the fingerprint folder to store the resulting fingerprint in
- * @param subjectId the identifier string we want to tag this fingerprint with
- * @param libraryId the identifier string for the library we want to tag this fingerprint with
+ * @param individualId if present, the identifier string we want to tag this fingerprint with
+ * @param libraryId if present, the identifier string for the library we want to tag this fingerprint with
+ * @param excludeFromCheck if present, signifies that this fingerprint should never be compared by the check operation other then when it is passed in (is a control sample for instance)
+ * @param autoExpire if present, tags the fingerprint so that it auto disappears from the db after a while (weeks)
  */
-async function fingerprint(
-  readsUrlString: string,
+export async function fingerprintExtract(
+  index: string,
+  reference: string,
   fingerprintFolder: string,
-  subjectId: string,
-  libraryId: string
+  individualId: string | undefined,
+  libraryId: string | undefined,
+  excludeFromCheck: boolean | undefined,
+  autoExpire: boolean | undefined
 ) {
   console.log(
-    `Computing fingerprint for '${readsUrlString}' into the folder '${fingerprintFolder}' and with sbj '${subjectId}' and lib '${libraryId}'`
+    `Computing fingerprint for '${index}' into the folder '${fingerprintFolder}', with sbj='${individualId}' and lib='${libraryId}' and excludeFromCheck='${excludeFromCheck}' and autoExpire='${autoExpire}'`
   );
+
+  // whether it is lambda or fargate we do our work in a folder we know to be read/write
+  chdir(somalierWork);
+
+  // setup the local env for extraction
+  await downloadReferenceData(reference);
 
   // we create a working directory that we can clean up later
   const randomString = crypto.randomBytes(16).toString("hex");
   await mkdir(randomString);
 
   // this is a simple way to make sure our inputs conform to URL pattern
-  const readsUrl = new URL(readsUrlString);
+  const readsUrl = new URL(index);
 
   if (readsUrl.protocol !== "s3:")
     throw new Error(
@@ -90,15 +89,15 @@ async function fingerprint(
   console.time("Download Index");
   {
     let readsIndexUrl: URL;
-    let readsIndexHttpPath;
+    let readsIndexHttpPath: string;
 
-    if (readsUrlString.endsWith(".bam")) {
-      readsIndexUrl = new URL(readsUrlString + ".bai");
-    } else if (readsUrlString.endsWith(".cram")) {
-      readsIndexUrl = new URL(readsUrlString + ".crai");
+    if (index.endsWith(".bam")) {
+      readsIndexUrl = new URL(index + ".bai");
+    } else if (index.endsWith(".cram")) {
+      readsIndexUrl = new URL(index + ".crai");
     } else {
       throw new Error(
-        `Unknown file suffix for ${readsUrlString} - must be .bam or .cram`
+        `Unknown file suffix for ${index} - must be .bam or .cram`
       );
     }
 
@@ -125,7 +124,7 @@ async function fingerprint(
 
   // the toFingerprintString is the eventual string we need to pass to somalier extract...
   // but depending on the protocol we need to do different things (i.e. it is not always just the index)
-  let toFingerprintString;
+  let toFingerprintString: string;
 
   // rather than rely on the S3 support of the somalier binary (we don't have enough control of what libraries
   // are included for its build) - we construct links manually by pre-signing ourselves
@@ -138,7 +137,7 @@ async function fingerprint(
     toFingerprintString = `${s3Url}##idx##${readsIndexLocalPath}`;
   } else {
     // construct presigned HTTPS links and get it to source the BAMs that way
-    const s3PresignedUrl = await s3Presign(readsUrlString);
+    const s3PresignedUrl = await s3Presign(index);
 
     await dumpFileHead(s3PresignedUrl);
 
@@ -150,7 +149,6 @@ async function fingerprint(
   console.time("somalier");
 
   // do a somalier extract to generate the fingerprint
-  // TODO: send failure events to event bridge?
   try {
     const args = [
       "extract",
@@ -181,10 +179,6 @@ async function fingerprint(
     if (stderr) {
       stderr.split("\n").forEach((l) => console.log(`stderr ${l}`));
     }
-  } catch (e) {
-    console.error("somalier extract invoke failed");
-    console.error(e);
-    return;
   } finally {
     console.timeEnd("somalier");
   }
@@ -209,52 +203,49 @@ async function fingerprint(
   // remove what we don't need
   await rm(randomString, { recursive: true, force: true });
 
+  const m: Record<string, string> = {
+    // note the key name is lower-cased automatically by AWS so we have no choice here
+    "fingerprint-created": new Date().toISOString(),
+  };
+
+  if (individualId && individualId.trim().length > 0)
+    m["individual-id"] = individualId.trim();
+
+  if (libraryId && libraryId.trim().length > 0)
+    m["library-identifier"] = libraryId.trim();
+
+  if (excludeFromCheck) m["exclude-from-check"] = true.toString();
+
+  let tagging: string | undefined = undefined;
+
+  if (autoExpire) tagging = "AutoExpire=7";
+
   // our *last* step is to upload to S3 - if anything above fails we don't want
   // any trace of this fingerprint in the 'done' fingerprints bucket
   const bucketParams: PutObjectCommandInput = {
     Bucket: fingerprintBucketName,
     Key: urlToKey(fingerprintFolder, readsUrl),
     Body: fingerprintData,
-    Metadata: {
-      // note the key name is lower-cased automatically by AWS
-      "fingerprint-created": new Date().toISOString(),
-      "subject-identifier": subjectId,
-      "library-identifier": libraryId,
-    },
+    Metadata: m,
+    Tagging: tagging,
   };
 
   await s3Client.send(new PutObjectCommand(bucketParams));
 }
 
 /**
- * Perform the fingerprint extract for a set of files, according to the
- * given reference. The reference should match the inner portion of the sites filenames
- * that are located in the config/ folder of the fingerprint bucket. See docs
- * for more details but essentially for "config/sites.hg19.rna.vcf.gz" - the "reference" is
- * "hg19.rna".
+ * Useful proof of life of the (remote https) file we are about to send to somalier binary.
+ * Given lots of our issues are to do with access/auth/file not found - this gives us
+ * an early and useful error message if we can't read.
  *
- * @param reference the string representing the genome build our BAM matches up with
- * @param fingerprintFolder the slash terminated folder path for where the fingerprints will be sent
- * @param subjectId the subject identifier to tag the fingerprint with
- * @param libraryId the library identifier to tag the fingerprint with
- * @param files the list of source BAMs
+ * @param httpUrl
  */
-export async function extract(
-  reference: string,
-  fingerprintFolder: string,
-  subjectId: string,
-  libraryId: string,
-  files: string[]
-) {
-  console.log("Starting extract task");
+async function dumpFileHead(httpUrl: string) {
+  const head = await axios.get(httpUrl, {
+    headers: { Range: "bytes=0-64" },
+  });
 
-  // whether it is lambda or fargate we do our work in a folder we know to be read/write
-  chdir(somalierWork);
-
-  // setup the local env for extraction
-  await awsFingerprintDownloadReferenceData(reference);
-
-  for (const file of files) {
-    await fingerprint(file, fingerprintFolder, subjectId, libraryId);
-  }
+  console.log(head.status);
+  console.log(head.statusText);
+  console.log(head.headers);
 }

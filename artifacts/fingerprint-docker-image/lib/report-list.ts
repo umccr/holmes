@@ -11,14 +11,21 @@ export async function reportList(
 ): Promise<string> {
   const tableData: string[][] = [];
 
-  tableData.push(["BAM", "Subject", "Library", "Last\nModified"]);
+  tableData.push([
+    "BAM",
+    "Individual",
+    "Library",
+    "Created\nMelbourne",
+    "Exclude From\nCheck",
+  ]);
 
   for (const u of fingerprints)
     tableData.push([
-      u.key,
-      u.subjectIdentifier || "",
-      u.libraryIdentifier || "",
-      u.created?.toString() || "",
+      u.url?.toString() || "",
+      u.individualId || "",
+      u.libraryId || "",
+      u.createdMelbourneDisplay || "",
+      u.excludeFromCheck ? "Y" : "N",
     ]);
 
   return table(tableData, {

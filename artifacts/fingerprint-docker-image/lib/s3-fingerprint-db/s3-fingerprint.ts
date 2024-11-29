@@ -20,12 +20,12 @@ export type S3Fingerprint = {
   // timezone
   createdMelbourneDisplay?: string;
 
-  // if present, the subject identifier for this fingerprint
-  subjectIdentifier?: string;
+  // if present, the individual identifier for this fingerprint
+  individualId?: string;
 
   // if present, the library identifier for this fingerprint
-  libraryIdentifier?: string;
+  libraryId?: string;
 
-  // if present and true, this fingerprint was identified as a control sample
-  isControl?: boolean;
+  // if present and true, this fingerprint should not ever match with a "check"
+  excludeFromCheck?: boolean;
 };

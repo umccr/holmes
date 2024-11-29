@@ -128,7 +128,7 @@ describe("Run pairing analysis", () => {
           fingerprintDisplay: index0,
           generatedSampleId: "0000000",
           generatedPath: "/tmp/0.somalier",
-          subjectIdentifier: "subject_AAAA",
+          individualId: "subject_AAAA",
         },
         "0000001": {
           bucket: UNIT_TEST_FINGERPRINT_BUCKET,
@@ -136,7 +136,7 @@ describe("Run pairing analysis", () => {
           fingerprintDisplay: index1,
           generatedSampleId: "0000001",
           generatedPath: "/tmp/1.somalier",
-          subjectIdentifier: "subject_BBBB",
+          individualId: "subject_BBBB",
         },
       },
       {
@@ -146,7 +146,7 @@ describe("Run pairing analysis", () => {
           fingerprintDisplay: index2,
           generatedSampleId: "0000002",
           generatedPath: "/tmp/2.somalier",
-          subjectIdentifier: "subject_BBBB",
+          individualId: "subject_BBBB",
         },
         "0000003": {
           bucket: UNIT_TEST_FINGERPRINT_BUCKET,
@@ -154,7 +154,7 @@ describe("Run pairing analysis", () => {
           fingerprintDisplay: index3,
           generatedSampleId: "0000003",
           generatedPath: "/tmp/3.somalier",
-          subjectIdentifier: "subject_AAAA",
+          individualId: "subject_AAAA",
         },
         "0000004": {
           bucket: UNIT_TEST_FINGERPRINT_BUCKET,
@@ -162,7 +162,7 @@ describe("Run pairing analysis", () => {
           fingerprintDisplay: index4,
           generatedSampleId: "0000004",
           generatedPath: "/tmp/4.somalier",
-          subjectIdentifier: "subject_BBBB",
+          individualId: "subject_BBBB",
         },
         "0000005": {
           bucket: UNIT_TEST_FINGERPRINT_BUCKET,
@@ -170,7 +170,7 @@ describe("Run pairing analysis", () => {
           fingerprintDisplay: index5,
           generatedSampleId: "0000005",
           generatedPath: "/tmp/5.somalier",
-          subjectIdentifier: "subject_FFFF",
+          individualId: "subject_FFFF",
         },
       },
       0.9,

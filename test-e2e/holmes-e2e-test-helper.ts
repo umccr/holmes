@@ -13,30 +13,36 @@ import { toUtf8 } from "@aws-sdk/util-utf8";
  *
  * @param stepsClient a configured Steps client
  * @param extractStepsArn the ARN of the extract Steps
- * @param fingerprintFolder the test specific folder for fingerprints
  * @param bamUrl the URL to extract
- * @param subjectIdentifier the subject identifier of the human who belongs to the BAM
- * @param libraryIdentifier the library identifier of the sequencing who belongs to the BAM
  * @param reference the id of the reference genome (hg19 or hg38)
+ * @param fingerprintFolder the test specific folder for fingerprints
+ * @param individualId the individual identifier of the human who belongs to the BAM (e.g SBJ12345)
+ * @param libraryId the library identifier of the sequencing who belongs to the BAM (e.g. L1234567)
+ * @param excludeFromCheck whether to set the ignore in check field
+ * @param autoExpire whether to set the auto expire tag
  */
 export async function doFingerprintExtract(
   stepsClient: SFNClient,
   extractStepsArn: string,
-  fingerprintFolder: string,
   bamUrl: string,
-  subjectIdentifier: string,
-  libraryIdentifier: string,
-  reference: string
+  reference: string,
+  fingerprintFolder: string,
+  individualId: string,
+  libraryId: string,
+  excludeFromCheck: boolean,
+  autoExpire: boolean
 ): Promise<any> {
-  const timeLabel = `EXTRACT ${bamUrl} for subject ${subjectIdentifier}/library ${libraryIdentifier}`;
+  const timeLabel = `EXTRACT ${bamUrl} for subject ${individualId}/library ${libraryId}`;
   console.time(timeLabel);
 
   return doStepsExecution(stepsClient, extractStepsArn, {
-    indexes: [bamUrl],
-    subjectIdentifier: subjectIdentifier,
-    libraryIdentifier: libraryIdentifier,
-    fingerprintFolder: fingerprintFolder,
+    index: bamUrl,
     reference: reference,
+    fingerprintFolder: fingerprintFolder,
+    individualId: individualId,
+    libraryId: libraryId,
+    excludeFromCheck: excludeFromCheck ? true : undefined,
+    autoExpire: autoExpire ? true : undefined,
   }).then(() => {
     console.timeEnd(timeLabel);
   });
@@ -61,8 +67,7 @@ export async function doFingerprintCheck(
   fingerprintBucket: string,
   fingerprintFolder: string,
   bamUrl: string,
-  excludeRegex?: string,
-  expectRelatedRegex?: string
+  excludeRegex?: string
 ) {
   const lambaResult = await lambdaClient.send(
     new InvokeCommand({
@@ -77,7 +82,6 @@ export async function doFingerprintCheck(
           minimumNCount: 10,
           fingerprintFolder: fingerprintFolder,
           excludeRegex: excludeRegex,
-          expectRelatedRegex: expectRelatedRegex,
         })
       ),
     })

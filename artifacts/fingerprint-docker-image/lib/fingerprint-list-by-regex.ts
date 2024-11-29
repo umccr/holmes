@@ -1,6 +1,5 @@
 import { keyToUrl } from "./aws-misc";
 import { fingerprintBucketName } from "./environment-constants";
-import { formatInTimeZone } from "date-fns-tz";
 import { listS3Fingerprints } from "./s3-fingerprint-db/list-s3-fingerprints";
 import { S3Fingerprint } from "./s3-fingerprint-db/s3-fingerprint";
 
@@ -13,14 +12,14 @@ import { S3Fingerprint } from "./s3-fingerprint-db/s3-fingerprint";
  * Also allows the regex to match
  * against portions of the printed date of modification of the
  * fingerprint - so that fingerprints can be extracted by day
- * (i.e. "2022-04-02")
+ * (i.e. "2022-04-02") and by metadata individualId and libraryId.
  *
  * @param regexes an array of regexs of which ANY can match
  * @param indexes an array of URLs that can match directly as well
  * @param fingerprintFolder the folder the fingerprints are in
  * @param excludeRegex a possible regex used to exclude by filename
  */
-export async function urlListByRegex(
+export async function fingerprintListByRegex(
   regexes: string[],
   indexes: string[],
   fingerprintFolder: string,
@@ -47,6 +46,7 @@ export async function urlListByRegex(
       s3Fingerprint.key
     ).toString();
 
+    // we have a useful feature to exclude entirely by regex
     if (excludeRegexReal) if (excludeRegexReal.test(urlAsString)) continue;
 
     // if the name of the URL was specified in the inputs then we immediately match
@@ -75,15 +75,15 @@ export async function urlListByRegex(
         }
       }
 
-      if (s3Fingerprint.libraryIdentifier) {
-        if (r.test(s3Fingerprint.libraryIdentifier)) {
+      if (s3Fingerprint.libraryId) {
+        if (r.test(s3Fingerprint.libraryId)) {
           anyMatched = true;
           break;
         }
       }
 
-      if (s3Fingerprint.subjectIdentifier) {
-        if (r.test(s3Fingerprint.subjectIdentifier)) {
+      if (s3Fingerprint.individualId) {
+        if (r.test(s3Fingerprint.individualId)) {
           anyMatched = true;
           break;
         }

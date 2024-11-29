@@ -15,7 +15,7 @@ import { awsListObjects } from "./aws-list-objects";
  *
  * @param reference
  */
-export async function awsFingerprintDownloadReferenceData(
+export async function downloadReferenceData(
   reference: string
 ): Promise<[string, string, string]> {
   if (!fingerprintBucketName)

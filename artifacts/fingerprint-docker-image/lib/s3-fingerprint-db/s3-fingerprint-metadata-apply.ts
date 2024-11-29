@@ -32,24 +32,24 @@ export function s3FingerprintMetadataApply(
     );
   }
 
-  const subjectMeta = m ? m["subject-identifier"] : undefined;
+  const subjectMeta = m ? m["individual-id"] : undefined;
 
-  if (subjectMeta) f.subjectIdentifier = subjectMeta.trim();
+  if (subjectMeta) f.individualId = subjectMeta.trim();
   else {
     // we can have older samples that used to get subject ids from their BAM URL
     const re = new RegExp(/.*(SBJ\d\d\d\d\d).*/);
     const r = key.match(re);
-    if (r) f.subjectIdentifier = r[1];
+    if (r) f.individualId = r[1];
   }
 
-  const libraryMeta = m ? m["library-identifier"] : undefined;
+  const libraryMeta = m ? m["library-id"] : undefined;
 
-  if (libraryMeta) f.libraryIdentifier = libraryMeta.trim();
+  if (libraryMeta) f.libraryId = libraryMeta.trim();
   else {
     // we can have older libraries that used to get library ids from their BAM URL
     const re = new RegExp(/.*(L\d\d\d\d\d\d\d).*/);
     const r = key.match(re);
-    if (r) f.libraryIdentifier = r[1];
+    if (r) f.libraryId = r[1];
   }
 
   return f;

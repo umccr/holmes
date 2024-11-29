@@ -1,17 +1,17 @@
 import { chdir } from "process";
 import { URL } from "url";
-import { somalierWork } from "./lib/environment-constants";
-import { keyToUrl, urlToKey } from "./lib/aws-misc";
+import { somalierWork } from "../lib/environment-constants";
+import { keyToUrl, urlToKey } from "../lib/aws-misc";
 import {
   cleanSomalierFiles,
   runSomalierRelate,
-} from "./lib/somalier-download-run-clean";
-import { HolmesReturnType } from "./lib/somalier-types";
-import { pairsAnalyse } from "./lib/somalier-pairs-analyse";
+} from "../lib/somalier-download-run-clean";
+import { HolmesReturnType } from "../lib/somalier-types";
+import { pairsAnalyse } from "../lib/somalier-pairs-analyse";
 import {
   downloadAndCorrectFingerprint,
   FingerprintDownloaded,
-} from "./lib/aws-fingerprint";
+} from "../lib/fingerprint-download";
 
 /**
  * NOTE this is the guts of the actual fingerprint check

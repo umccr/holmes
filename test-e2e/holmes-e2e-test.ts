@@ -85,6 +85,20 @@ export async function runTest(
   console.log("EXTRACT TESTS");
   console.log(CONSOLE_BREAK_LINE);
 
+  // confirm that nonsense inputs ends up throwing an exception
+  // Should turn into proper test case
+  //await doFingerprintExtract(
+  //    stepsClient,
+  //    extractStepsArn,
+  //    "s3://a-bucket/not-a-file.bam",
+  //    "hg38.rna",
+  //    fingerprintFolder,
+  //    "A",
+  //    "B",
+  //    false,
+  //    false
+  // )
+
   // add in extractors for all the HG38 samples
   const allExtractPromises = [
     [INDIVIDUAL_96, INDIVIDUAL_96_ID, "L654321"],
@@ -93,16 +107,32 @@ export async function runTest(
     [TRIO_SON, TRIO_SON_ID, "L333333"],
     [TRIO_FATHER, TRIO_FATHER_ID, "L444444"],
     [TRIO_MOTHER, TRIO_MOTHER_ID, "L123456"],
-    [CELLPTC, "CELLPTC", "LXYX"],
   ].map((tuple) =>
     doFingerprintExtract(
       stepsClient,
       extractStepsArn,
-      fingerprintFolder,
       tuple[0],
+      "hg38.rna",
+      fingerprintFolder,
       tuple[1],
       tuple[2],
-      "hg38.rna"
+      false,
+      false
+    )
+  );
+
+  // add in an example fingerprint that doesn't participate in checks and auto expires
+  allExtractPromises.push(
+    doFingerprintExtract(
+      stepsClient,
+      extractStepsArn,
+      CELLPTC,
+      "hg38.rna",
+      fingerprintFolder,
+      "CELLPTC",
+      "LXYX",
+      true,
+      true
     )
   );
 
@@ -111,11 +141,13 @@ export async function runTest(
     doFingerprintExtract(
       stepsClient,
       extractStepsArn,
-      fingerprintFolder,
       CTDNA,
+      "hg19.rna",
+      fingerprintFolder,
       "CTDNA",
       "L2200417",
-      "hg19.rna"
+      false,
+      false
     )
   );
 
@@ -365,36 +397,6 @@ export async function runTest(
       "ctDNA/mother relation not found"
     );
 
-    console.log("Passed");
-  }
-
-  {
-    console.log(CONSOLE_BREAK_LINE);
-    console.log("EXPECTED FAMILY REGEX CHECK");
-    console.log(CONSOLE_BREAK_LINE);
-
-    const familyCheckResult = await doFingerprintCheck(
-      lambdaClient,
-      checkLambdaArn,
-      fingerprintBucket,
-      fingerprintFolder,
-      TRIO_FATHER,
-      "ctdna",
-      "(family)"
-    );
-
-    //console.log(JSON.stringify(familyCheckResult, null, 2));
-
-    assert.ok(
-      familyCheckResult.expectedRelated.length == 1 &&
-        findExpectedRelatedRelatedness(familyCheckResult, TRIO_SON) > 0.4,
-      "Family related should match 1 person - the son"
-    );
-    assert.ok(
-      familyCheckResult.unexpectedUnrelated.length == 1 &&
-        findUnexpectedUnrelatedRelatedness(familyCheckResult, TRIO_MOTHER) < 2,
-      "Family unrelated should match 1 person - the mother"
-    );
     console.log("Passed");
   }
 

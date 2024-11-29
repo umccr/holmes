@@ -1,4 +1,4 @@
-import { downloadAndCorrectFingerprint } from "../lib/aws-fingerprint";
+import { downloadAndCorrectFingerprint } from "../lib/fingerprint-download";
 import {
   SOME_METADATA_BUT_SUBJECT_KEY,
   SOME_METADATA_BUT_SUBJECT_URL,
@@ -17,7 +17,7 @@ describe("Fingerprints in AWS", () => {
     );
 
     expect(r.generatedSampleId).toBe("000000000000000000000005");
-    expect(r.subjectIdentifier).toBe("CTDNA");
+    expect(r.individualId).toBe("CTDNA");
 
     expect(r.created).toBeDefined();
     expect(r.created!.getUTCFullYear()).toBe(2024);
@@ -39,8 +39,8 @@ describe("Fingerprints in AWS", () => {
     );
 
     expect(r.generatedSampleId).toBe("0000002");
-    expect(r.subjectIdentifier).toBe("SBJ00125");
-    expect(r.libraryIdentifier).toBe("ALIB");
+    expect(r.individualId).toBe("SBJ00125");
+    expect(r.libraryId).toBe("ALIB");
 
     // the created date should come from the underlying S3 LastModified but let's not
     // assert a value as it might change as we edit the fingerprint

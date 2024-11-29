@@ -1,7 +1,7 @@
 import { parse } from "csv/sync";
 import { keyToUrl } from "./aws-misc";
 import { HolmesReturnType, SomalierCommonType } from "./somalier-types";
-import { FingerprintDownloaded } from "./aws-fingerprint";
+import { FingerprintDownloaded } from "./fingerprint-download";
 
 /**
  * From the somalier output pairs file - we analyse all the pairs to find
@@ -101,31 +101,31 @@ export async function pairsAnalyse(
       const relatedness = parseFloat(record[2]);
 
       // see if the names of the files imply a relation
-      let regexMatch = false;
+      let identifierMatch = false;
 
-      // we only need to do the regex check if they DO match the regexp AND there is a capture group in the regex
+      // we want there to be identifiers of a decent length AND for them to match
       if (
-        indexFingerprintDownloaded.subjectIdentifier &&
-        sampleFingerprintDownloaded.subjectIdentifier &&
-        indexFingerprintDownloaded.subjectIdentifier.length >= 2
+        indexFingerprintDownloaded.individualId &&
+        sampleFingerprintDownloaded.individualId &&
+        indexFingerprintDownloaded.individualId.length >= 1
       ) {
         if (
-          indexFingerprintDownloaded.subjectIdentifier ===
-          sampleFingerprintDownloaded.subjectIdentifier
+          indexFingerprintDownloaded.individualId ===
+          sampleFingerprintDownloaded.individualId
         )
-          regexMatch = true;
+          identifierMatch = true;
       }
 
       const regexJson = JSON.stringify({
         // return the match groups that matched
-        index: indexFingerprintDownloaded.subjectIdentifier,
-        sample: sampleFingerprintDownloaded.subjectIdentifier,
+        index: indexFingerprintDownloaded.individualId,
+        sample: sampleFingerprintDownloaded.individualId,
       });
 
       // NOTE we DO NOT use the minimumNCount here - as ruling out relations with low N counts
       // is counterproductive for Unexpected Unrelated (a low N just means that we can't make strong assertions
       // which is why we *only* use it for Related)
-      if (regexMatch && relatedness < relatednessThreshold) {
+      if (identifierMatch && relatedness < relatednessThreshold) {
         // these appear to be genomically unrelated but the regex says they are - which means we report
         // that they are Unexpected Unrelated
         console.log(
@@ -149,7 +149,7 @@ export async function pairsAnalyse(
         if (relatedness >= relatednessThreshold && n >= minimumNCount) {
           // if they are genomically related according to the threshold we want to report that
           // but we can report it as expected or unexpected
-          if (regexMatch) {
+          if (identifierMatch) {
             console.log(
               `ExpectedRelated of ${relatedness} to sample id ${
                 record[1]

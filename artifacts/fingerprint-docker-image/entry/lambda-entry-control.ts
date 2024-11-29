@@ -1,14 +1,17 @@
 import { chdir } from "process";
-import { somalierWork } from "./lib/environment-constants";
+import { somalierWork } from "../lib/environment-constants";
 import {
   cleanSomalierFiles,
   runSomalierRelate,
-} from "./lib/somalier-download-run-clean";
-import { somalierTsvCorrectIds } from "./lib/somalier-tsv-correct-ids";
-import { getSlackTextAttacher } from "./lib/slack";
-import { downloadControlSamples, downloadIndexSamples } from "./lib/ids";
-import { reportControl } from "./lib/report-control";
-import { FingerprintDownloaded } from "./lib/aws-fingerprint";
+} from "../lib/somalier-download-run-clean";
+import { somalierTsvCorrectIds } from "../lib/somalier-tsv-correct-ids";
+import { getSlackTextAttacher } from "../lib/slack";
+import {
+  downloadControlSamples,
+  downloadIndexSamples,
+} from "../lib/download-samples";
+import { reportControl } from "../lib/report-control";
+import { FingerprintDownloaded } from "../lib/fingerprint-download";
 
 type EventInput = {
   // a BAM urls to use as index (i.e. to compare against the controls)

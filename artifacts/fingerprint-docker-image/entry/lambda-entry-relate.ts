@@ -1,16 +1,16 @@
 import { chdir } from "process";
-import { somalierWork } from "./lib/environment-constants";
+import { somalierWork } from "../lib/environment-constants";
 import {
   cleanSomalierFiles,
   runSomalierRelate,
-} from "./lib/somalier-download-run-clean";
-import { somalierTsvCorrectIds } from "./lib/somalier-tsv-correct-ids";
-import { getSlackTextAttacher } from "./lib/slack";
-import { reportRelate } from "./lib/report-relate";
-import { downloadIndexSamples } from "./lib/ids";
-import { urlListByRegex } from "./lib/url-list-by-regex";
-import { MAX_RELATE } from "./limits";
-import { S3Fingerprint } from "./lib/s3-fingerprint-db/s3-fingerprint";
+} from "../lib/somalier-download-run-clean";
+import { somalierTsvCorrectIds } from "../lib/somalier-tsv-correct-ids";
+import { getSlackTextAttacher } from "../lib/slack";
+import { reportRelate } from "../lib/report-relate";
+import { downloadIndexSamples } from "../lib/download-samples";
+import { fingerprintListByRegex } from "../lib/fingerprint-list-by-regex";
+import { MAX_RELATE } from "../limits";
+import { S3Fingerprint } from "../lib/s3-fingerprint-db/s3-fingerprint";
 
 type EventInput = {
   // EITHER the BAM urls to use as indexes
@@ -54,7 +54,7 @@ export const lambdaHandler = async (ev: EventInput, _context: any) => {
 
   if (ev.regexes) {
     fingerprintUrlsToCheck = (
-      await urlListByRegex(
+      await fingerprintListByRegex(
         ev.regexes,
         [],
         ev.fingerprintFolder,

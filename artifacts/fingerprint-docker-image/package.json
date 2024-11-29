@@ -6,14 +6,14 @@
   "license": "MIT",
   "scripts": {
     "//test": "This is obviously a mess of a launch so please do better if the whole Node/TS/ESM/Jest debacle sorts itself out",
-    "test": "tsc && node --experimental-vm-modules --no-warnings ./node_modules/jest/bin/jest.js tests/*.ts"
+    "test": "tsc && node --experimental-vm-modules --no-warnings ./node_modules/jest/bin/jest.js tests/**.ts"
   },
   "dependencies": {
-    "@aws-sdk/client-lambda": "3.693.0",
-    "@aws-sdk/client-s3": "3.693.0",
-    "@aws-sdk/client-secrets-manager": "3.693.0",
-    "@aws-sdk/client-sfn": "3.693.0",
-    "@aws-sdk/s3-request-presigner": "3.693.0",
+    "@aws-sdk/client-lambda": "3.699.0",
+    "@aws-sdk/client-s3": "3.699.0",
+    "@aws-sdk/client-secrets-manager": "3.699.0",
+    "@aws-sdk/client-sfn": "3.699.0",
+    "@aws-sdk/s3-request-presigner": "3.701.0",
     "@slack/web-api": "7.7.0",
     "@slack/webhook": "7.0.3",
     "axios": "1.7.8",

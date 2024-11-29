@@ -1,12 +1,12 @@
-import { fingerprintBucketName } from "./lib/environment-constants";
-import { getSlackTextAttacher } from "./lib/slack";
-import { stepsDoExecution } from "./lib/aws-misc";
+import { fingerprintBucketName } from "../lib/environment-constants";
+import { getSlackTextAttacher } from "../lib/slack";
+import { stepsDoExecution } from "../lib/aws-misc";
 import { SFNClient } from "@aws-sdk/client-sfn";
-import { distributedMapManifestToLambdaResults } from "./lib/distributed-map";
-import { reportCheck } from "./lib/report-check";
-import { urlListByRegex } from "./lib/url-list-by-regex";
-import { MAX_CHECK } from "./limits";
-import { S3Fingerprint } from "./lib/s3-fingerprint-db/s3-fingerprint";
+import { distributedMapManifestToLambdaResults } from "../lib/distributed-map";
+import { reportCheck } from "../lib/report-check";
+import { fingerprintListByRegex } from "../lib/fingerprint-list-by-regex";
+import { MAX_CHECK } from "../limits";
+import { S3Fingerprint } from "../lib/s3-fingerprint-db/s3-fingerprint";
 
 type EventInput = {
   // EITHER the BAM urls to use as indexes
@@ -66,14 +66,14 @@ export const lambdaHandler = async (ev: EventInput, _context: any) => {
   let truncated = false;
 
   if (ev.regexes) {
-    fingerprintsToCheck = await urlListByRegex(
+    fingerprintsToCheck = await fingerprintListByRegex(
       ev.regexes,
       [],
       ev.fingerprintFolder,
       ev.excludeRegex
     );
   } else if (ev.indexes) {
-    fingerprintsToCheck = await urlListByRegex(
+    fingerprintsToCheck = await fingerprintListByRegex(
       [],
       ev.indexes,
       ev.fingerprintFolder,
@@ -109,7 +109,7 @@ export const lambdaHandler = async (ev: EventInput, _context: any) => {
 
   const stepsArgs = {
     fingerprintFolder: ev.fingerprintFolder,
-    indexes: fingerprintsToCheck,
+    indexes: fingerprintsToCheck.map((f) => f.url.toString()),
     relatednessThreshold: ev.relatednessThreshold,
     minimumNCount: ev.minimumNCount,
     excludeRegex: ev.excludeRegex,

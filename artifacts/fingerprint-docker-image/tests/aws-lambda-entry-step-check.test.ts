@@ -1,4 +1,4 @@
-import { lambdaHandler } from "../lambda-entry-step-check";
+import { lambdaHandler } from "../entry/lambda-entry-step-check";
 
 import {
   HG002_KEY,

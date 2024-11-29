@@ -3,7 +3,7 @@ import { getFingerprintControlKeys } from "./environment-constants";
 import {
   downloadAndCorrectFingerprint,
   FingerprintDownloaded,
-} from "./aws-fingerprint";
+} from "./fingerprint-download";
 
 /**
  * Bring down a set of fingerprints for the given BAM urls and return

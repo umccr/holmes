@@ -1,5 +1,5 @@
 import { parse, stringify, transform } from "csv/sync";
-import { FingerprintDownloaded } from "./aws-fingerprint";
+import { FingerprintDownloaded } from "./fingerprint-download";
 
 /**
  * For a somalier TSV file (either pairs or samples) - correct the sample ids so that

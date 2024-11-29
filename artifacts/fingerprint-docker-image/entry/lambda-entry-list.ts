@@ -1,7 +1,7 @@
-import { fingerprintBucketName } from "./lib/environment-constants";
-import { getSlackResponder, getSlackTextAttacher } from "./lib/slack";
-import { reportList } from "./lib/report-list";
-import { urlListByRegex } from "./lib/url-list-by-regex";
+import { fingerprintBucketName } from "../lib/environment-constants";
+import { getSlackResponder, getSlackTextAttacher } from "../lib/slack";
+import { reportList } from "../lib/report-list";
+import { fingerprintListByRegex } from "../lib/fingerprint-list-by-regex";
 
 type EventInput = {
   // for list indexes and regexes can both be specified together
@@ -44,7 +44,7 @@ export const lambdaHandler = async (ev: EventInput, _context: any) => {
   console.log(`Regexps = ${ev.regexes}`);
   console.log(`Indexes = ${ev.indexes}`);
 
-  const fingerprints = await urlListByRegex(
+  const fingerprints = await fingerprintListByRegex(
     ev.regexes,
     ev.indexes,
     ev.fingerprintFolder,
