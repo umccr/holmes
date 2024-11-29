@@ -88,7 +88,8 @@ export class HolmesPipelineStack extends Stack {
     {
       // other aspects are specific to staging
       const STG_FINGERPRINT_BUCKET = "umccr-fingerprint-stg";
-      const STG_GDS_TEST_DATA_BASE = "gds://staging/test-data/holmes-test-data";
+      const STG_GDS_TEST_DATA_BASE =
+        "s3://umccr-fingerprint-local-dev-test/test-bams";
 
       const stgStage = new HolmesBuildStage(
         this,
