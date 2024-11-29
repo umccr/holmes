@@ -21,7 +21,7 @@ case $ACCOUNT in
      NODE_OPTIONS="--unhandled-rejections=strict" npx ts-node "$(dirname "$0")/holmes-e2e-test.ts" \
      . \
      "umccr-fingerprint-prod" \
-     "gds://production/test-data/holmes-test-data" \
+     "s3://umccr-fingerprint-local-dev-test/test-bams" \
      "umccr" \
      $*
     ;;
@@ -31,7 +31,7 @@ case $ACCOUNT in
      NODE_OPTIONS="--unhandled-rejections=strict" npx ts-node "$(dirname "$0")/holmes-e2e-test.ts" \
      . \
      "umccr-fingerprint-stg" \
-     "gds://staging/test-data/holmes-test-data" \
+     "s3://umccr-fingerprint-local-dev-test/test-bams" \
      "umccr" \
      $*
     ;;
