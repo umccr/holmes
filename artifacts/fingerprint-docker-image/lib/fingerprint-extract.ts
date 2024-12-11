@@ -212,7 +212,7 @@ export async function fingerprintExtract(
     m["individual-id"] = individualId.trim();
 
   if (libraryId && libraryId.trim().length > 0)
-    m["library-identifier"] = libraryId.trim();
+    m["library-id"] = libraryId.trim();
 
   if (excludeFromCheck) m["exclude-from-check"] = true.toString();
 
