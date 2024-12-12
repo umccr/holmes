@@ -1,14 +1,20 @@
 import { table } from "table";
 import { HolmesResultMapType } from "./distributed-map";
+import { headS3Fingerprint } from "./s3-fingerprint-db/head-s3-fingerprint";
+import { urlToKey } from "./aws-misc";
 
 /**
  * Takes data from a check or checkx call and formats a
  * plain text report.
  *
  * @param relations
+ * @param fingerprintBucketName
+ * @param fingerprintFolder
  */
 export async function reportCheck(
-  relations: Record<string, HolmesResultMapType>
+  relations: Record<string, HolmesResultMapType>,
+  fingerprintBucketName: string,
+  fingerprintFolder: string
 ) {
   // we build this report string
   let reportText = "";
@@ -22,11 +28,26 @@ UU = unexpected unrelated\n\n`;
 
   const tableData: any[][] = [];
 
-  tableData.push(["Index URL", "ER\n(self + others)", "UR", "UU"]);
+  tableData.push([
+    "Index URL",
+    "ER\n(self + others)",
+    "UR",
+    "UU",
+    "Individual",
+  ]);
 
   // we want to display the indexes in alphabetic order (I mean why not!)
   for (const rKey of Object.keys(relations).sort()) {
     const m = relations[rKey];
+
+    // now that we do not have subject ids in the filenames - we need to fetch them to report on them
+    const f = await headS3Fingerprint(
+      fingerprintBucketName,
+      fingerprintFolder,
+      urlToKey(fingerprintFolder, URL.parse(rKey))
+    );
+
+    // TBD lookup external ids from API
 
     tableData.push([
       rKey,
@@ -37,6 +58,7 @@ UU = unexpected unrelated\n\n`;
       m.unexpectedUnrelated.length === 0
         ? 0
         : m.unexpectedUnrelated.length.toString() + " ❌",
+      f.individualId || "<none>",
     ]);
 
     // if this index has unexpected related - create a breakout table
@@ -44,10 +66,23 @@ UU = unexpected unrelated\n\n`;
     if (m.unexpectedRelated.length > 0) {
       const urTableData: any[][] = [];
 
-      urTableData.push(["Other URL", "Relatedness", "N"]);
+      urTableData.push(["Other URL", "Relatedness", "N", "Individual"]);
 
       for (const ur of m.unexpectedRelated) {
-        urTableData.push([ur.file, ur.relatedness, ur.n]);
+        // similarly for the other samples - it helps to display the subject id
+        // which we used to read from the filename
+        const f = await headS3Fingerprint(
+          fingerprintBucketName,
+          fingerprintFolder,
+          urlToKey(fingerprintFolder, URL.parse(ur.file))
+        );
+
+        urTableData.push([
+          ur.file,
+          ur.relatedness,
+          ur.n,
+          f.individualId || "<none>",
+        ]);
       }
 
       reportUrBreakoutText.push(
@@ -65,10 +100,23 @@ UU = unexpected unrelated\n\n`;
     if (m.unexpectedUnrelated.length > 0) {
       const uuTableData: any[][] = [];
 
-      uuTableData.push(["Other URL", "Relatedness", "N"]);
+      uuTableData.push(["Other URL", "Relatedness", "N", "Individual"]);
 
       for (const uu of m.unexpectedUnrelated) {
-        uuTableData.push([uu.file, uu.relatedness, uu.n]);
+        // similarly for the other samples - it helps to display the subject id
+        // which we used to read from the filename
+        const f = await headS3Fingerprint(
+          fingerprintBucketName,
+          fingerprintFolder,
+          urlToKey(fingerprintFolder, URL.parse(uu.file))
+        );
+
+        uuTableData.push([
+          uu.file,
+          uu.relatedness,
+          uu.n,
+          f.individualId || "<none>",
+        ]);
       }
 
       reportUuBreakoutText.push(

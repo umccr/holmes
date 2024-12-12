@@ -1,5 +1,8 @@
 import { chdir } from "process";
-import { somalierWork } from "../lib/environment-constants";
+import {
+  fingerprintBucketName,
+  somalierWork,
+} from "../lib/environment-constants";
 import {
   cleanSomalierFiles,
   runSomalierRelate,
@@ -126,7 +129,12 @@ export const lambdaHandler = async (ev: EventInput, _context: any) => {
     const responder = await getSlackTextAttacher(ev.channelId);
 
     const report =
-      (await reportRelate(fixedSamplesTsv, fixedPairsTsv)) +
+      (await reportRelate(
+        fixedSamplesTsv,
+        fixedPairsTsv,
+        fingerprintBucketName,
+        ev.fingerprintFolder
+      )) +
       (truncated
         ? `\n⚠️ TOO MANY FINGERPRINT INPUTS SO RELATE WAS RUN ONLY ON FIRST ${MAX_RELATE}`
         : "");

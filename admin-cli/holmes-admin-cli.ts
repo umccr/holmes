@@ -1,8 +1,10 @@
 #!/usr/bin/env -S npx tsx
 
-import { listS3Fingerprints } from "../artifacts/fingerprint-docker-image/lib/s3-fingerprint-db/list-s3-fingerprints";
 import { program } from "commander";
 import { S3Fingerprint } from "../artifacts/fingerprint-docker-image/lib/s3-fingerprint-db/s3-fingerprint";
+import { listS3Fingerprints } from "../artifacts/fingerprint-docker-image/lib/s3-fingerprint-db/list-s3-fingerprints";
+import { headS3Fingerprint } from "../artifacts/fingerprint-docker-image/lib/s3-fingerprint-db/head-s3-fingerprint";
+import { urlToKey } from "../artifacts/fingerprint-docker-image/lib/aws-misc";
 
 /**
  * Get all the fingerprints sorted by creation date.
@@ -60,10 +62,50 @@ program
       options.folder
     );
 
+    throw new Error("Not implemented");
+
     for (const f of sortedFingerprints) {
       // detect if correction needed
       // do correction
     }
+  });
+
+program
+  .command("set")
+  .description("Set metadata for an individual fingerprint")
+  .argument("<url>", "URL of BAM")
+  .option("--bucket <bucket>", "fingerprint bucket", "umccr-fingerprint-prod")
+  .option("--folder <folder>", "slash terminated folder name", "fingerprints/")
+  .option("--individual-id <ii>", "new individual id")
+  .action(async (url: string, options) => {
+    console.log(options);
+    const f = await headS3Fingerprint(
+      options.bucket,
+      options.folder,
+      urlToKey(options.folder, URL.parse(url))
+    );
+
+    if (options.individualId)
+      console.log(`set ${f.key} to ${options.individualId}`);
+
+    // bucket = "umccr-fingerprint-prod"
+    // key = "fingerprints/s3%3A%2F%2Fanother-bucket%2FPTC_TsqN200511_N.bam.somalier"
+    //
+    // k = client.head_object(Bucket=bucket, Key=key)
+    //
+    // m = k["Metadata"]
+    //
+    // print(m)
+    //
+    // if "library-identifier" in m:
+    //     m["library-id"] = m["library-identifier"]
+    //     del m["library-identifier"]
+    //
+    // if "subject-identifier" in m:
+    //     m["individual-id"] = m["subject-identifier"]
+    //     del m["subject-identifier"]
+    //
+    // client.copy_object(Bucket=bucket, Key=key, CopySource=bucket + '/' + key, Metadata=m, ContentType=k['ContentType'], MetadataDirective='REPLACE')
   });
 
 program.parse();

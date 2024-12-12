@@ -28,12 +28,7 @@ export async function* listS3Fingerprints(
 
   // just a bridge to make our more general function work with pMapIterable
   const headBridge = (s3Object: _Object) =>
-    headS3Fingerprint(
-      fingerprintBucketName,
-      fingerprintFolder,
-      s3Object.Key!,
-      s3Object.LastModified!
-    );
+    headS3Fingerprint(fingerprintBucketName, fingerprintFolder, s3Object.Key!);
 
   const pi = await import("p-map");
 

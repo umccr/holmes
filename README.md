@@ -1,7 +1,9 @@
 # holmes
 
-An AWS Steps based service that does bioinformatics fingerprint checks,
-deployed as a CDK pipeline project.
+A set of functionality for performing large-scale bioinformatics fingerprint checks.
+
+This is a CDK project that deploys lambdas and step functions to perform various
+tasks.
 
 ## Overview
 
@@ -33,7 +35,7 @@ See [here](docs/SLACK.md)
 
 ## Deployment
 
-The stack does not create the fingerprint bucket. Instead this should be created
+The stack _does not_ create the fingerprint bucket. Instead this should be created
 manually before installing Holmes.
 
 (in the past this bucket was created in the Holmes stack but that prevented deleting
@@ -64,6 +66,22 @@ new Bucket(this, "FingerprintBucket", {
   removalPolicy: RemovalPolicy.RETAIN,
 });
 ```
+
+## Admin CLI
+
+A CLI tool has been written for administrators that is a parking spot for
+various functionality. For instance, when we renamed the format of the fingerprints in S3 -
+we wrote a Python tool to do that. The current NodeJs version is the best
+spot for putting this functionality now. See [here](admin-cli).
+
+Easiest entry point is to `cd` into `admin-cli` and type
+
+```shell
+./.holmes-admin-cli.ts list
+```
+
+which will print a list of all fingerprints in TSV format. Command line flags
+control the bucket and folder.
 
 ## Costing
 

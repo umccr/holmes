@@ -1,6 +1,8 @@
 import { parse, transform } from "csv/sync";
 import { table } from "table";
 import { createFriendlyIds } from "./misc";
+import { headS3Fingerprint } from "./s3-fingerprint-db/head-s3-fingerprint";
+import { urlToKey } from "./aws-misc";
 
 function fixHeaderRow(row: string[]): string[] {
   return row.map((v) => {
@@ -18,8 +20,15 @@ function fixHeaderRow(row: string[]): string[] {
  *
  * @param samplesTsv
  * @param pairsTsv
+ * @param fingerprintBucketName
+ * @param fingerprintFolder
  */
-export async function reportRelate(samplesTsv: string, pairsTsv: string) {
+export async function reportRelate(
+  samplesTsv: string,
+  pairsTsv: string,
+  fingerprintBucketName: string,
+  fingerprintFolder: string
+) {
   // we build this report string
   let reportText = "";
 
@@ -42,12 +51,23 @@ export async function reportRelate(samplesTsv: string, pairsTsv: string) {
     });
 
     const friendlies = createFriendlyIds(sampleUrls, "A");
-    for (let i = 0; i < sampleUrls.length; i++)
-      sampleUrlToFriendlyId[sampleUrls[i]] = friendlies[i];
+    for (let i = 0; i < sampleUrls.length; i++) {
+      const f = await headS3Fingerprint(
+        fingerprintBucketName,
+        fingerprintFolder,
+        urlToKey(fingerprintFolder, URL.parse(sampleUrls[i]))
+      );
+
+      sampleUrlToFriendlyId[sampleUrls[i]] = `${f.individualId || "<none>"} (${
+        friendlies[i]
+      })`;
+    }
   }
 
   reportText += Object.entries(sampleUrlToFriendlyId)
-    .map(([u, t]) => `${t} = ${u}`)
+    .map(([u, t]) => {
+      return `${t} = ${u}`;
+    })
     .join("\n");
 
   reportText += "\n";

@@ -1,12 +1,16 @@
 import { fingerprintBucketName } from "../lib/environment-constants";
 import { getSlackTextAttacher } from "../lib/slack";
-import { stepsDoExecution } from "../lib/aws-misc";
+import { stepsDoExecution, urlToKey } from "../lib/aws-misc";
 import { SFNClient } from "@aws-sdk/client-sfn";
-import { distributedMapManifestToLambdaResults } from "../lib/distributed-map";
+import {
+  distributedMapManifestToLambdaResults,
+  HolmesResultMapType,
+} from "../lib/distributed-map";
 import { reportCheck } from "../lib/report-check";
 import { fingerprintListByRegex } from "../lib/fingerprint-list-by-regex";
 import { MAX_CHECK } from "../limits";
 import { S3Fingerprint } from "../lib/s3-fingerprint-db/s3-fingerprint";
+import { headS3Fingerprint } from "../lib/s3-fingerprint-db/head-s3-fingerprint";
 
 type EventInput = {
   // EITHER the BAM urls to use as indexes
@@ -132,7 +136,11 @@ export const lambdaHandler = async (ev: EventInput, _context: any) => {
     const responder = await getSlackTextAttacher(ev.channelId);
 
     const report =
-      (await reportCheck(lambdaResults)) +
+      (await reportCheck(
+        lambdaResults,
+        fingerprintBucketName,
+        ev.fingerprintFolder
+      )) +
       (truncated
         ? `\n⚠️ TOO MANY FINGERPRINT INPUTS SO CHECK WAS RUN ONLY ON FIRST ${MAX_CHECK}`
         : "");

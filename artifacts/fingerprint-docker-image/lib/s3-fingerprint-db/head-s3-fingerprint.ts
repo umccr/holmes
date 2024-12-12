@@ -12,13 +12,11 @@ const s3Client = new S3Client({});
  * @param fingerprintBucketName
  * @param fingerprintFolder
  * @param s3Key
- * @param s3LastModified
  */
 export async function headS3Fingerprint(
   fingerprintBucketName: string,
   fingerprintFolder: string,
-  s3Key: string,
-  s3LastModified: Date
+  s3Key: string
 ): Promise<S3Fingerprint> {
   return s3Client
     .send(
