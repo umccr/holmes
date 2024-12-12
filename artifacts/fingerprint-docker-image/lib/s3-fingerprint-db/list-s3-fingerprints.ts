@@ -9,10 +9,16 @@ import { headS3Fingerprint } from "./head-s3-fingerprint";
  *
  * @param fingerprintBucketName the bucket to list files from
  * @param fingerprintFolder the prefix key to restrict the list to
+ * @param concurrency the concurrency limit for the S3 api calls
+ *
+ * Concurrency was made a parameter here because when run from a Mac,
+ * we get some wierd DNS resolution errors - that I presume are due
+ * to smashing the local DNS server
  */
 export async function* listS3Fingerprints(
   fingerprintBucketName: string,
-  fingerprintFolder: string
+  fingerprintFolder: string,
+  concurrency = 1000
 ): AsyncGenerator<S3Fingerprint> {
   // we have metadata about each fingerprint but only accessible via HEAD
   // on each object
@@ -36,7 +42,7 @@ export async function* listS3Fingerprints(
     // so will set this in prod and adjust
     // S3 documentation talks of limits around 5500 HEAD/second
     // in practice our fingerprint db has around 5000 fingerprintsa
-    concurrency: 1000,
+    concurrency: concurrency,
   })) {
     yield post;
   }

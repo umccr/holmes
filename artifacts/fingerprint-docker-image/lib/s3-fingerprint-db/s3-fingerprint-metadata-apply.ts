@@ -34,23 +34,33 @@ export function s3FingerprintMetadataApply(
 
   const subjectMeta = m ? m["individual-id"] : undefined;
 
-  if (subjectMeta) f.individualId = subjectMeta.trim();
-  else {
+  if (subjectMeta) {
+    f.individualId = subjectMeta.trim();
+    f.individualIdCameFromUrl = false;
+  } else {
     // we can have older samples that used to get subject ids from their BAM URL
     const re = new RegExp(/.*(SBJ\d\d\d\d\d).*/);
     const r = key.match(re);
-    if (r) f.individualId = r[1];
+    if (r) {
+      f.individualId = r[1];
+      f.individualIdCameFromUrl = true;
+    }
   }
 
-  const libraryMeta = m ? m["library-id"] : undefined;
-
-  if (libraryMeta) f.libraryId = libraryMeta.trim();
+  // const libraryMeta = m ? m["library-id"] : undefined;
+  // if (libraryMeta) f.libraryId = libraryMeta.trim();
+  // else {
+  // because Library ids are *always* in the path name we do not store them in the metadata
+  const re = new RegExp(/.*(L\d\d\d\d\d\d\d).*/);
+  const r = key.match(re);
+  if (r) f.libraryId = r[1];
   else {
-    // we can have older libraries that used to get library ids from their BAM URL
-    const re = new RegExp(/.*(L\d\d\d\d\d\d\d).*/);
-    const r = key.match(re);
-    if (r) f.libraryId = r[1];
+    // we can also have external library designations
+    const reExternal = new RegExp(/.*(LPRJ\d\d\d\d\d\d).*/);
+    const rExternal = key.match(reExternal);
+    if (rExternal) f.libraryId = rExternal[1];
   }
+  // }
 
   return f;
 }

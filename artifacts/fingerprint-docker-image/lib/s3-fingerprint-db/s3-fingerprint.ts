@@ -12,6 +12,9 @@ export type S3Fingerprint = {
   // fingerprint artifacts we are using for other purposes
   url?: URL;
 
+  // if present, the library identifier for this fingerprint derived from the URL
+  libraryId?: string;
+
   // if present, the date of when this fingerprint was created (this represents our metadata
   // field not the actual object created date)
   created?: Date;
@@ -23,8 +26,8 @@ export type S3Fingerprint = {
   // if present, the individual identifier for this fingerprint
   individualId?: string;
 
-  // if present, the library identifier for this fingerprint
-  libraryId?: string;
+  // for admin purposes it is useful to know
+  individualIdCameFromUrl?: boolean;
 
   // if present and true, this fingerprint should not ever match with a "check"
   excludeFromCheck?: boolean;
