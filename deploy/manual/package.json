@@ -8,7 +8,7 @@
   },
   "dependencies": {
     "@smithy/abort-controller": "2.2.0",
-    "aws-cdk-lib": "2.171.1",
+    "aws-cdk-lib": "2.177.0",
     "axios-retry": "3.3.1",
     "constructs": "10.4.2",
     "source-map-support": "0.5.21"
