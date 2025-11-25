@@ -41,7 +41,7 @@ UU = unexpected unrelated\n\n`;
     const m = relations[rKey];
 
     // now that we do not have subject ids in the filenames - we need to fetch them to report on them
-    const f = await headS3Fingerprint(
+    const rFingerprint = await headS3Fingerprint(
       fingerprintBucketName,
       fingerprintFolder,
       urlToKey(fingerprintFolder, URL.parse(rKey))
@@ -58,7 +58,7 @@ UU = unexpected unrelated\n\n`;
       m.unexpectedUnrelated.length === 0
         ? 0
         : m.unexpectedUnrelated.length.toString() + " ❌",
-      f.individualId || "<none>",
+      rFingerprint.individualId || "<none>",
     ]);
 
     // if this index has unexpected related - create a breakout table
@@ -66,7 +66,13 @@ UU = unexpected unrelated\n\n`;
     if (m.unexpectedRelated.length > 0) {
       const urTableData: any[][] = [];
 
-      urTableData.push(["Other URL", "Relatedness", "N", "Individual"]);
+      urTableData.push([
+        "Other URL",
+        "Relatedness",
+        "N",
+        "Other Individual",
+        "Index Individual",
+      ]);
 
       for (const ur of m.unexpectedRelated) {
         // similarly for the other samples - it helps to display the subject id
@@ -82,6 +88,7 @@ UU = unexpected unrelated\n\n`;
           ur.relatedness,
           ur.n,
           f.individualId || "<none>",
+          rFingerprint?.individualId || "<none>",
         ]);
       }
 
@@ -100,7 +107,13 @@ UU = unexpected unrelated\n\n`;
     if (m.unexpectedUnrelated.length > 0) {
       const uuTableData: any[][] = [];
 
-      uuTableData.push(["Other URL", "Relatedness", "N", "Individual"]);
+      uuTableData.push([
+        "Other URL",
+        "Relatedness",
+        "N",
+        "Other Individual",
+        "Index Individual",
+      ]);
 
       for (const uu of m.unexpectedUnrelated) {
         // similarly for the other samples - it helps to display the subject id
@@ -116,6 +129,7 @@ UU = unexpected unrelated\n\n`;
           uu.relatedness,
           uu.n,
           f.individualId || "<none>",
+          rFingerprint?.individualId || "<none>",
         ]);
       }
 
