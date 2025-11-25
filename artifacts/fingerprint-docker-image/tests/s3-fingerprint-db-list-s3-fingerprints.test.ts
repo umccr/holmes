@@ -24,12 +24,14 @@ describe("S3 Fingerprint Database List", () => {
     // S3 list results are returned in alphabetic order so so are our fingerprints
     expect(res[0].key).toBe(HG00096_KEY);
     expect(res[0].individualId).toBe("HG00096");
-    expect(res[0].libraryId).toBe("L654321");
+    // there is no library id in the key name so library id will be undefined
+    expect(res[0].libraryId).toBeUndefined();
 
     expect(res[7].key).toBe(
       "fingerprints-for-unit-tests/s3%3A%2F%2Fanother-bucket%2FPTC_ctTSO220404_L2200417.bam.somalier"
     );
     expect(res[7].individualId).toBe("CTDNA");
+    // library id is in the key name so will be present
     expect(res[7].libraryId).toBe("L2200417");
   });
 

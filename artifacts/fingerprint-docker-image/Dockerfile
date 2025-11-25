@@ -1,9 +1,9 @@
-FROM --platform=linux/amd64 brentp/somalier:v0.2.19 AS somalier-real
+FROM --platform=linux/amd64 brentp/somalier:v0.3.1 AS somalier-real
 
 # we are going to grab the compiled somalier binary out of the docker image (our linux bases
 # between our different layers are compatible enough for this to work)
 
-# we have to force a platform of linux/amd64 because somalier only builds for that arch (as of 0.2.19)
+# we have to force a platform of linux/amd64 because somalier only builds for that arch (as of 0.3.1)
 
 FROM --platform=linux/amd64 public.ecr.aws/lambda/nodejs:22 AS lambda-builder
 
