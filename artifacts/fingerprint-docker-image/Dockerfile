@@ -1,4 +1,8 @@
-FROM --platform=linux/amd64 brentp/somalier:v0.3.1 AS somalier-real
+FROM --platform=linux/amd64 brentp/somalier:v0.2.19 AS somalier-real
+# TODO: the docker image introduced at 0.3.1 is missing libraries for our nodejs lambda
+#       I tried my best to get it working (an hour or two) but it seems to have hard dependencies
+#       on specific versions of htslib that then don't work in the aws lambda node image
+#       best to let it settle before we upgrade (Patto Nov 2025)
 
 # we are going to grab the compiled somalier binary out of the docker image (our linux bases
 # between our different layers are compatible enough for this to work)
@@ -37,7 +41,18 @@ RUN npx esbuild entry/lambda-entry-slack-command.ts --bundle --outfile=slack-com
 
 FROM --platform=linux/amd64 public.ecr.aws/lambda/nodejs:22 AS lambda
 
+# this was what was attempted to make this image compatible with somalier 0.3.1
+# libraries needed by somalier
+#RUN dnf update -y && dnf install -y ldconfig procps openblas libgomp bzip2
+# libraries built during the somalier build itself
+#COPY --from=somalier-real /usr/lib/libhts.so* /usr/lib/
+#COPY --from=somalier-real /usr/lib64/libhts.so* /usr/lib64/
+#RUN /sbin/ldconfig
+
+# the actual somalier binary
 COPY --from=somalier-real /usr/bin/somalier ./
+
+# the compiled javscript entrypoints for node
 COPY --from=lambda-builder /var/task/*.cjs ./
 
 # the CMD must be set as part of the lambda definition or docker invoke.. we have no default
