@@ -1,6 +1,6 @@
 {
   "name": "holmes",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "license": "MIT",
   "author": "Andrew Patterson",
   "repository": {
@@ -20,17 +20,17 @@
   },
   "dependencies": {},
   "peerDependencies": {
-    "aws-cdk-lib": "^2.171.1",
-    "constructs": "^10.4.2"
+    "aws-cdk-lib": "^2.229.0",
+    "constructs": "^10.4.3"
   },
   "devDependencies": {
-    "aws-cdk": "2.171.1",
-    "aws-cdk-lib": "2.171.1",
-    "constructs": "10.4.2",
-    "jsii": "5.7.0",
-    "prettier": "3.4.1",
+    "@tsconfig/node24": "24.0.2",
+    "aws-cdk-lib": "2.229.0",
+    "constructs": "10.4.3",
+    "jsii": "5.9.14",
+    "prettier": "3.6.2",
     "source-map-support": "0.5.21",
     "ts-node": "10.9.2",
-    "typescript": "5.7.2"
+    "typescript": "5.9.3"
   }
 }

@@ -151,6 +151,16 @@ export class SomalierExtractStateMachineConstruct extends SomalierBaseStateMachi
       memoryLimitMiB: 4096,
     });
 
+    // Allow the task definition role ecr access to the guardduty agent
+    // https://docs.aws.amazon.com/guardduty/latest/ug/prereq-runtime-monitoring-ecs-support.html#before-enable-runtime-monitoring-ecs
+    // Which is in another account - 005257825471.dkr.ecr.ap-southeast-2.amazonaws.com/aws-guardduty-agent-fargate
+    td.obtainExecutionRole().addManagedPolicy(
+      ManagedPolicy.fromAwsManagedPolicyName(
+        "service-role/AmazonECSTaskExecutionRolePolicy"
+      )
+    );
+
+    // add permissions to the task to read the BAM files from S3
     td.taskRole.addManagedPolicy(
       ManagedPolicy.fromAwsManagedPolicyName("AmazonS3ReadOnlyAccess")
     );

@@ -7,18 +7,17 @@
     "dev-destroy": "cdk --app 'npx ts-node stacks.ts' destroy HolmesLocalDevTestStack"
   },
   "dependencies": {
-    "@smithy/abort-controller": "2.2.0",
-    "aws-cdk-lib": "2.171.1",
-    "axios-retry": "3.3.1",
-    "constructs": "10.4.2",
+    "@smithy/abort-controller": "4.2.5",
+    "aws-cdk-lib": "2.229.0",
+    "constructs": "10.4.3",
     "source-map-support": "0.5.21"
   },
   "devDependencies": {
-    "@tsconfig/node18": "1.0.3",
-    "@types/node": "18.11.17",
-    "aws-cdk": "2.171.1",
-    "prettier": "3.4.1",
+    "@tsconfig/node24": "24.0.2",
+    "@types/node": "24.10.1",
+    "aws-cdk": "2.1033.0",
+    "prettier": "3.6.2",
     "ts-node": "10.9.2",
-    "typescript": "5.7.2"
+    "typescript": "5.9.3"
   }
 }

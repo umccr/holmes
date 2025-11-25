@@ -14,7 +14,7 @@ import { HolmesSettings, STACK_DESCRIPTION } from "../deploy/holmes-settings";
 import { SomalierCheckStateMachineConstruct } from "./somalier-check-state-machine-construct";
 import { Bucket } from "aws-cdk-lib/aws-s3";
 import { Vpc } from "aws-cdk-lib/aws-ec2";
-import { Cluster } from "aws-cdk-lib/aws-ecs";
+import { Cluster, ContainerInsights } from "aws-cdk-lib/aws-ecs";
 import { SomalierExtractStateMachineConstruct } from "./somalier-extract-state-machine-construct";
 import {
   AccountPrincipal,
@@ -66,7 +66,7 @@ export class HolmesApplicationStack extends Stack {
     const cluster = new Cluster(this, "FargateCluster", {
       vpc: vpc,
       enableFargateCapacityProviders: true,
-      containerInsights: true,
+      containerInsightsV2: ContainerInsights.ENABLED,
     });
 
     // we need access to a ICA JWT in order to be able to download from GDS

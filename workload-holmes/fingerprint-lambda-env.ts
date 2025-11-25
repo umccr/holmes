@@ -4,7 +4,7 @@ import { IBucket } from "aws-cdk-lib/aws-s3";
 /**
  * Just a little common function so we can share env variable names
  * between both fargate and lambdas.
- * @param p
+ * @param p properties to turn into environment variables
  */
 export function standardEnv(p: {
   icaSecret: ISecret;
