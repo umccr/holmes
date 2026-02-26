@@ -7,7 +7,7 @@
   },
   "dependencies": {
     "@aws-sdk/abort-controller": "3.342.0",
-    "aws-cdk-lib": "2.229.0",
+    "aws-cdk-lib": "2.240.0",
     "constructs": "10.4.3",
     "source-map-support": "0.5.21"
   },
